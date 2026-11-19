@@ -171,9 +171,13 @@ const workspaceStore = (set, get) => ({
         ws.onopen = () => set({ wsConnected: true });
         ws.onmessage = (event) => {
             try {
-                const packet = JSON.parse(event.data);
-                // Zero React re-renders: update non-reactive ref directly
-                telemetry.current = packet;
+                const message = JSON.parse(event.data);
+                // Messages are typed (see backend/hub.py). Only telemetry is used so far;
+                // 'events' and 'source_status' get wired up with the event panels.
+                if (message.type === 'telemetry') {
+                    // Zero React re-renders: update non-reactive ref directly
+                    telemetry.current = message;
+                }
             } catch (_) {}
         };
         ws.onclose = () => {

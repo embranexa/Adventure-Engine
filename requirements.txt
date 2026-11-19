@@ -1,5 +1,4 @@
 fastapi[standard]
-dominate
-sqlalchemy[asyncio]
+sqlalchemy[asyncio]>=2.0
 aiosqlite
-geopy
+httpx

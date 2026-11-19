@@ -1,6 +1,10 @@
+"""Workspace layout: panel definitions, the default dock tree, and the current layout.
+
+The layout lives in memory, so it resets to DEFAULT_LAYOUT_TREE on server restart.
+"""
+
 import copy
-from typing import Dict, Any
-from pydantic import BaseModel
+from typing import Any
 
 PANELS_METADATA = {
     "p1":  {"id": "p1",  "title": "01 // Scrying Feed",    "category": "OPTIC-ETHER", "status": "LOCKED"},
@@ -16,7 +20,7 @@ PANELS_METADATA = {
     "p11": {"id": "p11", "title": "11 // Soulcore Flux",   "category": "REACTOR",     "status": "99.9%"},
 }
 
-DEFAULT_LAYOUT_TREE: Dict[str, Any] = {
+DEFAULT_LAYOUT_TREE: dict[str, Any] = {
     "id": "root-split",
     "type": "split",
     "direction": "horizontal",
@@ -74,9 +78,19 @@ DEFAULT_LAYOUT_TREE: Dict[str, Any] = {
     },
 }
 
-state_store = {
-    "tree": copy.deepcopy(DEFAULT_LAYOUT_TREE)
-}
 
-class LayoutPayload(BaseModel):
-    tree: Dict[str, Any]
+_state: dict[str, Any] = {"tree": copy.deepcopy(DEFAULT_LAYOUT_TREE)}
+
+
+def get_tree() -> dict[str, Any]:
+    return _state["tree"]
+
+
+def save_tree(tree: dict[str, Any]) -> dict[str, Any]:
+    _state["tree"] = tree
+    return tree
+
+
+def reset_tree() -> dict[str, Any]:
+    _state["tree"] = copy.deepcopy(DEFAULT_LAYOUT_TREE)
+    return _state["tree"]
