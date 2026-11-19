@@ -68,17 +68,10 @@ async def telemetry_socket(websocket: WebSocket):
                 },
             ]
 
-            spectrum = [
-                round(40 + 45 * abs(math.sin(tick + i * 0.55)), 1)
-                for i in range(12)
-            ]
-
             await websocket.send_json({
                 "timestamp": round(time.time(), 1),
-                "sweepAngle": round((tick * 48) % 360, 1),
                 "aetherFlux": round(84.0 + 14.5 * math.sin(tick * 0.6), 1),
                 "entities": entities,
-                "spectrum": spectrum,
             })
             await asyncio.sleep(0.25)
     except WebSocketDisconnect:

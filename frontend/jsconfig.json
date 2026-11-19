@@ -1,0 +1,17 @@
+{
+    // Type-checks the plain JS in js/ inside VS Code. No build step, no Node needed:
+    // VS Code ships its own TypeScript. Types live in types/*.d.ts.
+    "compilerOptions": {
+        "checkJs": true,
+        "noEmit": true,
+        "target": "es2022",
+        "module": "es2022",
+        "moduleResolution": "bundler",
+        "lib": ["es2022", "dom", "dom.iterable"],
+        "strictNullChecks": true,
+        "noImplicitAny": false
+    },
+    "include": ["js/**/*.js", "types/**/*.d.ts"],
+    // Don't auto-download @types via npm: keeps results identical on machines without Node.
+    "typeAcquisition": { "enable": false }
+}

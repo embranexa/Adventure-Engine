@@ -1,25 +1,47 @@
 import { create } from 'zustand';
 
 // --- Pure Tree Helpers ---
+/** @template T @param {T} obj @returns {T} */
 function clone(obj) {
     return JSON.parse(JSON.stringify(obj));
 }
 
+/** @param {LayoutNode} node @param {string} nodeId @param {number} newRatio @returns {LayoutNode} */
 function updateSplitRatio(node, nodeId, newRatio) {
     if (!node) return node;
     if (node.id === nodeId && node.type === 'split') {
         return { ...node, ratio: Math.max(12, Math.min(88, newRatio)) };
     }
     if (node.type === 'split') {
-        return {
-            ...node,
-            first: updateSplitRatio(node.first, nodeId, newRatio),
-            second: updateSplitRatio(node.second, nodeId, newRatio),
-        };
+        const first = updateSplitRatio(node.first, nodeId, newRatio);
+        const second = updateSplitRatio(node.second, nodeId, newRatio);
+        // Keep untouched branches referentially equal so memoized nodes skip rendering
+        if (first === node.first && second === node.second) return node;
+        return { ...node, first, second };
     }
     return node;
 }
 
+/** @param {LayoutNode} node @param {string} leafId @param {PanelId} panelId @returns {LayoutNode} */
+function updateActiveTab(node, leafId, panelId) {
+    if (!node) return node;
+    if (node.type === 'leaf') {
+        return node.id === leafId && node.activeTab !== panelId ? { ...node, activeTab: panelId } : node;
+    }
+    const first = updateActiveTab(node.first, leafId, panelId);
+    const second = updateActiveTab(node.second, leafId, panelId);
+    if (first === node.first && second === node.second) return node;
+    return { ...node, first, second };
+}
+
+const DEFAULT_MAP_PANELS = new Set(['p2', 'p5']);
+
+/** @param {Record<PanelId, boolean>} mapModes @param {PanelId} panelId @returns {boolean} */
+export function isMapActive(mapModes, panelId) {
+    return mapModes[panelId] ?? DEFAULT_MAP_PANELS.has(panelId);
+}
+
+/** @param {LayoutNode | null} node @param {PanelId} panelId @returns {LayoutNode | null} Null when no panels remain. */
 function removePanelFromTree(node, panelId) {
     if (!node) return null;
     if (node.type === 'leaf') {
@@ -39,13 +61,14 @@ function removePanelFromTree(node, panelId) {
     return node;
 }
 
+/** @param {LayoutNode} node @param {string | null} targetLeafId @param {PanelId} panelId @param {DropZone} zone @returns {LayoutNode} */
 function insertPanelAtTarget(node, targetLeafId, panelId, zone) {
-    if (!node) return null;
     if (node.type === 'leaf' && node.id === targetLeafId) {
         if (zone === 'center') {
             const tabs = node.tabs.includes(panelId) ? node.tabs : [...node.tabs, panelId];
             return { ...node, tabs, activeTab: panelId };
         }
+        /** @type {LeafNode} */
         const newLeaf = {
             id: `leaf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             type: 'leaf',
@@ -73,7 +96,8 @@ function insertPanelAtTarget(node, targetLeafId, panelId, zone) {
     return node;
 }
 
-function collectMountedPanels(node, out = new Set()) {
+/** @param {LayoutNode | null} node @param {Set<PanelId>} [out] @returns {Set<PanelId>} */
+export function collectMountedPanels(node, out = new Set()) {
     if (!node) return out;
     if (node.type === 'leaf') node.tabs.forEach((t) => out.add(t));
     if (node.type === 'split') {
@@ -83,26 +107,32 @@ function collectMountedPanels(node, out = new Set()) {
     return out;
 }
 
+/** @param {LayoutNode | null} node @returns {string | null} */
 function findFirstLeafId(node) {
     if (!node) return null;
     if (node.type === 'leaf') return node.id;
     return findFirstLeafId(node.first) || findFirstLeafId(node.second);
 }
 
-// Global telemetry buffer for decoupled 60 FPS canvas consumption
-window.rawTelemetry = {
-    sweepAngle: 0,
+// Non-reactive telemetry buffer: the WebSocket writes `telemetry.current`,
+// canvases read it every frame, and nothing triggers React renders.
+/** @type {{ current: TelemetryPacket }} */
+export const telemetry = { current: {
     aetherFlux: 88.4,
     entities: [
         { id: "VALKYRIE-01", name: "Seraphim Cyber-Knight", faction: "AETHER-CORP", mana: 92, x: 0.5, y: 0.5, color: "#00f0ff" },
         { id: "WRAITH-09", name: "Void Netrunner", faction: "SHADOW-SYNTH", mana: 74, x: 0.4, y: 0.6, color: "#ff2a85" },
         { id: "ARCHON-04", name: "Chrono-Weaver", faction: "SOLARIS-ORDER", mana: 85, x: 0.6, y: 0.4, color: "#f59e0b" },
         { id: "DRACONIC-X", name: "Elder AI Node", faction: "ABYSSAL-NET", mana: 99, x: 0.55, y: 0.65, color: "#a855f7" }
-    ],
-    spectrum: [50, 65, 80, 45, 90, 70, 60, 85, 40, 75, 95, 55]
-};
+    ]
+} };
 
-export const useWorkspaceStore = create((set, get) => ({
+const PERSIST_DEBOUNCE_MS = 300;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let persistTimer;
+
+/** @type {import('zustand').StateCreator<WorkspaceState>} */
+const workspaceStore = (set, get) => ({
     panels: {},
     tree: null,
     draggingPanelId: null,
@@ -111,15 +141,15 @@ export const useWorkspaceStore = create((set, get) => ({
     // UI-level state subscriptions
     wsConnected: false,
     selectedEntityId: 'VALKYRIE-01',
-    mapFilterIds: {},
+    mapModes: {},
 
     setSelectedEntity: (entityId) => set({ selectedEntityId: entityId }),
 
     togglePanelMapMode: (panelId) =>
         set((state) => ({
-            mapFilterIds: {
-                ...state.mapFilterIds,
-                [panelId]: !state.mapFilterIds[panelId],
+            mapModes: {
+                ...state.mapModes,
+                [panelId]: !isMapActive(state.mapModes, panelId),
             },
         })),
 
@@ -143,7 +173,7 @@ export const useWorkspaceStore = create((set, get) => ({
             try {
                 const packet = JSON.parse(event.data);
                 // Zero React re-renders: update non-reactive ref directly
-                window.rawTelemetry = packet;
+                telemetry.current = packet;
             } catch (_) {}
         };
         ws.onclose = () => {
@@ -152,25 +182,34 @@ export const useWorkspaceStore = create((set, get) => ({
         };
     },
 
-    persistLayout: async (nextTree) => {
+    // Updates the tree immediately; the server PUT is debounced so rapid
+    // changes collapse into one request and can't land out of order.
+    persistLayout: (nextTree) => {
         set({ tree: nextTree, syncStatus: 'INSCRIBING...' });
-        try {
-            await fetch('/api/workspace/layout', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tree: nextTree }),
-            });
-            set({ syncStatus: 'AETHER-SYNCED' });
-        } catch (_) {
-            set({ syncStatus: 'LOCAL ONLY' });
-        }
+        clearTimeout(persistTimer);
+        persistTimer = setTimeout(async () => {
+            const sentTree = get().tree;
+            try {
+                await fetch('/api/workspace/layout', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tree: sentTree }),
+                });
+                // Only report synced if nothing changed while the request was in flight
+                if (get().tree === sentTree) set({ syncStatus: 'AETHER-SYNCED' });
+            } catch (_) {
+                set({ syncStatus: 'LOCAL ONLY' });
+            }
+        }, PERSIST_DEBOUNCE_MS);
     },
 
     setDraggingPanel: (panelId) => set({ draggingPanelId: panelId }),
 
     resizeSplit: (splitId, ratio) => {
-        const nextTree = updateSplitRatio(get().tree, splitId, ratio);
-        set({ tree: nextTree });
+        const { tree } = get();
+        if (!tree) return;
+        const nextTree = updateSplitRatio(tree, splitId, ratio);
+        if (nextTree !== tree) set({ tree: nextTree });
     },
 
     commitResize: () => {
@@ -179,17 +218,10 @@ export const useWorkspaceStore = create((set, get) => ({
     },
 
     selectTab: (leafId, panelId) => {
-        const walk = (node) => {
-            if (!node) return node;
-            if (node.type === 'leaf' && node.id === leafId) {
-                return { ...node, activeTab: panelId };
-            }
-            if (node.type === 'split') {
-                return { ...node, first: walk(node.first), second: walk(node.second) };
-            }
-            return node;
-        };
-        get().persistLayout(walk(get().tree));
+        const { tree, persistLayout } = get();
+        if (!tree) return;
+        const nextTree = updateActiveTab(tree, leafId, panelId);
+        if (nextTree !== tree) persistLayout(nextTree);
     },
 
     dockPanel: (panelId, targetLeafId, zone) => {
@@ -221,16 +253,13 @@ export const useWorkspaceStore = create((set, get) => ({
     },
 
     resetWorkspace: async () => {
+        clearTimeout(persistTimer); // a pending layout save must not overwrite the reset
         try {
             const res = await fetch('/api/workspace/reset', { method: 'POST' });
             const data = await res.json();
             set({ panels: data.panels, tree: data.tree, syncStatus: 'RUNES RESTORED' });
         } catch (_) {}
     },
+});
 
-    getUnmountedPanels: () => {
-        const { panels, tree } = get();
-        const mounted = collectMountedPanels(tree);
-        return Object.keys(panels).filter((id) => !mounted.has(id));
-    }
-}));
+export const useWorkspaceStore = create(workspaceStore);

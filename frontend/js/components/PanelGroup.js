@@ -1,20 +1,19 @@
-import { useState, useRef } from 'react';
+import { memo, useState, useRef } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { PanelContent } from './PanelContent.js';
 
-export function PanelGroup({ node }) {
-    const {
-        panels,
-        draggingPanelId,
-        setDraggingPanel,
-        selectTab,
-        dockPanel,
-        closePanel
-    } = useWorkspaceStore();
+/** @param {{ node: LeafNode }} props */
+function PanelGroupImpl({ node }) {
+    const panels = useWorkspaceStore((s) => s.panels);
+    const draggingPanelId = useWorkspaceStore((s) => s.draggingPanelId);
+    const setDraggingPanel = useWorkspaceStore((s) => s.setDraggingPanel);
+    const selectTab = useWorkspaceStore((s) => s.selectTab);
+    const dockPanel = useWorkspaceStore((s) => s.dockPanel);
+    const closePanel = useWorkspaceStore((s) => s.closePanel);
 
-    const [hoverZone, setHoverZone] = useState(null);
-    const groupRef = useRef(null);
+    const [hoverZone, setHoverZone] = useState(/** @type {DropZone | null} */ (null));
+    const groupRef = useRef(/** @type {HTMLDivElement | null} */ (null));
 
     const computeDropZone = (e) => {
         if (!groupRef.current) return 'center';
@@ -97,3 +96,5 @@ export function PanelGroup({ node }) {
         </div>
     `;
 }
+
+export const PanelGroup = memo(PanelGroupImpl);

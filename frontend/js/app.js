@@ -1,27 +1,28 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { html } from './html.js';
-import { useWorkspaceStore } from './store.js';
+import { useWorkspaceStore, collectMountedPanels } from './store.js';
 import { DockNode } from './components/DockNode.js';
 
 function App() {
-    const {
-        panels,
-        tree,
-        syncStatus,
-        wsConnected,
-        selectedEntityId,
-        initWorkspace,
-        resetWorkspace,
-        reopenPanel,
-        getUnmountedPanels
-    } = useWorkspaceStore();
+    // Per-field selectors: App re-renders only when one of these values changes
+    const panels = useWorkspaceStore((s) => s.panels);
+    const tree = useWorkspaceStore((s) => s.tree);
+    const syncStatus = useWorkspaceStore((s) => s.syncStatus);
+    const wsConnected = useWorkspaceStore((s) => s.wsConnected);
+    const selectedEntityId = useWorkspaceStore((s) => s.selectedEntityId);
+    const initWorkspace = useWorkspaceStore((s) => s.initWorkspace);
+    const resetWorkspace = useWorkspaceStore((s) => s.resetWorkspace);
+    const reopenPanel = useWorkspaceStore((s) => s.reopenPanel);
 
     useEffect(() => {
         initWorkspace();
     }, []);
 
-    const unmounted = getUnmountedPanels();
+    const unmounted = useMemo(() => {
+        const mounted = collectMountedPanels(tree);
+        return Object.keys(panels).filter((id) => !mounted.has(id));
+    }, [panels, tree]);
 
     return html`
         <div className="workspace-shell">

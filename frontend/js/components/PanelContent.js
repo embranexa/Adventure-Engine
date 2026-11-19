@@ -1,23 +1,56 @@
 import { useEffect, useRef, useState } from 'react';
 import { html } from '../html.js';
-import { useWorkspaceStore } from '../store.js';
+import { useWorkspaceStore, telemetry, isMapActive as resolveMapActive } from '../store.js';
 
+/** @param {{ panelId: PanelId, radarMode?: boolean }} props */
 function ArcaneVirtualMap({ panelId, radarMode = false }) {
-    const canvasRef = useRef(null);
+    const canvasRef = useRef(/** @type {HTMLCanvasElement | null} */ (null));
     const selectedEntityId = useWorkspaceStore((s) => s.selectedEntityId);
     const setSelectedEntity = useWorkspaceStore((s) => s.setSelectedEntity);
 
     // Persistent interpolation storage per instance
-    const coordsRef = useRef({});
+    const coordsRef = useRef(/** @type {Record<string, { x: number, y: number }>} */ ({}));
+
+    // Read selection through a ref so changing it doesn't restart the draw loop
+    const selectedRef = useRef(selectedEntityId);
+    selectedRef.current = selectedEntityId;
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const parent = canvas.parentElement;
+        const ctx = canvas.getContext('2d');
+        if (!parent || !ctx) return;
+
+        // Logical (CSS pixel) size; the backing store is scaled by devicePixelRatio
+        let w = 0;
+        let h = 0;
+        let gridLayer = null;
+
+        const buildGridLayer = (dpr) => {
+            const layer = document.createElement('canvas');
+            layer.width = canvas.width;
+            layer.height = canvas.height;
+            const g = /** @type {CanvasRenderingContext2D} */ (layer.getContext('2d'));
+            g.scale(dpr, dpr);
+            g.strokeStyle = 'rgba(139, 92, 246, 0.08)';
+            g.lineWidth = 1;
+            const step = 28;
+            g.beginPath();
+            for (let x = 0; x < w; x += step) { g.moveTo(x, 0); g.lineTo(x, h); }
+            for (let y = 0; y < h; y += step) { g.moveTo(0, y); g.lineTo(w, y); }
+            g.stroke();
+            return layer;
+        };
 
         const resizeObserver = new ResizeObserver(() => {
-            canvas.width = parent.clientWidth;
-            canvas.height = parent.clientHeight;
+            const dpr = window.devicePixelRatio || 1;
+            w = parent.clientWidth;
+            h = parent.clientHeight;
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // resizing resets the transform
+            gridLayer = w > 0 && h > 0 ? buildGridLayer(dpr) : null;
         });
         resizeObserver.observe(parent);
 
@@ -25,30 +58,18 @@ function ArcaneVirtualMap({ panelId, radarMode = false }) {
         let sweepAngleLocal = 0;
 
         const draw = () => {
-            const ctx = canvas.getContext('2d');
-            const w = canvas.width;
-            const h = canvas.height;
-
             if (w > 0 && h > 0) {
                 ctx.clearRect(0, 0, w, h);
                 const cx = w / 2;
                 const cy = h / 2;
                 const maxR = Math.min(w, h) * 0.42;
+                const selectedId = selectedRef.current;
 
                 // Read directly from non-reactive buffer
-                const telemetry = window.rawTelemetry || {};
-                const rawEntities = telemetry.entities || [];
+                const rawEntities = telemetry.current.entities || [];
 
-                // --- A. Grid Background ---
-                ctx.strokeStyle = 'rgba(139, 92, 246, 0.08)';
-                ctx.lineWidth = 1;
-                const step = 28;
-                for (let x = 0; x < w; x += step) {
-                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-                }
-                for (let y = 0; y < h; y += step) {
-                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-                }
+                // --- A. Grid Background (pre-rendered on resize) ---
+                if (gridLayer) ctx.drawImage(gridLayer, 0, 0, w, h);
 
                 // --- B. Sacred Geometry Concentric Rings ---
                 [0.35, 0.68, 1.0].forEach((factor, idx) => {
@@ -104,7 +125,7 @@ function ArcaneVirtualMap({ panelId, radarMode = false }) {
 
                 // --- F. Glowing Particle Nodes ---
                 renderedPositions.forEach((pos) => {
-                    const isSel = pos.id === selectedEntityId;
+                    const isSel = pos.id === selectedId;
 
                     if (isSel) {
                         const pulse = 13 + 2.5 * Math.sin(Date.now() / 140);
@@ -138,7 +159,7 @@ function ArcaneVirtualMap({ panelId, radarMode = false }) {
             cancelAnimationFrame(animationFrameId);
             resizeObserver.disconnect();
         };
-    }, [selectedEntityId, radarMode]);
+    }, [radarMode]);
 
     const handleCanvasClick = (e) => {
         const canvas = canvasRef.current;
@@ -149,8 +170,7 @@ function ArcaneVirtualMap({ panelId, radarMode = false }) {
 
         let closest = null;
         let minDist = 0.08;
-        const telemetry = window.rawTelemetry || {};
-        (telemetry.entities || []).forEach((ent) => {
+        (telemetry.current.entities || []).forEach((ent) => {
             const dist = Math.hypot(ent.x - clickX, ent.y - clickY);
             if (dist < minDist) {
                 minDist = dist;
@@ -171,28 +191,26 @@ function ArcaneVirtualMap({ panelId, radarMode = false }) {
     `;
 }
 
+/** @param {{ panelId: PanelId }} props */
 export function PanelContent({ panelId }) {
-    const {
-        panels,
-        selectedEntityId,
-        setSelectedEntity,
-        mapFilterIds,
-        togglePanelMapMode
-    } = useWorkspaceStore();
+    const meta = useWorkspaceStore((s) => s.panels[panelId]) || { title: panelId, category: 'ARCANE', status: 'OK' };
+    const selectedEntityId = useWorkspaceStore((s) => s.selectedEntityId);
+    const setSelectedEntity = useWorkspaceStore((s) => s.setSelectedEntity);
+    const togglePanelMapMode = useWorkspaceStore((s) => s.togglePanelMapMode);
+    const isMapActive = useWorkspaceStore((s) => resolveMapActive(s.mapModes, panelId));
 
-    // Low-frequency visual polling for HUD statistics without triggering canvas re-renders
-    const [hudData, setHudData] = useState(() => window.rawTelemetry);
+    // Low-frequency polling for HUD text; the map view draws from the buffer itself,
+    // so the timer only runs while the HUD is showing.
+    const [hudData, setHudData] = useState(() => telemetry.current);
 
     useEffect(() => {
+        if (isMapActive) return;
+        setHudData(telemetry.current);
         const timer = setInterval(() => {
-            setHudData({ ...window.rawTelemetry });
+            setHudData(telemetry.current);
         }, 120); // 8 Hz HUD text update is plenty for human reading
         return () => clearInterval(timer);
-    }, []);
-
-    const meta = panels[panelId] || { title: panelId, category: 'ARCANE', status: 'OK' };
-    const isDefaultMapPanel = panelId === 'p2' || panelId === 'p5';
-    const isMapActive = mapFilterIds[panelId] !== undefined ? mapFilterIds[panelId] : isDefaultMapPanel;
+    }, [isMapActive]);
 
     const activeEntity =
         (hudData.entities || []).find((e) => e.id === selectedEntityId) ||

@@ -1,12 +1,13 @@
-import { useRef, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { PanelGroup } from './PanelGroup.js';
 
-export function DockNode({ node }) {
+/** @param {{ node: LayoutNode | null }} props */
+function DockNodeImpl({ node }) {
     const resizeSplit = useWorkspaceStore((s) => s.resizeSplit);
     const commitResize = useWorkspaceStore((s) => s.commitResize);
-    const containerRef = useRef(null);
+    const containerRef = useRef(/** @type {HTMLDivElement | null} */ (null));
     const [dragging, setDragging] = useState(false);
 
     if (!node) return null;
@@ -70,3 +71,7 @@ export function DockNode({ node }) {
         </div>
     `;
 }
+
+// Memoized: the store keeps untouched subtrees referentially equal, so a
+// resize or tab switch only re-renders the branch that actually changed.
+export const DockNode = memo(DockNodeImpl);
