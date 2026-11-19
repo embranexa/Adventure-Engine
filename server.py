@@ -6,16 +6,16 @@ from fastapi.staticfiles import StaticFiles
 from backend.routes import router as api_router
 
 BASE_DIR = Path(__file__).resolve().parent
-STATIC_DIR = BASE_DIR / "static"
+FRONTEND_DIR = BASE_DIR / "frontend"
 
 app = FastAPI(title="AetherNet // Arcane-Cyberpunk Topology Engine")
 
 app.include_router(api_router, prefix="/api")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend")
 
 @app.get("/")
 async def serve_index():
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 if __name__ == "__main__":
     uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=True)
