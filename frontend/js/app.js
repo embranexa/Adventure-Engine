@@ -4,13 +4,23 @@ import { html } from './html.js';
 import { useWorkspaceStore, collectMountedPanels } from './store.js';
 import { DockNode } from './components/DockNode.js';
 
+/** @param {FeedStatus} status */
+function feedLabel(status) {
+    switch (status.state) {
+        case 'online': return '⚡ STREAM: ONLINE';
+        case 'retrying': return `◌ STREAM: RETRY IN ${Math.round((status.retryInMs ?? 0) / 1000)}s`;
+        case 'offline': return '◌ STREAM: OFFLINE';
+        default: return '◌ STREAM: CONNECTING';
+    }
+}
+
 function App() {
     // Per-field selectors: App re-renders only when one of these values changes
     const panels = useWorkspaceStore((s) => s.panels);
     const tree = useWorkspaceStore((s) => s.tree);
-    const syncStatus = useWorkspaceStore((s) => s.syncStatus);
-    const wsConnected = useWorkspaceStore((s) => s.wsConnected);
-    const selectedEntityId = useWorkspaceStore((s) => s.selectedEntityId);
+    const layoutStatus = useWorkspaceStore((s) => s.layoutStatus);
+    const feedStatus = useWorkspaceStore((s) => s.feedStatus);
+    const eventCount = useWorkspaceStore((s) => s.events.length);
     const initWorkspace = useWorkspaceStore((s) => s.initWorkspace);
     const resetWorkspace = useWorkspaceStore((s) => s.resetWorkspace);
     const reopenPanel = useWorkspaceStore((s) => s.reopenPanel);
@@ -29,11 +39,9 @@ function App() {
             <header className="topbar">
                 <div className="topbar-left">
                     <span className="brand">❖ AETHER//NEXUS GRIMOIRE OS</span>
-                    <span className="badge cyan">
-                        ${wsConnected ? '⚡ STREAM: ONLINE' : '◌ STREAM: RECONNECTING'}
-                    </span>
-                    <span className="badge">FOCUS: ${selectedEntityId}</span>
-                    <span className="badge">RUNE-STATE: ${syncStatus}</span>
+                    <span className="badge cyan">${feedLabel(feedStatus)}</span>
+                    <span className="badge">EVENTS: ${eventCount}</span>
+                    <span className="badge">RUNE-STATE: ${layoutStatus}</span>
                 </div>
 
                 <div className="topbar-right">
@@ -54,7 +62,7 @@ function App() {
                         </select>
                     `}
                     <button className="btn btn-primary" onClick=${resetWorkspace}>
-                        ✦ Restore 11-Conduit Sigil
+                        ✦ Restore Conduit Sigil
                     </button>
                 </div>
             </header>
@@ -64,7 +72,7 @@ function App() {
                     ? html`<${DockNode} node=${tree} />`
                     : html`
                         <div style=${{ margin: 'auto', color: '#a78bfa', fontFamily: 'Cinzel, serif' }}>
-                            All arcane conduits banished. Use "+ Summon Conduit" or "Restore 11-Conduit Sigil" above.
+                            All arcane conduits banished. Use "+ Summon Conduit" or "Restore Conduit Sigil" above.
                         </div>
                     `
                 }

@@ -1,0 +1,164 @@
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { html } from '../../html.js';
+import { useWorkspaceStore } from '../../store.js';
+import { addDays, hourOf, layoutWeek, sameDay, startOfWeek } from './calendarLayout.js';
+
+const FIRST_HOUR = 6;   // visible range: 06:00 ...
+const LAST_HOUR = 24;   // ... to midnight
+const HOUR_PX = 28;
+const DEFAULT_SCROLL_HOUR = 9;
+
+const fmtTime = (/** @type {Date} */ d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const fmtDay = (/** @type {Date} */ d) => d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+/** Re-renders the caller every `ms` so the "now" line moves. @param {number} ms */
+function useNow(ms) {
+    const [now, setNow] = useState(() => new Date());
+    useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), ms);
+        return () => clearInterval(timer);
+    }, [ms]);
+    return now;
+}
+
+/**
+ * Memoized: hovering or selecting re-renders only the blocks whose flags changed.
+ * @param {{
+ *   block: import('./calendarLayout.js').CalendarBlock,
+ *   selected: boolean, hovered: boolean,
+ *   selectEvent: WorkspaceState['selectEvent'], hoverEvent: WorkspaceState['hoverEvent'],
+ * }} props
+ */
+function CalendarBlockImpl({ block, selected, hovered, selectEvent, hoverEvent }) {
+    const { event } = block;
+    const className = ['cal-block', selected && 'sel', hovered && 'hov',
+        block.clippedTop && 'clip-top', block.clippedBottom && 'clip-bottom'].filter(Boolean).join(' ');
+    return html`
+        <div
+            className=${className}
+            data-id=${event.id}
+            title=${`${event.title}\n${fmtTime(block.start)} – ${fmtTime(block.end)}`}
+            style=${{
+                '--c': event.color,
+                top: `${block.top * HOUR_PX}px`,
+                height: `${block.height * HOUR_PX}px`,
+                left: `${(block.lane / block.lanes) * 100}%`,
+                width: `${100 / block.lanes}%`,
+            }}
+            onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); selectEvent(event.id, 'calendar'); }}
+            onPointerEnter=${() => hoverEvent(event.id)}
+            onPointerLeave=${() => hoverEvent(null)}
+        >
+            <b>${event.title}</b>
+            <span>${fmtTime(block.start)}</span>
+        </div>
+    `;
+}
+const CalendarBlock = memo(CalendarBlockImpl);
+
+/** Week view of crawled events (Mon–Sun, viewer's local time). */
+export function CalendarPanel() {
+    const events = useWorkspaceStore((s) => s.events);
+    const eventsById = useWorkspaceStore((s) => s.eventsById);
+    const selectedId = useWorkspaceStore((s) => s.selectedEventId);
+    const selectionSource = useWorkspaceStore((s) => s.selectionSource);
+    const hoveredId = useWorkspaceStore((s) => s.hoveredEventId);
+    const selectEvent = useWorkspaceStore((s) => s.selectEvent);
+    const hoverEvent = useWorkspaceStore((s) => s.hoverEvent);
+
+    const now = useNow(60_000);
+    const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+    const scrollRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+    const revealRef = useRef(/** @type {string | null} */ (null));
+
+    const days = useMemo(() => layoutWeek(events, weekStart, FIRST_HOUR, LAST_HOUR), [events, weekStart]);
+    const weekCount = days.reduce((n, d) => n + d.blocks.length, 0);
+
+    // A selection made in another view: jump to that event's week, then scroll to it.
+    useEffect(() => {
+        if (!selectedId || selectionSource === 'calendar') return;
+        const event = eventsById[selectedId];
+        if (!event) return;
+        const target = startOfWeek(new Date(event.start));
+        if (target.getTime() !== weekStart.getTime()) setWeekStart(target);
+        revealRef.current = selectedId;
+    }, [selectedId, selectionSource]);
+
+    // Runs after every render: performs a pending reveal once its block exists.
+    useEffect(() => {
+        const id = revealRef.current;
+        const scroller = scrollRef.current;
+        if (!id || !scroller) return;
+        const el = /** @type {HTMLElement | null} */ (scroller.querySelector(`[data-id="${CSS.escape(id)}"]`));
+        if (!el) return;
+        revealRef.current = null;
+        const top = el.offsetTop, bottom = top + el.offsetHeight;
+        if (top < scroller.scrollTop || bottom > scroller.scrollTop + scroller.clientHeight) {
+            scroller.scrollTo({ top: Math.max(0, top - HOUR_PX), behavior: 'smooth' });
+        }
+    });
+
+    // On a new week (or when events first arrive), scroll to the earliest event, else 9 AM.
+    const hasEvents = events.length > 0;
+    useEffect(() => {
+        const scroller = scrollRef.current;
+        if (!scroller || revealRef.current) return;
+        const tops = days.flatMap((d) => d.blocks.map((b) => b.top));
+        const hour = tops.length ? Math.min(...tops) - 1 : DEFAULT_SCROLL_HOUR - FIRST_HOUR;
+        scroller.scrollTop = Math.max(0, hour) * HOUR_PX;
+    }, [weekStart, hasEvents]);
+
+    const nowHour = hourOf(now);
+    const showNow = nowHour >= FIRST_HOUR && nowHour <= LAST_HOUR;
+    const hours = Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, i) => FIRST_HOUR + i);
+
+    return html`
+        <div className="panel-body calendar" style=${{ '--hour': `${HOUR_PX}px` }}>
+            <div className="cal-bar">
+                <button className="btn cal-btn" title="Previous week" onClick=${() => setWeekStart(addDays(weekStart, -7))}>‹</button>
+                <div className="cal-range">
+                    ${fmtDay(weekStart)} – ${fmtDay(addDays(weekStart, 6))}
+                    <small>${weekCount} event${weekCount === 1 ? '' : 's'}</small>
+                </div>
+                <button className="btn cal-btn" title="Next week" onClick=${() => setWeekStart(addDays(weekStart, 7))}>›</button>
+                <button className="btn cal-btn" onClick=${() => setWeekStart(startOfWeek(new Date()))}>Today</button>
+            </div>
+
+            <div className="cal-head">
+                <div />
+                ${days.map((d) => html`
+                    <div key=${d.date.toDateString()} className=${sameDay(d.date, now) ? 'today' : ''}>
+                        ${d.date.toLocaleDateString([], { weekday: 'short' }).slice(0, 2)} ${d.date.getDate()}
+                    </div>
+                `)}
+            </div>
+
+            <div className="cal-scroll" ref=${scrollRef} onClick=${() => selectEvent(null, 'calendar')}>
+                <div className="cal-grid" style=${{ height: `${(LAST_HOUR - FIRST_HOUR) * HOUR_PX}px` }}>
+                    <div className="cal-gutter">
+                        ${hours.map((h) => html`
+                            <span key=${h} style=${{ top: `${(h - FIRST_HOUR) * HOUR_PX + 1}px` }}>${String(h).padStart(2, '0')}</span>
+                        `)}
+                    </div>
+                    ${days.map((d) => html`
+                        <div key=${d.date.toDateString()} className="cal-col">
+                            ${d.blocks.map((b) => html`
+                                <${CalendarBlock}
+                                    key=${b.event.id}
+                                    block=${b}
+                                    selected=${b.event.id === selectedId}
+                                    hovered=${b.event.id === hoveredId}
+                                    selectEvent=${selectEvent}
+                                    hoverEvent=${hoverEvent}
+                                />
+                            `)}
+                            ${showNow && sameDay(d.date, now) && html`
+                                <div className="cal-now" style=${{ top: `${(nowHour - FIRST_HOUR) * HOUR_PX}px` }} />
+                            `}
+                        </div>
+                    `)}
+                </div>
+            </div>
+        </div>
+    `;
+}

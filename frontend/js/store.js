@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import * as feed from './feed.js';
+import { indexEvents, sameList } from './events.js';
 
 // --- Pure Tree Helpers ---
 /** @template T @param {T} obj @returns {T} */
@@ -32,13 +34,6 @@ function updateActiveTab(node, leafId, panelId) {
     const second = updateActiveTab(node.second, leafId, panelId);
     if (first === node.first && second === node.second) return node;
     return { ...node, first, second };
-}
-
-const DEFAULT_MAP_PANELS = new Set(['p2', 'p5']);
-
-/** @param {Record<PanelId, boolean>} mapModes @param {PanelId} panelId @returns {boolean} */
-export function isMapActive(mapModes, panelId) {
-    return mapModes[panelId] ?? DEFAULT_MAP_PANELS.has(panelId);
 }
 
 /** @param {LayoutNode | null} node @param {PanelId} panelId @returns {LayoutNode | null} Null when no panels remain. */
@@ -114,82 +109,95 @@ function findFirstLeafId(node) {
     return findFirstLeafId(node.first) || findFirstLeafId(node.second);
 }
 
-// Non-reactive telemetry buffer: the WebSocket writes `telemetry.current`,
-// canvases read it every frame, and nothing triggers React renders.
-/** @type {{ current: TelemetryPacket }} */
-export const telemetry = { current: {
-    aetherFlux: 88.4,
-    entities: [
-        { id: "VALKYRIE-01", name: "Seraphim Cyber-Knight", faction: "AETHER-CORP", mana: 92, x: 0.5, y: 0.5, color: "#00f0ff" },
-        { id: "WRAITH-09", name: "Void Netrunner", faction: "SHADOW-SYNTH", mana: 74, x: 0.4, y: 0.6, color: "#ff2a85" },
-        { id: "ARCHON-04", name: "Chrono-Weaver", faction: "SOLARIS-ORDER", mana: 85, x: 0.6, y: 0.4, color: "#f59e0b" },
-        { id: "DRACONIC-X", name: "Elder AI Node", faction: "ABYSSAL-NET", mana: 99, x: 0.55, y: 0.65, color: "#a855f7" }
-    ]
-} };
-
 const PERSIST_DEBOUNCE_MS = 300;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let persistTimer;
+
+/**
+ * Route feed messages into the store. Subscribed once, before the socket opens,
+ * so the snapshot sent on connect is never missed.
+ * @param {() => WorkspaceState} get
+ */
+let feedWired = false;
+function startFeed(get) {
+    if (feedWired) return;
+    feedWired = true;
+    feed.on('events', (msg) => get().setEvents(msg.events));
+    feed.on('source_status', (msg) => get().setSourceStatus(msg.source));
+}
 
 /** @type {import('zustand').StateCreator<WorkspaceState>} */
 const workspaceStore = (set, get) => ({
     panels: {},
     tree: null,
     draggingPanelId: null,
-    syncStatus: 'AWAITING LINK',
+    layoutStatus: 'AWAITING LINK',
 
     // UI-level state subscriptions
-    wsConnected: false,
-    selectedEntityId: 'VALKYRIE-01',
-    mapModes: {},
+    feedStatus: { state: 'connecting' },
 
-    setSelectedEntity: (entityId) => set({ selectedEntityId: entityId }),
-
-    togglePanelMapMode: (panelId) =>
-        set((state) => ({
-            mapModes: {
-                ...state.mapModes,
-                [panelId]: !isMapActive(state.mapModes, panelId),
-            },
-        })),
+    // crawled events + shared selection (every event view reads these)
+    events: [],
+    eventsById: {},
+    selectedEventId: null,
+    hoveredEventId: null,
+    selectionSource: null,
+    sources: {},
 
     initWorkspace: async () => {
         try {
             const res = await fetch('/api/workspace');
             const data = await res.json();
-            set({ panels: data.panels, tree: data.tree, syncStatus: 'AETHER-SYNCED' });
+            set({ panels: data.panels, tree: data.tree, layoutStatus: 'AETHER-SYNCED' });
         } catch (e) {
-            set({ syncStatus: 'OFFLINE MODE' });
+            set({ layoutStatus: 'OFFLINE MODE' });
         }
-        get().connectTelemetrySocket();
+        startFeed(get);
+        feed.start((feedStatus) => set({ feedStatus }));
     },
 
-    connectTelemetrySocket: () => {
-        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${proto}//${window.location.host}/api/ws`);
+    // --- events & sources ---
 
-        ws.onopen = () => set({ wsConnected: true });
-        ws.onmessage = (event) => {
-            try {
-                const message = JSON.parse(event.data);
-                // Messages are typed (see backend/hub.py). Only telemetry is used so far;
-                // 'events' and 'source_status' get wired up with the event panels.
-                if (message.type === 'telemetry') {
-                    // Zero React re-renders: update non-reactive ref directly
-                    telemetry.current = message;
-                }
-            } catch (_) {}
-        };
-        ws.onclose = () => {
-            set({ wsConnected: false });
-            setTimeout(() => get().connectTelemetrySocket(), 2000);
-        };
+    setEvents: (records) => {
+        const { events, eventsById, selectedEventId, hoveredEventId } = get();
+        const next = indexEvents(records, eventsById);
+        if (sameList(next.events, events)) return; // identical broadcast: nothing re-renders
+        /** @type {Partial<WorkspaceState>} */
+        const update = { ...next };
+        if (selectedEventId != null && !next.eventsById[selectedEventId]) {
+            update.selectedEventId = null;
+            update.selectionSource = null;
+        }
+        if (hoveredEventId != null && !next.eventsById[hoveredEventId]) update.hoveredEventId = null;
+        set(update);
+    },
+
+    selectEvent: (id, source) => {
+        if (id === get().selectedEventId) return;
+        set({ selectedEventId: id, selectionSource: id == null ? null : source });
+    },
+
+    hoverEvent: (id) => {
+        if (id !== get().hoveredEventId) set({ hoveredEventId: id });
+    },
+
+    setSourceStatus: (source) =>
+        set((state) => ({ sources: { ...state.sources, [source.name]: source } })),
+
+    syncSource: async (name) => {
+        try {
+            const res = await fetch(`/api/sources/${encodeURIComponent(name)}/sync`, { method: 'POST' });
+            // 409 = already syncing, which is fine: status updates are on their way
+            if (!res.ok && res.status !== 409) console.error(`[sync:${name}]`, res.status, await res.text());
+        } catch (err) {
+            console.error(`[sync:${name}] request failed`, err);
+        }
     },
 
     // Updates the tree immediately; the server PUT is debounced so rapid
     // changes collapse into one request and can't land out of order.
     persistLayout: (nextTree) => {
-        set({ tree: nextTree, syncStatus: 'INSCRIBING...' });
+        set({ tree: nextTree, layoutStatus: 'INSCRIBING...' });
         clearTimeout(persistTimer);
         persistTimer = setTimeout(async () => {
             const sentTree = get().tree;
@@ -200,9 +208,9 @@ const workspaceStore = (set, get) => ({
                     body: JSON.stringify({ tree: sentTree }),
                 });
                 // Only report synced if nothing changed while the request was in flight
-                if (get().tree === sentTree) set({ syncStatus: 'AETHER-SYNCED' });
+                if (get().tree === sentTree) set({ layoutStatus: 'AETHER-SYNCED' });
             } catch (_) {
-                set({ syncStatus: 'LOCAL ONLY' });
+                set({ layoutStatus: 'LOCAL ONLY' });
             }
         }, PERSIST_DEBOUNCE_MS);
     },
@@ -261,7 +269,7 @@ const workspaceStore = (set, get) => ({
         try {
             const res = await fetch('/api/workspace/reset', { method: 'POST' });
             const data = await res.json();
-            set({ panels: data.panels, tree: data.tree, syncStatus: 'RUNES RESTORED' });
+            set({ panels: data.panels, tree: data.tree, layoutStatus: 'RUNES RESTORED' });
         } catch (_) {}
     },
 });

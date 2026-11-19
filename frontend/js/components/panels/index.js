@@ -1,0 +1,12 @@
+// Panel registry: maps a panel's `kind` (set in backend/services/workspace.py)
+// to the component that renders its body. To add a panel type, add a component
+// here and give a panel that kind on the server.
+
+import { CalendarPanel } from './CalendarPanel.js';
+import { NodeCard } from './NodeCard.js';
+
+/** @type {Record<PanelKind, (props: { panelId: PanelId }) => any>} */
+export const PANEL_COMPONENTS = {
+    node: NodeCard,
+    calendar: CalendarPanel,
+};

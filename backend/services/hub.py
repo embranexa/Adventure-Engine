@@ -1,7 +1,6 @@
 """WebSocket hub: tracks connected browsers and pushes typed messages to them.
 
 Every message is a JSON object with a "type" field:
-    telemetry      fake map entities, ~4x/second (placeholder data)
     events         {"events": [...]}  full event list, on connect and after each sync
     source_status  {"source": {...}}  a crawler's status changed
 """
