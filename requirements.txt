@@ -1,0 +1,5 @@
+fastapi[standard]
+dominate
+sqlalchemy[asyncio]
+aiosqlite
+geopy
