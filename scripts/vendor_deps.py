@@ -6,9 +6,12 @@ are committed so the app works offline and without this script.
 
     python scripts/vendor_deps.py
 
-Each package is fetched from esm.sh as a single pre-bundled ES module.
-`react` is kept external everywhere so the page shares one React instance
-(the import map in frontend/index.html points "react" at vendor/react.js).
+Two kinds of dependency:
+  DEPS   ES modules for the import map, fetched from esm.sh as single pre-bundled
+         files. `react` is kept external everywhere so the page shares one React
+         instance (the import map in frontend/index.html points "react" at vendor/react.js).
+  FILES  Plain files saved byte-for-byte (browser builds that set a global, CSS),
+         e.g. the map libraries, which frontend/js/lib/loadScript.js loads on demand.
 """
 
 import re
@@ -27,6 +30,14 @@ DEPS = {
     "htm":              ("htm@3.1.1",               "htm.js",              ""),
 }
 
+# output file -> exact URL (pin versions in the URL)
+FILES = {
+    # three.js r128: the version the legacy map's 3D code was written against
+    "three.min.js":     "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+    "maplibre-gl.js":   "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js",
+    "maplibre-gl.css":  "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css",
+}
+
 # Bare imports a vendored file may still contain; each must be in the import map.
 ALLOWED_BARE_IMPORTS = {"react"}
 
@@ -39,10 +50,22 @@ IMPORT_RE = re.compile(
 )
 
 
-def fetch(url: str) -> str:
+def fetch_bytes(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "vendor-deps-script"})
-    with urllib.request.urlopen(req, timeout=30) as res:
-        return res.read().decode("utf-8")
+    with urllib.request.urlopen(req, timeout=60) as res:
+        return res.read()
+
+
+def fetch(url: str) -> str:
+    return fetch_bytes(url).decode("utf-8")
+
+
+def vendor_file(out_name: str, url: str) -> None:
+    data = fetch_bytes(url)
+    if not data:
+        raise RuntimeError(f"{out_name}: empty download from {url}")
+    (VENDOR_DIR / out_name).write_bytes(data)
+    print(f"  {out_name:<18} -> frontend/vendor/{out_name} ({len(data) // 1024} KB)")
 
 
 def vendor(specifier: str, pkg: str, out_name: str, extra: str) -> None:
@@ -69,6 +92,8 @@ def main() -> int:
     try:
         for specifier, (pkg, out_name, extra) in DEPS.items():
             vendor(specifier, pkg, out_name, extra)
+        for out_name, url in FILES.items():
+            vendor_file(out_name, url)
     except Exception as e:  # noqa: BLE001 - surface any failure plainly
         print(f"Failed: {e}", file=sys.stderr)
         return 1

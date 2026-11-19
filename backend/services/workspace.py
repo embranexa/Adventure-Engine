@@ -10,15 +10,23 @@ from typing import Any
 PANELS_METADATA = {
     "node":     {"id": "node",     "title": "Node // What",     "category": "EVENT-LOCK", "status": "LIVE", "kind": "node"},
     "calendar": {"id": "calendar", "title": "Calendar // When", "category": "CHRONO-MAP", "status": "LIVE", "kind": "calendar"},
+    "map":      {"id": "map",      "title": "Map // Where",     "category": "LEY-GRID",   "status": "LIVE", "kind": "map"},
 }
 
 DEFAULT_LAYOUT_TREE: dict[str, Any] = {
     "id": "root-split",
     "type": "split",
     "direction": "horizontal",
-    "ratio": 28,
+    "ratio": 26,
     "first": {"id": "leaf-node", "type": "leaf", "tabs": ["node"], "activeTab": "node"},
-    "second": {"id": "leaf-calendar", "type": "leaf", "tabs": ["calendar"], "activeTab": "calendar"},
+    "second": {
+        "id": "main-split",
+        "type": "split",
+        "direction": "vertical",
+        "ratio": 60,
+        "first": {"id": "leaf-map", "type": "leaf", "tabs": ["map"], "activeTab": "map"},
+        "second": {"id": "leaf-calendar", "type": "leaf", "tabs": ["calendar"], "activeTab": "calendar"},
+    },
 }
 
 

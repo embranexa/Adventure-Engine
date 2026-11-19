@@ -3,10 +3,12 @@
 // here and give a panel that kind on the server.
 
 import { CalendarPanel } from './CalendarPanel.js';
+import { MapPanel } from './MapPanel.js';
 import { NodeCard } from './NodeCard.js';
 
 /** @type {Record<PanelKind, (props: { panelId: PanelId }) => any>} */
 export const PANEL_COMPONENTS = {
     node: NodeCard,
     calendar: CalendarPanel,
+    map: MapPanel,
 };
