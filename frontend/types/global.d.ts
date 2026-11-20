@@ -25,7 +25,7 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'filters';
+type PanelKind = 'node' | 'calendar' | 'map' | 'filters' | 'classifier';
 
 interface PanelMeta {
     id: PanelId;

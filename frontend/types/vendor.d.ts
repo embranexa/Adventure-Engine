@@ -42,6 +42,10 @@ declare module 'react' {
     export default React;
 }
 
+// three.js (classifier) is used without types
+declare module 'three';
+declare module 'three/addons/controls/OrbitControls.js';
+
 declare module 'react-dom/client' {
     export function createRoot(container: Element | null): { render(element: any): void; unmount(): void };
 }

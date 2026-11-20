@@ -12,6 +12,7 @@ PANELS_METADATA = {
     "calendar": {"id": "calendar", "title": "Calendar // When", "category": "CHRONO-MAP", "status": "LIVE", "kind": "calendar"},
     "map":      {"id": "map",      "title": "Map // Where",     "category": "LEY-GRID",   "status": "LIVE", "kind": "map"},
     "filters":  {"id": "filters",  "title": "Filters // Which", "category": "SIEVE",      "status": "LIVE", "kind": "filters"},
+    "classifier": {"id": "classifier", "title": "Assay // Why", "category": "KNOWLEDGE-GRAPH", "status": "LIVE", "kind": "classifier"},
 }
 
 DEFAULT_LAYOUT_TREE: dict[str, Any] = {
@@ -32,7 +33,14 @@ DEFAULT_LAYOUT_TREE: dict[str, Any] = {
         "type": "split",
         "direction": "vertical",
         "ratio": 60,
-        "first": {"id": "leaf-map", "type": "leaf", "tabs": ["map"], "activeTab": "map"},
+        "first": {
+            "id": "top-split",
+            "type": "split",
+            "direction": "horizontal",
+            "ratio": 50,
+            "first": {"id": "leaf-classifier", "type": "leaf", "tabs": ["classifier"], "activeTab": "classifier"},
+            "second": {"id": "leaf-map", "type": "leaf", "tabs": ["map"], "activeTab": "map"},
+        },
         "second": {"id": "leaf-calendar", "type": "leaf", "tabs": ["calendar"], "activeTab": "calendar"},
     },
 }

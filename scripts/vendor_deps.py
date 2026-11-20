@@ -28,6 +28,11 @@ DEPS = {
     "react-dom/client": ("react-dom@18.3.1/client", "react-dom-client.js", "&external=react"),
     "zustand":          ("zustand@4.5.2",           "zustand.js",          "&external=react"),
     "htm":              ("htm@3.1.1",               "htm.js",              ""),
+    # modern three.js for the classifier (the map keeps its own older global build, below)
+    "three":            ("three@0.170.0",           "three.module.js",     ""),
+    "three/addons/controls/OrbitControls.js":
+                        ("three@0.170.0/examples/jsm/controls/OrbitControls.js",
+                                                    "three-orbit-controls.js", "&external=three"),
 }
 
 # output file -> exact URL (pin versions in the URL)
@@ -39,7 +44,7 @@ FILES = {
 }
 
 # Bare imports a vendored file may still contain; each must be in the import map.
-ALLOWED_BARE_IMPORTS = {"react"}
+ALLOWED_BARE_IMPORTS = {"react", "three"}
 
 VENDOR_DIR = Path(__file__).resolve().parent.parent / "frontend" / "vendor"
 # Matches real import/export-from statements (`import"x"`, `import{a}from"x"`,
@@ -83,7 +88,7 @@ def vendor(specifier: str, pkg: str, out_name: str, extra: str) -> None:
 
     header = f"/* {specifier} — vendored from {ESM}{bundle_paths[0]} by scripts/vendor_deps.py */\n"
     (VENDOR_DIR / out_name).write_text(header + code, encoding="utf-8")
-    print(f"  {specifier:<18} -> frontend/vendor/{out_name} ({len(code) // 1024} KB)")
+    print(f"  {specifier[:18]:<18} -> frontend/vendor/{out_name} ({len(code) // 1024} KB)")
 
 
 def main() -> int:

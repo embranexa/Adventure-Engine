@@ -1,6 +1,6 @@
 # Classifier & Discovery — design
 
-Status: concept agreed 2026-11-19, not built yet.
+Status: concept agreed 2026-11-19; parts 1–3 built (see section 8).
 Related: `features.md` (adventure lifecycle phases, panel list).
 
 ## 1. Purpose
@@ -163,14 +163,18 @@ A hybrid look: **space at a distance, trading cards up close.**
   count; zooming in breaks it into its adventures. Exploring the classifier is like
   travelling through space.
 - **Up close, adventures are cards** showing the cover image and title (more fields later).
-  Cover images will be fetched by the backend and served to the page, since the image
-  hosts may not allow them to be used as 3D textures directly.
+  As built, cards are HTML overlays positioned over the 3D scene (like the map's cards),
+  so any image URL works without the backend fetching and re-serving images.
 - **Which stars show:** always the active filters, the Hermetic Seal and the portal; other
   parent types are layers you switch on.
 - **Shared selection and hover** with the node card, calendar and map.
-- Likely a custom three.js scene rather than `3d-force-graph`, which isn't built for
-  swapping detail by zoom level. Uses one modern three.js loaded as an ES module (the map
-  keeps its own older copy).
+- **Interaction (as built):** click a star to cycle its filter (include → exclude → off; the
+  Seal toggles), right-click a star to collapse it, click a galaxy to fly in, click an
+  adventure to select it everywhere. A Layers bar chooses which parent types show as stars.
+- A custom three.js scene (not `3d-force-graph`, which isn't built for swapping detail by
+  zoom level), using three r170 loaded as an ES module only when the panel opens; the map
+  keeps its own older copy. Code: `frontend/js/lib/classifierGraph.js` (model + layout) and
+  `frontend/js/lib/classifierScene.js` (scene).
 
 ## 8. Build order
 
