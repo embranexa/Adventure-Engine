@@ -3,6 +3,7 @@
     event_sources  one row per crawler (luma, ...) with its sync status
     events         raw crawled events ("omens"), unique per (source, api_id), each with a review state
     adventures     the events you kept (plus, later, hand-made ones), each with a lifecycle phase
+                   and an optional action roadmap
     app_state      small JSON settings that must survive restarts (filters, saved places)
 
 Stage names (Sensorium, Hopper, Assay, ...) are only for display: see
@@ -89,6 +90,8 @@ class Adventure(Base):
     phase: Mapped[str] = mapped_column(String(20), default="queued")
     phase_before_kill: Mapped[str | None] = mapped_column(String(20))  # restored on revive
     stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # set by hand (HP, ATK, ...)
+    # action roadmap (Alembic): {actions, edges, done}; see backend/services/roadmap.py
+    roadmap: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     phase_changed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 

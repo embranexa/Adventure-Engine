@@ -7,6 +7,8 @@ const ICON_PATHS = {
     flask: html`<path d="M6 1.5h4M6.8 1.5v4.2L2.6 12.6A1.3 1.3 0 0 0 3.7 14.5h8.6a1.3 1.3 0 0 0 1.1-1.9L9.2 5.7V1.5"></path><path d="M4.4 10h7.2"></path>`,
     compass: html`<circle cx="8" cy="8" r="6.3"></circle><path d="M8 3.6l1.6 4.4L8 12.4 6.4 8z"></path>`,
     clock: html`<circle cx="8" cy="8" r="6.3"></circle><path d="M8 4.3V8l2.6 1.6"></path>`,
+    alembic: html`<circle cx="5.8" cy="10" r="4.2"></circle><path d="M8.4 6.7L14.6 3.6v3.2"></path><path d="M2 10.6h7.6"></path>`,
+    scroll: html`<path d="M4.5 2.5h8a1.6 1.6 0 0 1 0 3.2H11v7.6a1.6 1.6 0 0 1-1.6 1.6H3.2a1.6 1.6 0 0 1 0-3.2h1.3z"></path><path d="M6.6 7.2h2.8M6.6 9.8h2.8"></path>`,
 };
 
 /** @param {{ name: PanelIcon | string, size?: number }} props */

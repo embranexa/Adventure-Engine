@@ -66,6 +66,7 @@ def adventure_to_dict(a: Adventure, e: Event | None, source_name: str | None) ->
         "phase": a.phase,
         "phase_before_kill": a.phase_before_kill,
         "stats": a.stats,
+        "roadmap": a.roadmap,
     }
 
 

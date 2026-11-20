@@ -646,9 +646,207 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .pass-btn:disabled { opacity: 0.35; cursor: default; box-shadow: none; text-shadow: none; }
 .tray .btn { padding: 4px 10px; font-size: 11px; border-radius: 4px; }
 
+.btn:disabled { opacity: 0.4; cursor: default; border-color: var(--steel-2); color: var(--text-dim); }
+.btn.on { border-color: var(--text-muted); color: var(--text-bright); background: rgba(255, 255, 255, 0.07); }
+
+/* ═════════ Alembic: an adventure's action roadmap (scene in js/lib/alembicScene.js) ═════════ */
+.alembic { padding: 0; --amber: var(--m-distillate); }
+.alm-host, .alm-root { position: absolute; inset: 0; overflow: hidden; }
+.alm-root canvas { display: block; width: 100%; height: 100%; }
+.alm-labels { position: absolute; inset: 0; z-index: 10; pointer-events: none; overflow: hidden; }
+.alm-label {
+    position: absolute; left: 0; top: 0; will-change: transform; pointer-events: auto; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 1px; max-width: 150px; padding: 3px 7px 4px;
+    border-radius: 4px; background: rgba(5, 6, 8, 0.78); box-shadow: inset 0 0 0 1px var(--steel-2);
+    color: var(--text-muted); text-align: center; transition: box-shadow .15s, color .15s;
+}
+.alm-label b { font: 600 9px var(--font-mono); letter-spacing: 0.06em; color: var(--text-dim); }
+.alm-label span {
+    font: 600 11px var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; line-height: 1.15;
+    max-width: 136px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.alm-label[data-state="locked"] { opacity: 0.62; }
+.alm-label[data-state="ready"] { color: #f3dc8a; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 55%, transparent); }
+.alm-label[data-state="ready"] b { color: var(--amber); }
+.alm-label[data-state="done"] { color: var(--text-bright); box-shadow: inset 0 0 0 1px var(--amber), 0 0 12px color-mix(in srgb, var(--amber) 40%, transparent); }
+.alm-label[data-state="done"] b { color: var(--amber); }
+.alm-label.hover { color: var(--text-bright); opacity: 1; }
+.alm-label.selected { outline: 1px solid #fff; outline-offset: 1px; opacity: 1; }
+.alm-label.linking { outline: 1px dashed var(--accent-light); outline-offset: 2px; }
+
+.alm-overlay-empty { position: absolute; inset: 0; height: auto; z-index: 20; pointer-events: none; }
+
+.alm-hud {
+    position: absolute; z-index: 20; top: 10px; left: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 5px 8px; border-radius: 6px; background: rgba(5, 6, 8, 0.72); box-shadow: inset 0 0 0 1px var(--steel-2);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.alm-progress {
+    display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; color: var(--text-dim);
+    font: 600 11px var(--font-display); letter-spacing: 0.16em; text-transform: uppercase;
+}
+.alm-progress b { color: var(--amber); font-weight: 700; text-shadow: 0 0 8px color-mix(in srgb, var(--amber) 50%, transparent); }
+.alm-meter {
+    position: relative; display: inline-block; width: 64px; height: 4px; border-radius: 2px; overflow: hidden;
+    background: var(--steel-1); box-shadow: inset 0 0 0 1px var(--steel-2);
+}
+.alm-meter i {
+    position: absolute; inset: 0 auto 0 0; border-radius: 2px; transition: width .4s ease;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--meter, var(--m-distillate)) 60%, #000), var(--meter, var(--m-distillate)));
+    box-shadow: 0 0 6px var(--meter, var(--m-distillate));
+}
+
+.alm-empty {
+    position: absolute; z-index: 20; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(340px, calc(100% - 32px)); padding: 18px 20px; border-radius: 8px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    background: rgba(5, 6, 8, 0.82); box-shadow: inset 0 0 0 1px var(--steel-2), 0 18px 40px rgba(0, 0, 0, 0.6);
+}
+.alm-empty > span { color: var(--text-muted); font: 600 14px var(--font-display); letter-spacing: 0.26em; text-transform: uppercase; }
+.alm-empty small { color: var(--text-dim); font: 500 12px var(--font-body); line-height: 1.45; }
+.alm-empty > div { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+
+.alm-script {
+    position: absolute; z-index: 25; top: 50px; right: 10px; bottom: 10px;
+    width: min(380px, calc(100% - 20px)); display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px;
+    border-radius: 6px; background: #07080a; box-shadow: inset 0 0 0 1px var(--steel-3), 0 18px 40px rgba(0, 0, 0, 0.6);
+}
+.alm-script-head {
+    display: flex; align-items: center; gap: 8px; color: var(--text-muted);
+    font: 600 11px var(--font-display); letter-spacing: 0.22em; text-transform: uppercase;
+}
+.alm-script-head em { font: 500 10px var(--font-mono); font-style: normal; letter-spacing: 0; text-transform: none; color: var(--pending); }
+.alm-script-head .pclose { margin-left: auto; }
+.alm-script-text {
+    flex: 1 1 auto; min-height: 90px; resize: none; padding: 8px; border-radius: 4px; outline: none; user-select: text;
+    border: 1px solid var(--steel-2); background: rgba(0, 0, 0, 0.45); color: var(--text);
+    font: 500 12px/1.55 var(--font-mono); tab-size: 4;
+}
+.alm-script-text:focus { border-color: var(--steel-4); }
+.alm-script-help, .alm-script-error { font: 500 10px var(--font-mono); line-height: 1.4; }
+.alm-script-help { color: var(--text-dim); }
+.alm-script-error { color: var(--danger); user-select: text; }
+.alm-script-actions { display: flex; gap: 6px; }
+.alm-script-actions .btn { padding: 4px 12px; font-size: 11px; border-radius: 4px; }
+
+.alm-notice {
+    position: absolute; z-index: 26; top: 52px; left: 50%; transform: translateX(-50%);
+    max-width: calc(100% - 24px); padding: 5px 12px; border-radius: 4px; pointer-events: none; text-align: center;
+    background: rgba(5, 6, 8, 0.88); box-shadow: inset 0 0 0 1px var(--steel-3);
+    color: var(--text); font: 500 11px var(--font-body);
+}
+.alm-notice.link { color: var(--accent-light); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent); }
+
+.alm-bottom {
+    position: absolute; z-index: 22; left: 10px; right: 10px; bottom: 10px; pointer-events: none;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+}
+.alm-bottom > * { pointer-events: auto; }
+.alm-bottom > .alm-hint { position: static; pointer-events: none; }
+.alm-bar {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 100%; padding: 6px 8px; border-radius: 6px;
+    background: rgba(5, 6, 8, 0.85); box-shadow: inset 0 0 0 1px var(--steel-3);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.alm-bar .btn { padding: 3px 10px; font-size: 11px; border-radius: 4px; }
+.alm-bar-id {
+    padding: 2px 6px; border-radius: 3px; font: 600 10px var(--font-mono);
+    box-shadow: inset 0 0 0 1px var(--steel-3); color: var(--text-dim);
+}
+.alm-bar-id.state-ready { color: var(--amber); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 55%, transparent); }
+.alm-bar-id.state-done { color: #000; background: var(--amber); box-shadow: none; }
+.alm-bar-title {
+    flex: 1 1 140px; min-width: 100px; padding: 3px 6px; border-radius: 3px; outline: none; user-select: text;
+    border: 1px solid transparent; background: transparent; color: var(--text-bright); font: 500 13px var(--font-body);
+}
+.alm-bar-title:hover { border-color: var(--steel-2); }
+.alm-bar-title:focus { border-color: var(--steel-4); background: rgba(0, 0, 0, 0.4); }
+.alm-bar-locked { color: var(--text-dim); font: 600 11px var(--font-display); letter-spacing: 0.16em; text-transform: uppercase; padding: 0 4px; cursor: help; }
+.btn.alm-complete.ready { border-color: color-mix(in srgb, var(--amber) 70%, transparent); color: #f8e7a6; box-shadow: 0 0 10px color-mix(in srgb, var(--amber) 25%, transparent); }
+.btn.alm-complete.ready:hover { border-color: var(--amber); color: #fff; }
+.btn.alm-delete:hover { border-color: var(--danger); color: var(--danger); }
+
+/* ═════════ Quests: the Crucible's quest log ═════════ */
+.quests { padding: 10px 12px; gap: 10px; --alloy: var(--m-alloy); }
+.ql-head { flex-shrink: 0; color: var(--text-dim); font: 600 12px var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; }
+.ql-head b { color: var(--alloy); font-weight: 700; text-shadow: 0 0 8px color-mix(in srgb, var(--alloy) 50%, transparent); }
+.ql-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
+.ql-group {
+    display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 6px;
+    background: rgba(5, 6, 8, 0.5); box-shadow: inset 0 0 0 1px var(--steel-2);
+}
+.ql-group.selected { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alloy) 70%, transparent), 0 0 14px color-mix(in srgb, var(--alloy) 18%, transparent); }
+.ql-adventure {
+    display: flex; align-items: baseline; gap: 8px; padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+    color: var(--text-bright);
+}
+.ql-adventure:disabled { cursor: default; }
+.ql-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14px var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; }
+.ql-adventure:not(:disabled):hover .ql-title { color: #fff; text-shadow: var(--glow-text); }
+.ql-due { flex-shrink: 0; color: var(--text-dim); font: 500 10px var(--font-mono); }
+.ql-progress { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font: 500 10px var(--font-mono); }
+.ql-progress .alm-meter { --meter: var(--alloy); flex: 1 1 auto; max-width: 160px; }
+.ql-none {
+    align-self: flex-start; padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+    color: var(--text-dim); font: italic 500 12px var(--font-body);
+}
+.ql-none:not(:disabled):hover { color: var(--text); }
+.ql-none:disabled { cursor: default; }
+.ql-quest {
+    display: flex; align-items: center; gap: 8px; padding: 4px 2px; border-top: 1px solid rgba(255, 255, 255, 0.04);
+    transition: opacity .3s ease .12s, transform .3s ease .12s;
+}
+.ql-check {
+    flex-shrink: 0; width: 18px; height: 18px; padding: 0; border-radius: 4px; cursor: pointer; display: grid; place-items: center;
+    border: 1px solid color-mix(in srgb, var(--alloy) 60%, var(--steel-3)); background: transparent;
+    transition: background .15s, box-shadow .15s;
+}
+.ql-check svg { width: 12px; height: 12px; fill: none; stroke: #120800; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.ql-check:hover { box-shadow: 0 0 8px color-mix(in srgb, var(--alloy) 45%, transparent); }
+.ql-check:hover svg { opacity: 0.35; stroke: var(--alloy); }
+.ql-quest-title { flex: 1 1 auto; min-width: 0; color: var(--text); font: 500 13px var(--font-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ql-quest-id { flex-shrink: 0; color: var(--text-dim); font: 500 9px var(--font-mono); }
+.ql-quest.completing { opacity: 0; transform: translateX(10px); }
+.ql-quest.completing .ql-check { background: var(--alloy); border-color: var(--alloy); box-shadow: 0 0 12px var(--alloy); }
+.ql-quest.completing .ql-check svg { opacity: 1; stroke: #120800; }
+.ql-quest.completing .ql-quest-title { color: var(--text-dim); text-decoration: line-through; }
+
+/* ═════════ Promote: the reward for a finished roadmap ═════════ */
+@keyframes promote-glow { 0%, 100% { box-shadow: 0 0 14px color-mix(in srgb, var(--c) 45%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+                          50% { box-shadow: 0 0 28px color-mix(in srgb, var(--c) 75%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.2); } }
+@keyframes promote-shine { 0% { transform: translateX(-120%) skewX(-20deg); } 60%, 100% { transform: translateX(260%) skewX(-20deg); } }
+@keyframes promote-spark { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.3); } }
+.promote {
+    --c: #f28a2e; --l: #ffd3a3;
+    position: relative; display: inline-flex; align-items: center; padding: 8px 20px; border-radius: 6px; cursor: pointer; overflow: visible;
+    border: 1px solid var(--l); color: #fff;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--c) 55%, #000), color-mix(in srgb, var(--c) 20%, #000));
+    animation: promote-glow 2.4s ease-in-out infinite; transition: transform .15s, filter .15s;
+}
+.promote:hover { transform: translateY(-1px); filter: brightness(1.15); }
+.promote-shine { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+.promote-shine::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    animation: promote-shine 3.2s ease-in-out infinite;
+}
+.promote-text { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.promote-text small { color: var(--l); font: 600 9px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.85; }
+.promote-text span { font: 700 15px var(--font-display); letter-spacing: 0.2em; text-transform: uppercase; text-shadow: 0 0 10px var(--l); }
+.promote-sparks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.promote-sparks i {
+    position: absolute; left: 0; top: 0; width: 5px; height: 5px; border-radius: 50%; opacity: 0;
+    background: var(--l); box-shadow: 0 0 8px var(--c), 0 0 3px #fff;
+}
+.promote.fired { animation: none; filter: brightness(1.5); box-shadow: 0 0 40px var(--c); cursor: default; }
+.promote.fired .promote-sparks i { animation: promote-spark .6s ease-out forwards; }
+.promote.compact { align-self: flex-start; padding: 5px 12px; }
+.promote.compact .promote-text small { display: none; }
+.promote.compact .promote-text span { font-size: 12px; }
+
 /* While a splitter is dragged: skip the blur and the moving background (re-blurring
    them on every frame is what made resizing stutter), and don't animate layout changes. */
-.is-resizing .glass, .is-resizing .mode-switch, .is-resizing .lm-hud, .is-resizing .ring-ctl, .is-resizing .cls-layers {
+.is-resizing .glass, .is-resizing .mode-switch, .is-resizing .lm-hud, .is-resizing .ring-ctl, .is-resizing .cls-layers, .is-resizing .alm-hud, .is-resizing .alm-bar {
     backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
 }
 .is-resizing .glass { background: linear-gradient(180deg, rgba(14, 16, 20, 0.72), rgba(4, 5, 7, 0.82)); }
@@ -657,5 +855,5 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .is-resizing { cursor: col-resize; }
 
 @media (prefers-reduced-motion: reduce) {
-    .leviathan, .leviathan-bob, .leviathan-body, .lume, .arrow, .breathe, .light i { animation: none !important; }
+    .leviathan, .leviathan-bob, .leviathan-body, .lume, .arrow, .breathe, .light i, .promote, .promote-shine::after { animation: none !important; }
 }

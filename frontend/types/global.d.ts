@@ -25,10 +25,10 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'quests';
 
 /** Icon names drawn by components/PanelTitle.js. */
-type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock';
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'scroll';
 
 /** A panel's definition (backend/services/workspace.py). Its title reads:
  *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
@@ -93,6 +93,17 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     phase: Phase;
     phase_before_kill: Phase | null;
     stats: Record<string, unknown>;
+    /** Action roadmap (Alembic), or null before one is drafted. */
+    roadmap: Roadmap | null;
+}
+
+/** An adventure's action roadmap: a dependency graph (backend/services/roadmap.py). */
+interface Roadmap {
+    actions: { id: string; title: string }[];
+    /** [a, b]: a must be done before b. */
+    edges: [string, string][];
+    /** Ids of completed actions. */
+    done: string[];
 }
 
 /** Something in the current pool: an omen (Discovery mode) or an adventure. */
@@ -221,6 +232,10 @@ interface WorkspaceState {
     killAdventure(adventureId: string): Promise<void>;
     reviveAdventure(adventureId: string): Promise<void>;
     setPhase(adventureId: string, phase: Phase): Promise<void>;
+    /** Replace an adventure's roadmap: shown at once, saved shortly after (latest wins). */
+    saveRoadmap(adventureId: string, roadmap: Roadmap): void;
+    /** Last roadmap save error (shown in the Alembic); cleared by the next save. */
+    roadmapError: string | null;
 
     // filters (saved to the server, debounced)
     /** Draft: cycle one facet value off -> include -> exclude -> off. */

@@ -25,6 +25,14 @@ PANELS_METADATA = {
         "id": "calendar", "kind": "calendar", "icon": "clock",
         "name": "Calendar", "question": "when", "flow": ["matter", "time"],
     },
+    "alembic": {
+        "id": "alembic", "kind": "alembic", "icon": "alembic",
+        "name": "Alembic", "question": "how", "flow": ["essence", "distillate"],
+    },
+    "quests": {
+        "id": "quests", "kind": "quests", "icon": "scroll",
+        "name": "Quests", "question": "now", "flow": ["alloy", "animus"],
+    },
 }
 
 DEFAULT_LAYOUT_TREE: dict[str, Any] = {
@@ -43,10 +51,10 @@ DEFAULT_LAYOUT_TREE: dict[str, Any] = {
             "type": "split",
             "direction": "horizontal",
             "ratio": 50,
-            "first": {"id": "leaf-classifier", "type": "leaf", "tabs": ["classifier"], "activeTab": "classifier"},
+            "first": {"id": "leaf-classifier", "type": "leaf", "tabs": ["classifier", "alembic"], "activeTab": "classifier"},
             "second": {"id": "leaf-map", "type": "leaf", "tabs": ["map"], "activeTab": "map"},
         },
-        "second": {"id": "leaf-calendar", "type": "leaf", "tabs": ["calendar"], "activeTab": "calendar"},
+        "second": {"id": "leaf-calendar", "type": "leaf", "tabs": ["calendar", "quests"], "activeTab": "calendar"},
     },
 }
 

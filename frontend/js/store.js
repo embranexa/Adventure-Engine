@@ -271,6 +271,27 @@ async function actAndAdvance(get, id, action) {
     }
 }
 
+// --- roadmaps: shown at once, saved after a short pause (latest wins) ---
+
+const ROADMAP_SAVE_DEBOUNCE_MS = 250;
+/** Roadmaps edited here and not yet confirmed by the server, by adventure id. */
+const pendingRoadmaps = new Map();
+/** @type {Record<string, ReturnType<typeof setTimeout>>} */
+const roadmapTimers = {};
+
+/**
+ * Put local, unsaved roadmaps over a list from the server, so a broadcast of an older
+ * save doesn't briefly undo a newer edit.
+ * @param {AdventureRecord[]} records
+ */
+function withPendingRoadmaps(records) {
+    if (!pendingRoadmaps.size) return records;
+    return records.map((a) => (pendingRoadmaps.has(a.id) ? { ...a, roadmap: pendingRoadmaps.get(a.id) } : a));
+}
+
+/** @param {Roadmap} roadmap @returns {Roadmap | null} no actions means no roadmap */
+const storedRoadmap = (roadmap) => (roadmap.actions.length ? roadmap : null);
+
 /** @type {import('zustand').StateCreator<WorkspaceState>} */
 const workspaceStore = (set, get) => ({
     panels: {},
@@ -333,8 +354,10 @@ const workspaceStore = (set, get) => ({
     setRawEvents: (records) =>
         set((state) => withVisible(state, { rawEvents: records, ...poolUpdate({ ...state, rawEvents: records }) })),
 
-    setAdventures: (records) =>
-        set((state) => withVisible(state, { adventures: records, ...poolUpdate({ ...state, adventures: records }) })),
+    setAdventures: (incoming) => {
+        const records = withPendingRoadmaps(incoming);
+        set((state) => withVisible(state, { adventures: records, ...poolUpdate({ ...state, adventures: records }) }));
+    },
 
     setMode: (mode) =>
         set((state) => (state.mode === mode
@@ -479,6 +502,43 @@ const workspaceStore = (set, get) => ({
 
     setPhase: async (adventureId, phase) => {
         await callAction(set, `/api/adventures/${adventureId}/phase`, 'PUT', { phase });
+    },
+
+    roadmapError: null,
+
+    saveRoadmap: (adventureId, roadmap) => {
+        const local = storedRoadmap(roadmap);
+        pendingRoadmaps.set(adventureId, local);
+        set((state) => {
+            const adventures = state.adventures.map((a) => (a.id === adventureId ? { ...a, roadmap: local } : a));
+            return withVisible(state, { adventures, roadmapError: null, ...poolUpdate({ ...state, adventures }) });
+        });
+        clearTimeout(roadmapTimers[adventureId]);
+        roadmapTimers[adventureId] = setTimeout(async () => {
+            delete roadmapTimers[adventureId];
+            const sent = pendingRoadmaps.get(adventureId);
+            let error = null;
+            try {
+                const res = await fetch(`/api/adventures/${adventureId}/roadmap`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(sent ?? { actions: [], edges: [], done: [] }),
+                });
+                if (!res.ok) {
+                    const detail = (await res.json().catch(() => null))?.detail;
+                    error = typeof detail === 'string' ? detail : `Roadmap not saved (${res.status})`;
+                }
+            } catch {
+                error = 'Roadmap not saved: server unreachable';
+            }
+            if (pendingRoadmaps.get(adventureId) !== sent) return; // edited again meanwhile: that save follows
+            pendingRoadmaps.delete(adventureId);
+            if (error) {
+                set({ roadmapError: error });
+                // fall back to what the server has
+                fetch('/api/adventures').then((r) => r.json()).then((list) => get().setAdventures(list)).catch(() => {});
+            }
+        }, ROADMAP_SAVE_DEBOUNCE_MS);
     },
 
     setSourceStatus: (source) =>

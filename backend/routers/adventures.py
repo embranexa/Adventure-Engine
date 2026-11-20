@@ -1,15 +1,15 @@
-"""Adventures: list them, move them between phases, kill and revive."""
+"""Adventures: list them, move them between phases, kill and revive, edit roadmaps."""
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.base import get_session
 from backend.db.queries import list_adventures
 from backend.routers.errors import triage_errors
-from backend.schemas.adventures import PhasePayload
-from backend.services import triage
+from backend.schemas.adventures import PhasePayload, RoadmapPayload
+from backend.services import roadmap, triage
 
 router = APIRouter(prefix="/adventures", tags=["adventures"])
 
@@ -25,6 +25,17 @@ async def set_phase(adventure_id: uuid.UUID, payload: PhasePayload):
     with triage_errors():
         await triage.set_phase(adventure_id, payload.phase)
     return {"phase": payload.phase}
+
+
+@router.put("/{adventure_id}/roadmap")
+async def set_roadmap(adventure_id: uuid.UUID, payload: RoadmapPayload):
+    """Replace the adventure's action roadmap (no actions clears it). 422 if it has a cycle."""
+    with triage_errors():
+        try:
+            saved = await roadmap.save_roadmap(adventure_id, payload.model_dump())
+        except roadmap.InvalidRoadmap as e:
+            raise HTTPException(422, str(e)) from e
+    return {"roadmap": saved}
 
 
 @router.post("/{adventure_id}/kill")
