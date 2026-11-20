@@ -57,9 +57,12 @@ export class LevelMap {
 
         const {
             onSelect = () => {}, onHover = () => {},
-            onRingChange = () => {}, onRingPlace = () => {},
+            onRingChange = () => {}, onRingPlace = () => {}, onSiteClick = () => {},
             ...config
         } = options;
+        this.onSiteClick = onSiteClick;   // (site, { x, y } in the map's own pixels) after a site pin click
+        /** @type {Map<string, { marker: any, site: any }>} site id -> pin */
+        this._sites = new Map();
         this.onSelect = onSelect;
         this.onHover = onHover;
         this.onRingChange = onRingChange; // (ring) after dragging the ring's center or edge
@@ -988,7 +991,8 @@ export class LevelMap {
                 .setLngLat([center.lon, center.lat]).addTo(map);
             this._ringCenter.on('drag', () => {
                 const p = this._ringCenter.getLngLat();
-                this._ring.center = { ...this._ring.center, lat: p.lat, lon: p.lng, label: null };
+                // moved by hand: no longer anchored on a site
+                this._ring.center = { ...this._ring.center, lat: p.lat, lon: p.lng, label: null, site_id: null };
                 this._refreshRingShape();
             });
             this._ringCenter.on('dragend', () => this.onRingChange({ ...this._ring, center: { ...this._ring.center } }));
@@ -1028,7 +1032,56 @@ export class LevelMap {
         if (this._ringEdge) this._ringEdge.getElement().firstChild.textContent = this._ringLabel();
     }
 
+    /* ------------------------------------------------------------------ */
+    /*  Sites (virtual objects with a location, from the Codex)            */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Show sites as pins (VObject[] with lat/lon; others are skipped). Clicking a pin calls
+     * onSiteClick(site, point). `anchoredId` marks the site the proximity ring is on.
+     */
+    setSites(sites, anchoredId = null) {
+        const keep = new Set();
+        for (const site of sites) {
+            if (site.lat == null || site.lon == null) continue;
+            keep.add(site.id);
+            let entry = this._sites.get(site.id);
+            if (!entry) {
+                const el = document.createElement('button');
+                el.type = 'button';
+                el.className = 'lm-site';
+                const glyph = document.createElement('i');
+                glyph.textContent = '⌖';
+                const name = document.createElement('span');
+                el.append(glyph, name);
+                entry = { marker: new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([site.lon, site.lat]).addTo(this.map), site };
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation(); // not a click on empty map
+                    const rect = this.container.getBoundingClientRect();
+                    this.onSiteClick(this._sites.get(site.id)?.site ?? site, { x: e.clientX - rect.left, y: e.clientY - rect.top });
+                });
+                this._sites.set(site.id, entry);
+            }
+            entry.site = site;
+            entry.marker.setLngLat([site.lon, site.lat]);
+            const el = entry.marker.getElement();
+            el.lastChild.textContent = site.name; // text only, never parsed as HTML
+            el.title = `${site.name}${site.address ? ` · ${site.address}` : ''}`;
+            el.classList.toggle('anchored', site.id === anchoredId);
+        }
+        for (const [id, entry] of this._sites) {
+            if (!keep.has(id)) { entry.marker.remove(); this._sites.delete(id); }
+        }
+    }
+
+    /** Fly to a point (e.g. a site opened from the Codex). */
+    flyTo(lat, lon) {
+        this.map.flyTo({ center: [lon, lat], zoom: Math.max(this.map.getZoom(), 14), duration: 1200 });
+    }
+
     dispose() {
+        for (const entry of this._sites.values()) entry.marker.remove();
+        this._sites.clear();
         this._ringCenter?.remove();
         this._ringEdge?.remove();
         this._ro?.disconnect();

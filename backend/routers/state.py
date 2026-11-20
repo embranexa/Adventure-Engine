@@ -1,4 +1,4 @@
-"""Persisted settings: applied + draft filters and saved places (survive server restarts)."""
+"""Persisted settings: applied + draft filters (survive server restarts). Saved places became sites."""
 
 from typing import Any
 
@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.base import get_session
 from backend.db.models import AppState
-from backend.schemas.state import FilterState, PlacesState
+from backend.schemas.state import FilterState
 
 router = APIRouter(prefix="/state", tags=["state"])
 
@@ -16,7 +16,6 @@ router = APIRouter(prefix="/state", tags=["state"])
 SCHEMAS: dict[str, type[BaseModel]] = {
     "filters": FilterState,        # applied: what the calendar and map show
     "filters_draft": FilterState,  # the Nexus's pending edits, until "pass through"
-    "places": PlacesState,
 }
 
 

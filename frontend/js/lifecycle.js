@@ -39,6 +39,17 @@ export const ADVENTURE_TYPES = {
     song: { label: 'Song', glyph: '♪', hint: 'A song to write or learn: no when/where' },
 };
 
+/**
+ * Virtual object types (the Codex). Only sites have a location. Same list in
+ * backend/db/models.py.
+ * @type {Record<ObjectType, { label: string, plural: string, glyph: string, hint: string }>}
+ */
+export const OBJECT_TYPES = {
+    pillar: { label: 'Pillar', plural: 'Pillars', glyph: '⟁', hint: 'A theme or project adventures serve' },
+    site: { label: 'Site', plural: 'Sites', glyph: '⌖', hint: 'A place: shows on the Atlas, anchors the proximity ring' },
+    contact: { label: 'Contact', plural: 'Contacts', glyph: '☉', hint: 'A person' },
+};
+
 /** True if this item can have a when/where (an omen, or an event-type adventure). @param {PoolItem} item */
 export function hasWhenWhere(item) {
     return item.kind !== 'adventure' || item.type === 'event';

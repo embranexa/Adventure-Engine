@@ -1,4 +1,4 @@
-"""Shapes of the persisted settings (app_state table). Mirrors FilterState / SavedPlace in
+"""Shapes of the persisted settings (app_state table). Mirrors FilterState in
 frontend/types/global.d.ts; the filtering itself happens in the browser (frontend/js/filters.js)."""
 
 from datetime import date
@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 FilterMode = Literal["include", "exclude"]
-FacetKey = Literal["source", "city", "registration", "type", "phase", "review"]
+FacetKey = Literal["source", "city", "registration", "type", "phase", "review", "pillar", "site", "contact"]
 
 
 class DateRange(BaseModel):
@@ -25,7 +25,8 @@ class DateRange(BaseModel):
 class RingCenter(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
-    label: str | None = Field(None, max_length=100)
+    label: str | None = Field(None, max_length=200)
+    site_id: str | None = Field(None, max_length=64)  # set when the ring is anchored on a site
 
 
 class Ring(BaseModel):
@@ -42,13 +43,3 @@ class FilterState(BaseModel):
     seal: bool = True  # Hermetic Seal (Adventures mode)
     units: Literal["mi", "km"] = "mi"
 
-
-class SavedPlace(BaseModel):
-    id: str = Field(min_length=1, max_length=64)
-    label: str = Field(min_length=1, max_length=100)
-    lat: float = Field(ge=-90, le=90)
-    lon: float = Field(ge=-180, le=180)
-
-
-class PlacesState(BaseModel):
-    places: list[SavedPlace] = Field(default_factory=list, max_length=200)

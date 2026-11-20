@@ -37,7 +37,7 @@ function parseCoords(text) {
  *           placeholder?: string, overridden?: boolean, crawled?: boolean, autoFocus?: boolean,
  *           onCommit: (value: string) => Promise<string | null>, onReset?: () => void }} props
  */
-function Field({ label, value, kind = 'text', placeholder = '', overridden = false, crawled = false, autoFocus = false, onCommit, onReset }) {
+export function Field({ label, value, kind = 'text', placeholder = '', overridden = false, crawled = false, autoFocus = false, onCommit, onReset }) {
     const [draft, setDraft] = useState(value);
     const ref = useRef(/** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (null));
     useEffect(() => setDraft(value), [value]);
@@ -87,6 +87,9 @@ function Field({ label, value, kind = 'text', placeholder = '', overridden = fal
  */
 export function AdventureEditor({ adventure, focusTitle, onDone }) {
     const updateAdventure = useWorkspaceStore((s) => s.updateAdventure);
+    const objects = useWorkspaceStore((s) => s.objects);
+    const selectObject = useWorkspaceStore((s) => s.selectObject);
+    const showPanel = useWorkspaceStore((s) => s.showPanel);
     const [error, setError] = useState(/** @type {string | null} */ (null));
     const [saving, setSaving] = useState(false);
     useEffect(() => setError(null), [adventure.id]);
@@ -94,6 +97,8 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
     const own = adventure.own;
     const crawled = adventure.event_id != null;
     const isEvent = adventure.type === 'event';
+    // a hand-made event with a linked site takes its where from the site
+    const site = !crawled && adventure.site_id ? objects.find((o) => o.id === adventure.site_id) ?? null : null;
 
     /** @param {AdventureChanges} changes @returns {Promise<string | null>} the error, if refused */
     const save = async (changes) => {
@@ -173,14 +178,27 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
                         overridden=${own.end != null} crawled=${crawled}
                         onCommit=${(/** @type {string} */ v) => saveTime('end_time', v)} onReset=${() => save({ end_time: null })} />
                 </div>
-                <${Field} label="Venue" placeholder="Where it happens" ...${text('venue')} />
-                <${Field} label="Address" ...${text('address')} />
-                <div className="ae-pair">
-                    <${Field} label="City" ...${text('city')} />
-                    <${Field} label="Coordinates" placeholder="lat, lon" value=${coordsText(adventure.lat, adventure.lon)}
-                        overridden=${own.lat != null} crawled=${crawled}
-                        onCommit=${saveCoords} onReset=${() => save({ lat: null, lon: null })} />
-                </div>
+                ${site
+                    ? html`
+                        <div className="ae-field">
+                            <span className="ae-label">Where</span>
+                            <div className="ae-site">
+                                <span>⌖ <b>${site.name}</b>${[site.address, site.city].filter(Boolean).length ? ` · ${[site.address, site.city].filter(Boolean).join(', ')}` : ''}</span>
+                                <button type="button" className="cls-layer" onClick=${() => { selectObject(site.id); showPanel('codex'); }}>Open site</button>
+                            </div>
+                            <span className="ae-hint">From its linked site · unlink it below to type a place instead</span>
+                        </div>
+                    `
+                    : html`
+                        <${Field} label="Venue" placeholder="Where it happens (or link a site below)" ...${text('venue')} />
+                        <${Field} label="Address" ...${text('address')} />
+                        <div className="ae-pair">
+                            <${Field} label="City" ...${text('city')} />
+                            <${Field} label="Coordinates" placeholder="lat, lon" value=${coordsText(adventure.lat, adventure.lon)}
+                                overridden=${own.lat != null} crawled=${crawled}
+                                onCommit=${saveCoords} onReset=${() => save({ lat: null, lon: null })} />
+                        </div>
+                    `}
             `}
 
             <${Field} label="Link" kind="url" placeholder="https://…" ...${text('url')} />

@@ -1,42 +1,44 @@
 import { useEffect, useRef, useState } from 'react';
 import { html } from '../../html.js';
-import { useWorkspaceStore } from '../../store.js';
+import { DEFAULT_RING_RADIUS_KM, useWorkspaceStore } from '../../store.js';
 import { LevelMap, loadMapLibraries } from '../../lib/levelMap.js';
 import { KM_PER_MI, formatDistance } from '../../filters.js';
 
-const DEFAULT_RADIUS_KM = 5 * KM_PER_MI;
-
 /**
- * Proximity ring controls: place by clicking the map or from a saved place; set radius,
- * units and include/exclude; save the center as a place; clear.
+ * Proximity ring controls: place by clicking the map or anchor it on a site; set radius,
+ * units and include/exclude; save the center as a new site; clear.
  * @param {{ mapRef: { current: LevelMap | null }, placing: boolean, setPlacing: (v: boolean) => void }} props
  */
 function RingControl({ mapRef, placing, setPlacing }) {
     const ring = useWorkspaceStore((s) => s.filters.ring);
     const units = useWorkspaceStore((s) => s.filters.units);
-    const places = useWorkspaceStore((s) => s.places);
+    const objects = useWorkspaceStore((s) => s.objects);
     const setRing = useWorkspaceStore((s) => s.setRing);
     const setUnits = useWorkspaceStore((s) => s.setUnits);
     const toggleRangeMode = useWorkspaceStore((s) => s.toggleRangeMode);
-    const savePlace = useWorkspaceStore((s) => s.savePlace);
-    const deletePlace = useWorkspaceStore((s) => s.deletePlace);
+    const anchorRingOnSite = useWorkspaceStore((s) => s.anchorRingOnSite);
+    const createObject = useWorkspaceStore((s) => s.createObject);
+    const selectObject = useWorkspaceStore((s) => s.selectObject);
+    const showPanel = useWorkspaceStore((s) => s.showPanel);
     const [naming, setNaming] = useState(false);
     const [name, setName] = useState('');
+    const [error, setError] = useState(/** @type {string | null} */ (null));
+    const sites = objects.filter((o) => o.type === 'site' && o.lat != null && o.lon != null);
+    const anchored = ring?.center.site_id ? objects.find((o) => o.id === ring.center.site_id) : null;
 
     const togglePlacing = () => {
         if (placing) { mapRef.current?.cancelPlacing(); setPlacing(false); }
         else { mapRef.current?.startPlacing(); setPlacing(true); }
     };
 
-    /** @param {string} id */
-    const useSavedPlace = (id) => {
-        const p = places.find((x) => x.id === id);
-        if (!p) return;
-        setRing({
-            center: { lat: p.lat, lon: p.lon, label: p.label },
-            radius_km: ring?.radius_km ?? DEFAULT_RADIUS_KM,
-            mode: ring?.mode ?? 'include',
-        });
+    /** Make the ring's center a new site, and anchor the ring on it. @param {string} siteName */
+    const saveAsSite = async (siteName) => {
+        if (!ring) return;
+        const res = await createObject('site', { name: siteName || 'Site', lat: ring.center.lat, lon: ring.center.lon });
+        if (typeof res === 'string') { setError(res); return; }
+        setError(null);
+        setNaming(false); setName('');
+        anchorRingOnSite(res.id);
     };
 
     const radiusInUnits = ring ? (units === 'mi' ? ring.radius_km / KM_PER_MI : ring.radius_km) : 0;
@@ -46,7 +48,6 @@ function RingControl({ mapRef, placing, setPlacing }) {
         setRing({ ...ring, radius_km: units === 'mi' ? v * KM_PER_MI : v });
     };
 
-    const matchingPlace = ring && places.find((p) => p.lat === ring.center.lat && p.lon === ring.center.lon);
 
     return html`
         <div className="ring-ctl" onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
@@ -56,10 +57,11 @@ function RingControl({ mapRef, placing, setPlacing }) {
                     title="Then click the map to set the ring's center">
                     ${placing ? 'Click the map…' : ring ? 'Move center' : 'Place ring'}
                 </button>
-                ${places.length > 0 && html`
-                    <select className="btn ring-btn" value="" onChange=${(/** @type {any} */ e) => useSavedPlace(e.target.value)}>
-                        <option value="">Saved place…</option>
-                        ${places.map((p) => html`<option key=${p.id} value=${p.id}>${p.label}</option>`)}
+                ${sites.length > 0 && html`
+                    <select className="btn ring-btn" value="" title="Center the ring on a site (from the Codex)"
+                        onChange=${(/** @type {any} */ e) => e.target.value && anchorRingOnSite(e.target.value)}>
+                        <option value="">⌖ Site…</option>
+                        ${sites.map((p) => html`<option key=${p.id} value=${p.id}>${p.name}</option>`)}
                     </select>
                 `}
             </div>
@@ -80,23 +82,46 @@ function RingControl({ mapRef, placing, setPlacing }) {
                 </div>
                 <div className="ring-ctl-row ring-ctl-meta">
                     <span>${ring.center.label || `${ring.center.lat.toFixed(4)}, ${ring.center.lon.toFixed(4)}`} · ${formatDistance(ring.radius_km, units)}</span>
-                    ${matchingPlace
-                        ? html`<button className="ring-link" onClick=${() => deletePlace(matchingPlace.id)}>forget place</button>`
+                    ${anchored
+                        ? html`<button className="ring-link" onClick=${() => { selectObject(anchored.id); showPanel('codex'); }}
+                            title="The ring is anchored on this site and follows it">⌖ open site</button>`
                         : naming
                             ? html`
-                                <form className="ring-name" onSubmit=${(/** @type {Event} */ e) => {
-                                    e.preventDefault();
-                                    savePlace(name || 'Place', ring.center.lat, ring.center.lon);
-                                    setRing({ ...ring, center: { ...ring.center, label: name || 'Place' } });
-                                    setNaming(false); setName('');
-                                }}>
-                                    <input autoFocus placeholder="Name" value=${name} maxLength="100"
+                                <form className="ring-name" onSubmit=${(/** @type {Event} */ e) => { e.preventDefault(); saveAsSite(name.trim()); }}>
+                                    <input autoFocus placeholder="Site name" value=${name} maxLength="200"
                                         onInput=${(/** @type {any} */ e) => setName(e.target.value)} />
                                     <button className="ring-link" type="submit">save</button>
                                 </form>`
-                            : html`<button className="ring-link" onClick=${() => setNaming(true)}>save as place</button>`}
+                            : html`<button className="ring-link" onClick=${() => setNaming(true)} title="Make the center a site in the Codex">save as site</button>`}
                 </div>
+                ${error && html`<div className="ring-ctl-row ring-ctl-error">${error}</div>`}
             `}
+        </div>
+    `;
+}
+
+/**
+ * What to do with a site pin clicked on the Atlas.
+ * @param {{ site: VObject, x: number, y: number, onClose: () => void }} props
+ */
+function SiteMenu({ site, x, y, onClose }) {
+    const anchorRingOnSite = useWorkspaceStore((s) => s.anchorRingOnSite);
+    const selectObject = useWorkspaceStore((s) => s.selectObject);
+    const showPanel = useWorkspaceStore((s) => s.showPanel);
+    const linked = useWorkspaceStore((s) => s.adventures.filter((a) => a.objects.some((o) => o.id === site.id)).length);
+    return html`
+        <div className="site-menu" style=${{ left: `${x}px`, top: `${y}px` }} onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
+            <div className="site-menu-head">
+                <b>⌖ ${site.name}</b>
+                <button className="pclose" onClick=${onClose} aria-label="Close">✕</button>
+            </div>
+            ${(site.address || site.city) && html`<div className="site-menu-sub">${[site.address, site.city].filter(Boolean).join(', ')}</div>`}
+            <div className="site-menu-sub">${linked} linked ${linked === 1 ? 'adventure' : 'adventures'}</div>
+            <div className="site-menu-actions">
+                <button className="btn" onClick=${() => { anchorRingOnSite(site.id); onClose(); }}
+                    title="Center the proximity ring here; it follows the site">◎ Anchor ring</button>
+                <button className="btn ghost" onClick=${() => { selectObject(site.id); showPanel('codex'); onClose(); }}>Open in Codex</button>
+            </div>
         </div>
     `;
 }
@@ -120,6 +145,9 @@ export function MapPanel() {
     const mapRef = useRef(/** @type {LevelMap | null} */ (null));
     const [status, setStatus] = useState(/** @type {'loading' | 'ready' | 'error'} */ ('loading'));
     const [placing, setPlacing] = useState(false);
+    const objects = useWorkspaceStore((s) => s.objects);
+    const atlasFocus = useWorkspaceStore((s) => s.atlasFocus);
+    const [siteMenu, setSiteMenu] = useState(/** @type {{ site: VObject, x: number, y: number } | null} */ (null));
 
     // Create the map once; dispose it when the panel unmounts (tab switch, close).
     useEffect(() => {
@@ -135,12 +163,13 @@ export function MapPanel() {
                     onRingPlace: (/** @type {{ lat: number, lon: number }} */ p) => {
                         const current = store().filters.ring;
                         store().setRing({
-                            center: { lat: p.lat, lon: p.lon, label: null },
-                            radius_km: current?.radius_km ?? DEFAULT_RADIUS_KM,
+                            center: { lat: p.lat, lon: p.lon, label: null, site_id: null },
+                            radius_km: current?.radius_km ?? DEFAULT_RING_RADIUS_KM,
                             mode: current?.mode ?? 'include',
                         });
                         setPlacing(false);
                     },
+                    onSiteClick: (/** @type {VObject} */ site, /** @type {{ x: number, y: number }} */ point) => setSiteMenu({ site, ...point }),
                 });
                 setStatus('ready'); // re-runs the sync effects below with the new map
             })
@@ -173,13 +202,24 @@ export function MapPanel() {
         mapRef.current?.setRing(ring, units);
     }, [ring, units, status]);
 
+    useEffect(() => {
+        mapRef.current?.setSites(objects.filter((o) => o.type === 'site'), ring?.center.site_id ?? null);
+    }, [objects, ring?.center.site_id, status]);
+
+    useEffect(() => {
+        if (atlasFocus) mapRef.current?.flyTo(atlasFocus.lat, atlasFocus.lon);
+    }, [atlasFocus, status]);
+
+    const menuSite = siteMenu && objects.find((o) => o.id === siteMenu.site.id);
+
     return html`
         <div className="panel-body map-panel">
-            <div className="map-host" ref=${hostRef} />
+            <div className="map-host" ref=${hostRef} onPointerDown=${() => setSiteMenu(null)} />
             ${status === 'ready' && html`<${RingControl} mapRef=${mapRef} placing=${placing} setPlacing=${setPlacing} />`}
+            ${menuSite && siteMenu && html`<${SiteMenu} site=${menuSite} x=${siteMenu.x} y=${siteMenu.y} onClose=${() => setSiteMenu(null)} />`}
             ${status !== 'ready' && html`
                 <div className="map-status">
-                    ${status === 'loading' ? 'Loading map…' : 'Map failed to load (see console)'}
+                    ${status === 'loading' ? 'Opening the Atlas…' : 'Atlas failed to load (see console)'}
                 </div>
             `}
         </div>

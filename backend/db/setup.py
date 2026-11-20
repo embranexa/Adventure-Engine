@@ -1,4 +1,4 @@
-"""Database startup: create tables, add new columns, register crawler sources."""
+"""Database startup: create tables, add new columns, register crawler sources, migrate old data."""
 
 import logging
 
@@ -6,7 +6,7 @@ from sqlalchemy import Connection, inspect, select, text, update
 from sqlalchemy.schema import CreateColumn
 
 from backend.db.base import DB_PATH, Base, SessionLocal, engine
-from backend.db.models import EventSource
+from backend.db.models import AppState, EventSource
 
 log = logging.getLogger(__name__)
 
@@ -55,3 +55,21 @@ async def init_db(sources: dict[str, str]) -> None:
             update(EventSource).where(EventSource.status == "syncing").values(status="idle")
         )
         await session.commit()
+
+    await _migrate_saved_places()
+
+
+async def _migrate_saved_places() -> None:
+    """Saved map places (app_state "places") became sites in the Codex: move any left over."""
+    from backend.services.objects import migrate_saved_places  # avoids an import cycle
+
+    async with SessionLocal() as session:
+        row = await session.get(AppState, "places")
+        if row is None:
+            return
+        places = [p for p in (row.value or {}).get("places", []) if p.get("lat") is not None]
+        moved = await migrate_saved_places(places) if places else 0
+        await session.delete(row)
+        await session.commit()
+    if moved:
+        log.info("moved %d saved place(s) to sites", moved)

@@ -2,9 +2,11 @@
 
     event_sources  one row per crawler (luma, ...) with its sync status
     events         raw crawled events ("omens"), unique per (source, api_id), each with a review state
-    adventures     the events you kept (plus, later, hand-made ones), each with a lifecycle phase
+    adventures     the events you kept and hand-made ones, each with a lifecycle phase
                    and an optional action roadmap
-    app_state      small JSON settings that must survive restarts (filters, saved places)
+    objects        virtual objects (pillars, sites, contacts) that adventures link to (the Codex)
+    adventure_objects  links between adventures and objects
+    app_state      small JSON settings that must survive restarts (filters)
 
 Stage names (Sensorium, Hopper, Assay, ...) are only for display: see
 resources/classifier.md. The database stores the plain values below.
@@ -116,6 +118,47 @@ class Adventure(Base):
     roadmap: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     phase_changed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+# Virtual objects (the Codex): things adventures link to. Only sites have a location.
+OBJECT_TYPES = ("pillar", "site", "contact")
+GEO_OBJECT_TYPES = ("site",)
+
+
+class VirtualObject(Base):
+    """A pillar, site or contact that adventures link to (see services/objects.py)."""
+
+    __tablename__ = "objects"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    type: Mapped[str] = mapped_column(String(20))  # OBJECT_TYPES
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str | None] = mapped_column(Text)
+    # location: sites only (GEO_OBJECT_TYPES)
+    address: Mapped[str | None] = mapped_column(String(500))
+    city: Mapped[str | None] = mapped_column(String(200))
+    lat: Mapped[float | None] = mapped_column(Float)
+    lon: Mapped[float | None] = mapped_column(Float)
+    # type-specific extras: contact {email, phone, handle}
+    details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class AdventureObject(Base):
+    """A link between an adventure and a virtual object (many-to-many).
+
+    SQLite here doesn't enforce foreign keys, so services delete links explicitly.
+    """
+
+    __tablename__ = "adventure_objects"
+
+    adventure_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("adventures.id", ondelete="CASCADE"), primary_key=True)
+    object_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("objects.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class AppState(Base):

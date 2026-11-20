@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
-import { FACETS, UNKNOWN, formatDistance, parseDay, pendingChanges } from '../../filters.js';
+import { FACETS, facetLabel, formatDistance, parseDay, pendingChanges } from '../../filters.js';
 import { buildModel } from '../../lib/classifierGraph.js';
 
 const LAYERS_KEY = 'adventure-engine.classifier.layers';
@@ -59,7 +59,7 @@ function FilterTray({ passCount }) {
     const facetChips = FACETS.filter((f) => f.modes.includes(mode)).flatMap((facet) =>
         Object.entries(draft.facets[facet.key] ?? {}).map(([value, fmode]) => ({
             key: `${facet.key}:${value}`, facet: facet.key, value, mode: fmode,
-            label: value === UNKNOWN ? 'Unknown' : facet.display ? facet.display(value) : value,
+            label: facetLabel(facet, value),
             pending: applied.facets[facet.key]?.[value] !== fmode,
         })));
     const removedPending = FACETS.flatMap((facet) =>
@@ -102,7 +102,7 @@ function FilterTray({ passCount }) {
             <span className="tray-applied">map + calendar show <b>${shown}</b></span>
             ${pending > 0 && html`<button className="btn" onClick=${discardDraft} title="Throw away pending changes">Discard</button>`}
             <button className="pass-btn" disabled=${pending === 0} onClick=${passFilters}
-                title=${pending ? 'Send this subset to the calendar and map' : 'Nothing pending'}>
+                title=${pending ? 'Send this subset to the Calendar and Atlas' : 'Nothing pending'}>
                 Pass through <span className="arrow">⟶</span> ${passCount}
             </button>
         </div>

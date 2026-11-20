@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../../store.js';
 import { formatEventWhen, formatPrice, safeHttpUrl } from '../../events.js';
 import { ADVENTURE_TYPES, MAIN_ROUTE, PHASE_STAGES, hasWhenWhere, stageOf } from '../../lifecycle.js';
 import { AdventureEditor } from './AdventureEditor.js';
+import { ObjectLinks } from '../ObjectLinks.js';
 
 // details keys shown in their own rows; any others are listed generically below
 const KNOWN_DETAILS = new Set([
@@ -240,16 +241,15 @@ export function NodeCard() {
                     `}
                     ${event.kind === 'adventure' && editing
                         ? html`<${AdventureEditor} adventure=${event} focusTitle=${fresh} onDone=${stopEditing} />`
-                        : html`
-                            <${ItemActions} item=${event} />
-                            <${EventRows} event=${event} />
-                        `}
+                        : html`<${ItemActions} item=${event} />`}
+                    ${event.kind === 'adventure' && html`<${ObjectLinks} adventure=${event} />`}
+                    ${!(event.kind === 'adventure' && editing) && html`<${EventRows} event=${event} />`}
                 `
                 : html`
                     <div className="nc-empty">Nothing selected
                         <small>${mode === 'discovery'
                             ? 'Select an omen to review it, or make an adventure from scratch'
-                            : 'Select an adventure in the Nexus, map or calendar, or make one from scratch'}</small>
+                            : 'Select an adventure in the Nexus, Atlas or Calendar, or make one from scratch'}</small>
                         <${NewAdventureButtons} />
                         ${actionError && html`<div className="nc-error">${actionError}</div>`}
                     </div>

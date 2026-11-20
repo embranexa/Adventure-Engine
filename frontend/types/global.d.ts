@@ -25,10 +25,10 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex';
 
 /** Icon names drawn by components/PanelTitle.js. */
-type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll';
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex';
 
 /** A panel's definition (backend/services/workspace.py). Its title reads:
  *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
@@ -99,6 +99,10 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     stats: Record<string, unknown>;
     /** Action roadmap (Alembic), or null before one is drafted. */
     roadmap: Roadmap | null;
+    /** Linked virtual objects (the Codex). */
+    objects: { id: string; type: ObjectType; name: string }[];
+    /** Its linked site, if any; a hand-made event takes its where from it. */
+    site_id: string | null;
 }
 
 /** event | item | song; only events have a when/where (js/lifecycle.js ADVENTURE_TYPES). */
@@ -156,7 +160,8 @@ type FacetKey = 'source' | 'city' | 'registration' | 'type' | 'phase' | 'review'
 interface DateRange { start: string; end: string; mode: FilterMode }
 
 interface Ring {
-    center: { lat: number; lon: number; label?: string | null };
+    /** site_id: set when the ring is anchored on a site (the Atlas). */
+    center: { lat: number; lon: number; label?: string | null; site_id?: string | null };
     radius_km: number;
     mode: FilterMode;
 }
@@ -171,7 +176,31 @@ interface FilterState {
     units: 'mi' | 'km';
 }
 
-interface SavedPlace { id: string; label: string; lat: number; lon: number }
+/** pillar | site | contact (js/lifecycle.js OBJECT_TYPES); only sites have a location. */
+type ObjectType = 'pillar' | 'site' | 'contact';
+
+/** A virtual object (the Codex): something adventures link to (backend/services/objects.py). */
+interface VObject {
+    id: string;
+    type: ObjectType;
+    name: string;
+    description: string | null;
+    url: string | null;
+    /** sites only */
+    address: string | null;
+    city: string | null;
+    lat: number | null;
+    lon: number | null;
+    /** contacts: email, phone, handle */
+    details: Record<string, string>;
+    created_at: string;
+}
+
+/** A change sent to PATCH /api/objects/{id}: only the keys present change; null clears. */
+type ObjectChanges = Partial<{
+    name: string | null; description: string | null; url: string | null; address: string | null;
+    city: string | null; lat: number | null; lon: number | null; details: Record<string, string | null>;
+}>;
 
 interface SourceStatus {
     name: string;
@@ -186,6 +215,7 @@ interface SourceStatus {
 interface FeedMessages {
     events: { type: 'events'; events: EventRecord[] };
     adventures: { type: 'adventures'; adventures: AdventureRecord[] };
+    objects: { type: 'objects'; objects: VObject[] };
     source_status: { type: 'source_status'; source: SourceStatus };
 }
 
@@ -233,7 +263,10 @@ interface WorkspaceState {
     draftFilters: FilterState;
     /** The pool after the applied filters: what the calendar and map show. */
     visibleItems: PoolItem[];
-    places: SavedPlace[];
+    /** Virtual objects (the Codex), kept current by the feed. */
+    objects: VObject[];
+    /** The object open in the Codex (separate from the adventure selection). */
+    selectedObjectId: string | null;
 
     initWorkspace(): Promise<void>;
     persistLayout(nextTree: LayoutNode | null): void;
@@ -294,8 +327,21 @@ interface WorkspaceState {
     setUnits(units: 'mi' | 'km'): void;
     /** Clear facets (pending) and ranges (immediately); keeps the Seal and units. */
     clearFilters(): void;
-    savePlace(label: string, lat: number, lon: number): void;
-    deletePlace(id: string): void;
+    setObjects(objects: VObject[]): void;
+    /** Center the proximity ring on a site (keeps the radius and mode); it follows the site. */
+    anchorRingOnSite(siteId: string): void;
+    /** A point the Atlas should fly to (set by focusOnAtlas, e.g. from the Codex). */
+    atlasFocus: { lat: number; lon: number; at: number } | null;
+    /** Bring the Atlas to the front and fly to a point. */
+    focusOnAtlas(lat: number, lon: number): void;
+    selectObject(objectId: string | null): void;
+    /** Create an object; resolves to it, or to an error message. */
+    createObject(type: ObjectType, fields?: ObjectChanges): Promise<VObject | string>;
+    /** Resolves to an error message, or null. */
+    updateObject(objectId: string, changes: ObjectChanges): Promise<string | null>;
+    deleteObject(objectId: string): Promise<string | null>;
+    linkObject(adventureId: string, objectId: string): Promise<string | null>;
+    unlinkObject(adventureId: string, objectId: string): Promise<string | null>;
     setSourceStatus(source: SourceStatus): void;
     /** Ask the server to crawl a source; progress arrives as source_status messages. */
     syncSource(name: string): Promise<void>;

@@ -8,11 +8,11 @@
 // Whether an item passes is decided by filters.js. Every active filter is always a
 // visible star, so all items in a galaxy share the same answer.
 
-import { FACETS, UNKNOWN, facetValue, inDateRange, inRing, isSealed, passes } from '../filters.js';
+import { FACETS, facetLabel, facetValues, inDateRange, inRing, isSealed, passes } from '../filters.js';
 
 /** Facet star colours (off state). */
 /** Parent colors: monochrome (matter colors are for adventures). Off parents are steel. */
-const FACET_COLORS = { source: '#9aa0aa', city: '#9aa0aa', registration: '#9aa0aa', phase: '#9aa0aa', review: '#9aa0aa' };
+const FACET_COLOR = '#9aa0aa';
 export const ROLE_COLORS = { include: '#f2f3f5', exclude: '#4a4f58', seal: '#e9c43b' };
 
 /**
@@ -47,8 +47,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
         /** @type {Map<string, number>} */
         const counts = new Map();
         for (const item of items) {
-            const v = facetValue(item, facet);
-            counts.set(v, (counts.get(v) ?? 0) + 1);
+            for (const v of facetValues(item, facet)) counts.set(v, (counts.get(v) ?? 0) + 1);
         }
         const values = new Set(layers[facet.key] ? counts.keys() : []);
         for (const v of Object.keys(active)) values.add(v); // active filters are always stars
@@ -57,11 +56,11 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
             const role = /** @type {FilterMode | 'off'} */ (active[value] ?? 'off');
             stars.push({
                 id, kind: 'facet', facet: facet.key, value, group: facet.label,
-                label: value === UNKNOWN ? 'Unknown' : facet.display ? facet.display(value) : value,
-                role, color: role === 'off' ? FACET_COLORS[facet.key] : ROLE_COLORS[role],
+                label: facetLabel(facet, value),
+                role, color: role === 'off' ? FACET_COLOR : ROLE_COLORS[role],
                 count: counts.get(value) ?? 0, collapsed: collapsed.has(id),
             });
-            membership.set(id, (item) => facetValue(item, facet) === value);
+            membership.set(id, (item) => facetValues(item, facet).includes(value));
         }
     }
 

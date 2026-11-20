@@ -3,8 +3,12 @@
 // Logic: each facet value can be include / exclude / off. Within one facet, includes
 // combine with OR and any exclude removes; different facets (and the date range, ring
 // and Hermetic Seal) combine with AND. The result is the subset every view shows.
+//
+// Most facets have one value per item (its city, its source). Object facets (pillar,
+// site, contact) have several: an item passes an include if ANY of its linked objects is
+// included, and fails if any is excluded. An item with none counts as UNKNOWN.
 
-import { ADVENTURE_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
+import { ADVENTURE_TYPES, OBJECT_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
 
 /** @type {FilterState} */
 export const DEFAULT_FILTERS = { facets: {}, date_range: null, ring: null, seal: true, units: 'mi' };
@@ -12,9 +16,26 @@ export const DEFAULT_FILTERS = { facets: {}, date_range: null, ring: null, seal:
 /** Value used for items that have no value for a facet (e.g. no city). */
 export const UNKNOWN = '∅';
 
+/** Object id -> name, for labels of object facet values (kept current by the store). */
+const objectNames = new Map();
+/** @param {VObject[]} objects */
+export function setObjectNames(objects) {
+    objectNames.clear();
+    for (const o of objects) objectNames.set(o.id, o.name);
+}
+
+/** Facet values for an object type: the ids of the item's linked objects of that type. @param {ObjectType} type */
+const objectFacet = (type) => ({
+    key: /** @type {FacetKey} */ (type), label: OBJECT_TYPES[type].plural, modes: /** @type {PoolMode[]} */ (['adventures']),
+    value: (/** @type {PoolItem} */ i) => (i.kind === 'adventure' ? i.objects.filter((o) => o.type === type).map((o) => o.id) : null),
+    display: (/** @type {string} */ v) => objectNames.get(v) ?? 'Deleted object',
+    unknown: `No ${OBJECT_TYPES[type].label.toLowerCase()}`,
+});
+
 /**
- * Facets: the derived parent types. `modes` limits a facet to one pool.
- * @type {{ key: FacetKey, label: string, modes: PoolMode[], value: (item: PoolItem) => string | null | undefined, display?: (value: string) => string }[]}
+ * Facets: the parent types. `modes` limits a facet to one pool. `value` gives one value
+ * or (object facets) a list; `unknown` labels items that have none.
+ * @type {{ key: FacetKey, label: string, modes: PoolMode[], value: (item: PoolItem) => string | string[] | null | undefined, display?: (value: string) => string, unknown?: string }[]}
  */
 export const FACETS = [
     { key: 'source', label: 'Source', modes: ['adventures', 'discovery'], value: (i) => i.source },
@@ -38,15 +59,26 @@ export const FACETS = [
         value: (i) => (i.kind === 'omen' ? i.review : null),
         display: (v) => REVIEW_STAGES[/** @type {ReviewState} */ (v)]?.matter ?? v,
     },
+    objectFacet('pillar'),
+    objectFacet('site'),
+    objectFacet('contact'),
 ];
 
 /** Phases the Hermetic Seal hides (on top of anything already past). */
 export const SEALED_PHASES = new Set(['completed', 'killed', 'decommissioned']);
 
-/** @param {PoolItem} item @param {(typeof FACETS)[number]} facet */
-export function facetValue(item, facet) {
+/** The item's values for a facet (one, or several for object facets); [UNKNOWN] if none.
+ *  @param {PoolItem} item @param {(typeof FACETS)[number]} facet @returns {string[]} */
+export function facetValues(item, facet) {
     const v = facet.value(item);
-    return v == null || v === '' ? UNKNOWN : String(v);
+    if (Array.isArray(v)) return v.length ? v : [UNKNOWN];
+    return v == null || v === '' ? [UNKNOWN] : [String(v)];
+}
+
+/** Display label of one facet value. @param {(typeof FACETS)[number]} facet @param {string} value */
+export function facetLabel(facet, value) {
+    if (value === UNKNOWN) return facet.unknown ?? 'Unknown';
+    return facet.display ? facet.display(value) : value;
 }
 
 /** off -> include -> exclude -> off. @param {FilterMode | undefined} mode @returns {FilterMode | null} */
@@ -126,11 +158,10 @@ export function passes(item, filters, mode, now) {
         if (!facet.modes.includes(mode)) continue;
         const settings = filters.facets[facet.key];
         if (!settings) continue;
-        const value = facetValue(item, facet);
-        const setting = settings[value];
-        if (setting === 'exclude') return false;
+        const values = facetValues(item, facet);
+        if (values.some((v) => settings[v] === 'exclude')) return false;
         const includes = Object.values(settings).some((m) => m === 'include');
-        if (includes && setting !== 'include') return false;
+        if (includes && !values.some((v) => settings[v] === 'include')) return false;
     }
 
     // items and songs have no when/where: date and proximity filters don't apply to them
@@ -168,8 +199,7 @@ export function facetCounts(items, mode) {
         /** @type {Map<string, number>} */
         const counts = new Map();
         for (const item of items) {
-            const v = facetValue(item, facet);
-            counts.set(v, (counts.get(v) ?? 0) + 1);
+            for (const v of facetValues(item, facet)) counts.set(v, (counts.get(v) ?? 0) + 1);
         }
         const values = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
         return { facet, values };

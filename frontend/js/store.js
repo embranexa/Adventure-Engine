@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import * as feed from './feed.js';
 import { indexItems, sameList } from './events.js';
-import { DEFAULT_FILTERS, applyFilters, nextMode } from './filters.js';
+import { DEFAULT_FILTERS, KM_PER_MI, applyFilters, nextMode, setObjectNames } from './filters.js';
+
+/** Radius of a newly placed proximity ring. */
+export const DEFAULT_RING_RADIUS_KM = 5 * KM_PER_MI;
 
 // --- Pure Tree Helpers ---
 /** @template T @param {T} obj @returns {T} */
@@ -132,6 +135,7 @@ function startFeed(get) {
     feedWired = true;
     feed.on('events', (msg) => get().setRawEvents(msg.events));
     feed.on('adventures', (msg) => get().setAdventures(msg.adventures));
+    feed.on('objects', (msg) => get().setObjects(msg.objects));
     feed.on('source_status', (msg) => get().setSourceStatus(msg.source));
 }
 
@@ -261,6 +265,28 @@ async function callAction(set, url, method = 'POST', body = undefined) {
 }
 
 /**
+ * Send a JSON request. Resolves to the parsed response, or to an error message.
+ * @param {string} url @param {string} method @param {unknown} [body] @returns {Promise<unknown>}
+ */
+async function sendJson(url, method, body = undefined) {
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+            body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok) return data;
+        const detail = data?.detail;
+        if (typeof detail === 'string') return detail;
+        if (Array.isArray(detail) && detail[0]?.msg) return `${detail[0].loc?.at(-1) ?? 'field'}: ${detail[0].msg}`;
+        return `Request failed (${res.status})`;
+    } catch {
+        return 'Server unreachable';
+    }
+}
+
+/**
  * Run an action that removes `id` from the pool (pass/ignore/revive in Discovery), then
  * move the selection to its neighbour so you can keep reviewing.
  * @param {() => WorkspaceState} get @param {string} id @param {() => Promise<boolean>} action
@@ -324,7 +350,8 @@ const workspaceStore = (set, get) => ({
     filters: DEFAULT_FILTERS,
     draftFilters: DEFAULT_FILTERS,
     visibleItems: [],
-    places: [],
+    objects: [],
+    selectedObjectId: null,
 
     initWorkspace: async () => {
         try {
@@ -334,21 +361,19 @@ const workspaceStore = (set, get) => ({
         } catch (e) {
             set({ layoutStatus: 'OFFLINE MODE' });
         }
-        // saved filters and places, loaded before the first pool arrives
+        // saved filters, loaded before the first pool arrives
         try {
-            const [filters, draft, places] = await Promise.all([
+            const [filters, draft] = await Promise.all([
                 fetch('/api/state/filters').then((r) => r.json()),
                 fetch('/api/state/filters_draft?or_null=true').then((r) => r.json()),
-                fetch('/api/state/places').then((r) => r.json()),
             ]);
             const applied = { ...DEFAULT_FILTERS, ...filters };
             set((state) => withVisible(state, {
                 filters: applied,
                 draftFilters: draft ? { ...DEFAULT_FILTERS, ...draft } : applied, // never saved: start equal
-                places: places.places ?? [],
             }));
         } catch (err) {
-            console.error('[state] could not load saved filters/places', err);
+            console.error('[state] could not load saved filters', err);
         }
         // items become past (and fall behind the Hermetic Seal) as time passes
         setInterval(() => set((state) => withVisible(state, {})), 60_000);
@@ -468,15 +493,74 @@ const workspaceStore = (set, get) => ({
         saveApplied(get); saveDraft(get);
     },
 
-    savePlace: (label, lat, lon) => {
-        const place = { id: `place-${Date.now().toString(36)}`, label: label.trim().slice(0, 100) || 'Place', lat, lon };
-        set((state) => ({ places: [...state.places, place] }));
-        saveState('places', { places: get().places });
+    // --- virtual objects (the Codex) ---
+
+    setObjects: (objects) => {
+        setObjectNames(objects);
+        set((state) => ({
+            objects,
+            selectedObjectId: objects.some((o) => o.id === state.selectedObjectId) ? state.selectedObjectId : null,
+        }));
+        // a ring anchored on a site follows it (moved), or lets go (deleted / no location)
+        const ring = get().filters.ring;
+        const siteId = ring?.center.site_id;
+        if (ring && siteId) {
+            const site = objects.find((o) => o.id === siteId);
+            if (!site || site.lat == null || site.lon == null) {
+                get().setRing({ ...ring, center: { ...ring.center, site_id: null } });
+            } else if (site.lat !== ring.center.lat || site.lon !== ring.center.lon || site.name !== ring.center.label) {
+                get().setRing({ ...ring, center: { lat: site.lat, lon: site.lon, label: site.name, site_id: site.id } });
+            }
+        }
     },
 
-    deletePlace: (id) => {
-        set((state) => ({ places: state.places.filter((p) => p.id !== id) }));
-        saveState('places', { places: get().places });
+    anchorRingOnSite: (siteId) => {
+        const site = get().objects.find((o) => o.id === siteId);
+        if (!site || site.lat == null || site.lon == null) return;
+        const ring = get().filters.ring;
+        get().setRing({
+            center: { lat: site.lat, lon: site.lon, label: site.name, site_id: site.id },
+            radius_km: ring?.radius_km ?? DEFAULT_RING_RADIUS_KM,
+            mode: ring?.mode ?? 'include',
+        });
+    },
+
+    atlasFocus: null,
+    focusOnAtlas: (lat, lon) => {
+        get().showPanel('map');
+        set({ atlasFocus: { lat, lon, at: Date.now() } });
+    },
+
+    selectObject: (objectId) => set({ selectedObjectId: objectId }),
+
+    createObject: async (type, fields = {}) => {
+        const res = await sendJson('/api/objects', 'POST', { type, ...fields });
+        if (typeof res === 'string') return res;
+        const obj = /** @type {VObject} */ (res);
+        if (!get().objects.some((o) => o.id === obj.id)) get().setObjects([...get().objects, obj]); // before the broadcast
+        return obj;
+    },
+
+    updateObject: async (objectId, changes) => {
+        const res = await sendJson(`/api/objects/${objectId}`, 'PATCH', changes);
+        if (typeof res === 'string') return res;
+        get().setObjects(get().objects.map((o) => (o.id === objectId ? /** @type {VObject} */ (res) : o)));
+        return null;
+    },
+
+    deleteObject: async (objectId) => {
+        const res = await sendJson(`/api/objects/${objectId}`, 'DELETE');
+        return typeof res === 'string' ? res : null;
+    },
+
+    linkObject: async (adventureId, objectId) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/objects/${objectId}`, 'PUT');
+        return typeof res === 'string' ? res : null;
+    },
+
+    unlinkObject: async (adventureId, objectId) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/objects/${objectId}`, 'DELETE');
+        return typeof res === 'string' ? res : null;
     },
 
     selectItem: (id, source) => {

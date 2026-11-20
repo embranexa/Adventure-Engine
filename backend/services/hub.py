@@ -3,6 +3,7 @@
 Every message is a JSON object with a "type" field:
     events         {"events": [...]}  all raw events (omens), on connect and after changes
     adventures     {"adventures": [...]}  all adventures (flattened), on connect and after changes
+    objects        {"objects": [...]}  all virtual objects (the Codex), on connect and after changes
     source_status  {"source": {...}}  a crawler's status changed
 """
 

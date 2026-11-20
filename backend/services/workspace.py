@@ -19,7 +19,7 @@ PANELS_METADATA = {
     },
     "map": {
         "id": "map", "kind": "map", "icon": "compass",
-        "name": "Map", "question": "where", "flow": ["matter", "where"],
+        "name": "Atlas", "question": "where", "flow": ["matter", "where"],
     },
     "calendar": {
         "id": "calendar", "kind": "calendar", "icon": "clock",
@@ -33,6 +33,10 @@ PANELS_METADATA = {
         "id": "scripter", "kind": "scripter", "icon": "quill",
         "name": "Scripter", "question": "how", "flow": ["essence", "distillate"],
     },
+    "codex": {
+        "id": "codex", "kind": "codex", "icon": "codex",
+        "name": "Codex", "question": "with", "flow": ["objects", "links"],
+    },
     "quests": {
         "id": "quests", "kind": "quests", "icon": "scroll",
         "name": "Crucible", "question": "now", "flow": ["alloy", "animus"],
@@ -44,7 +48,7 @@ DEFAULT_LAYOUT_TREE: dict[str, Any] = {
     "type": "split",
     "direction": "horizontal",
     "ratio": 25,
-    "first": {"id": "leaf-node", "type": "leaf", "tabs": ["node", "scripter", "quests"], "activeTab": "quests"},
+    "first": {"id": "leaf-node", "type": "leaf", "tabs": ["node", "scripter", "quests", "codex"], "activeTab": "quests"},
     "second": {
         "id": "top-split",
         "type": "split",
