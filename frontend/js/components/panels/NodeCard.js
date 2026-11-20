@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { formatEventWhen, formatPrice, safeHttpUrl } from '../../events.js';
-import { MAIN_ROUTE, PHASE_STAGES, stageOf } from '../../lifecycle.js';
+import { ADVENTURE_TYPES, MAIN_ROUTE, PHASE_STAGES, hasWhenWhere, stageOf } from '../../lifecycle.js';
+import { AdventureEditor } from './AdventureEditor.js';
 
 // details keys shown in their own rows; any others are listed generically below
 const KNOWN_DETAILS = new Set([
@@ -55,8 +56,10 @@ function TradingCard({ item }) {
     const element = /** @type {keyof typeof ELEMENT_PATHS | null} */ (stat(stats, 'element'));
     const pillar = /** @type {string | null} */ (stat(stats, 'pillar'));
     const difficulty = Math.max(0, Math.min(5, Number(stat(stats, 'difficulty')) || 0));
-    const when = item.start ? formatEventWhen(item) : 'Undated';
-    const place = item.location_approximate ? item.city : (item.venue || item.city);
+    const kind = item.kind === 'adventure' ? ADVENTURE_TYPES[item.type] : null;
+    const when = !hasWhenWhere(item) ? `${kind?.glyph ?? ''} ${kind?.label ?? ''}`.trim()
+        : item.start ? formatEventWhen(item) : 'Undated';
+    const place = hasWhenWhere(item) ? (item.location_approximate ? item.city : (item.venue || item.city)) : null;
 
     return html`
         <div
@@ -93,6 +96,9 @@ function TradingCard({ item }) {
 
 /** Detail rows under the card. @param {{ event: PoolItem }} props */
 function EventRows({ event }) {
+    const placed = hasWhenWhere(event);
+    const kind = event.kind === 'adventure' ? ADVENTURE_TYPES[event.type] : null;
+    const description = event.kind === 'adventure' ? event.description : null;
     const details = event.details || {};
     const link = safeHttpUrl(event.url);
     const price = formatPrice(details);
@@ -102,8 +108,12 @@ function EventRows({ event }) {
         : [event.venue, event.address].filter(Boolean).join(' — ') || event.city || 'Unknown';
 
     /** @type {[string, string][]} */
-    const rows = [['When', formatEventWhen(event)], ['Where', where]];
-    if (event.lat != null && event.lon != null) rows.push(['Coords', `${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}`]);
+    const rows = [];
+    if (kind) rows.push(['Type', `${kind.glyph} ${kind.label}`]);
+    if (placed) {
+        rows.push(['When', event.start ? formatEventWhen(event) : 'Undated'], ['Where', where]);
+        if (event.lat != null && event.lon != null) rows.push(['Coords', `${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}`]);
+    }
     if (price) rows.push(['Price', details.sold_out ? `${price} (sold out)` : price]);
     else if (details.sold_out) rows.push(['Price', 'Sold out']);
     if (hosts) rows.push(['Hosts', hosts]);
@@ -115,13 +125,14 @@ function EventRows({ event }) {
     }
 
     return html`
+        ${description && html`<p className="nc-desc">${description}</p>`}
         <dl className="nc-rows">
             ${rows.map(([label, value], i) => html`
                 <dt key=${'k' + i}>${label}</dt>
                 <dd key=${'v' + i}>${value}</dd>
             `)}
         </dl>
-        ${link && html`<a className="btn nc-link" href=${link} target="_blank" rel="noopener noreferrer">Open event page ↗</a>`}
+        ${link && html`<a className="btn nc-link" href=${link} target="_blank" rel="noopener noreferrer">${event.source ? 'Open event page ↗' : 'Open link ↗'}</a>`}
     `;
 }
 
@@ -177,12 +188,38 @@ function ItemActions({ item }) {
     `;
 }
 
-/** The selected item: its trading card, triage / stage controls and details. */
+/** Buttons that make a hand-made adventure (it opens here, in edit mode). */
+export function NewAdventureButtons() {
+    const createAdventure = useWorkspaceStore((s) => s.createAdventure);
+    return html`
+        <div className="nc-new">
+            ${Object.entries(ADVENTURE_TYPES).map(([key, t]) => html`
+                <button key=${key} className="btn" title=${t.hint}
+                    onClick=${() => createAdventure(/** @type {AdventureType} */ (key))}>✦ New ${t.label.toLowerCase()}</button>
+            `)}
+        </div>
+    `;
+}
+
+/** The selected item: its trading card, triage / stage controls and details; adventures
+ *  can be edited in place (✎), and a freshly made one opens in edit mode. */
 export function NodeCard() {
     const event = useWorkspaceStore((s) => (s.selectedItemId ? s.itemsById[s.selectedItemId] : null));
     const hoverItem = useWorkspaceStore((s) => s.hoverItem);
     const mode = useWorkspaceStore((s) => s.mode);
+    const editingId = useWorkspaceStore((s) => s.editingAdventureId);
+    const setEditingAdventure = useWorkspaceStore((s) => s.setEditingAdventure);
+    const actionError = useWorkspaceStore((s) => s.actionError);
     const stage = event ? stageOf(event) : null;
+
+    const [editing, setEditing] = useState(false);
+    const fresh = event != null && editingId === event.id; // just created here
+    useEffect(() => { setEditing(fresh); }, [event?.id, fresh]);
+
+    const stopEditing = () => {
+        setEditing(false);
+        if (fresh) setEditingAdventure(null);
+    };
 
     return html`
         <div
@@ -193,13 +230,30 @@ export function NodeCard() {
             ${event
                 ? html`
                     <${TradingCard} item=${event} />
-                    ${stage && html`<div className="nc-stage">${stage.matter} · ${stage.hint}</div>`}
-                    <${ItemActions} item=${event} />
-                    <${EventRows} event=${event} />
+                    ${stage && html`
+                        <div className="nc-stage">
+                            <span>${stage.matter} · ${stage.hint}</span>
+                            ${event.kind === 'adventure' && !editing && html`
+                                <button className="cls-layer nc-edit" onClick=${() => setEditing(true)} title="Edit this adventure">✎ Edit</button>
+                            `}
+                        </div>
+                    `}
+                    ${event.kind === 'adventure' && editing
+                        ? html`<${AdventureEditor} adventure=${event} focusTitle=${fresh} onDone=${stopEditing} />`
+                        : html`
+                            <${ItemActions} item=${event} />
+                            <${EventRows} event=${event} />
+                        `}
                 `
-                : html`<div className="nc-empty">Nothing selected<small>${mode === 'discovery'
-                    ? 'Select an omen to review it'
-                    : 'Select an adventure in the Nexus, map or calendar'}</small></div>`}
+                : html`
+                    <div className="nc-empty">Nothing selected
+                        <small>${mode === 'discovery'
+                            ? 'Select an omen to review it, or make an adventure from scratch'
+                            : 'Select an adventure in the Nexus, map or calendar, or make one from scratch'}</small>
+                        <${NewAdventureButtons} />
+                        ${actionError && html`<div className="nc-error">${actionError}</div>`}
+                    </div>
+                `}
         </div>
     `;
 }

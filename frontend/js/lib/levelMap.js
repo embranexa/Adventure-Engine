@@ -801,8 +801,10 @@ export class LevelMap {
                 this.onRingPlace({ lat: event.lngLat.lat, lon: event.lngLat.lng });
                 return;
             }
+            // a click on a node selects it; anywhere else clears the selection
+            // (MapLibre only fires click when the pointer barely moved, so drags don't count)
             const entry = this._pick(event.point);
-            if (entry) this.select(entry.node.id);
+            this.select(entry ? entry.node.id : null);
         };
 
         this._onMove = (event) => {

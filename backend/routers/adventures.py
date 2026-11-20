@@ -1,4 +1,4 @@
-"""Adventures: list them, move them between phases, kill and revive, edit roadmaps."""
+"""Adventures: list, create and edit them, move them between phases, kill and revive, edit roadmaps."""
 
 import uuid
 
@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.base import get_session
 from backend.db.queries import list_adventures
 from backend.routers.errors import triage_errors
-from backend.schemas.adventures import PhasePayload, RoadmapPayload
-from backend.services import roadmap, triage
+from backend.schemas.adventures import AdventureCreate, AdventureUpdate, PhasePayload, RoadmapPayload
+from backend.services import adventures, roadmap, triage
 
 router = APIRouter(prefix="/adventures", tags=["adventures"])
 
@@ -17,6 +17,28 @@ router = APIRouter(prefix="/adventures", tags=["adventures"])
 @router.get("")
 async def get_adventures(session: AsyncSession = Depends(get_session)):
     return await list_adventures(session)
+
+
+@router.post("")
+async def create_adventure(payload: AdventureCreate):
+    """A hand-made adventure (event, item or song) in ore. 422 if a field is invalid."""
+    try:
+        return await adventures.create_adventure(payload.model_dump(exclude_unset=True) | {"type": payload.type})
+    except adventures.InvalidAdventure as e:
+        raise HTTPException(422, str(e)) from e
+
+
+@router.patch("/{adventure_id}")
+async def update_adventure(adventure_id: uuid.UUID, payload: AdventureUpdate):
+    """Set (or, with null, clear) the adventure's own fields. Only the fields sent change."""
+    changes = payload.model_dump(exclude_unset=True)
+    if changes.get("type") is None:
+        changes.pop("type", None)
+    with triage_errors():
+        try:
+            return await adventures.update_adventure(adventure_id, changes)
+        except adventures.InvalidAdventure as e:
+            raise HTTPException(422, str(e)) from e
 
 
 @router.put("/{adventure_id}/phase")

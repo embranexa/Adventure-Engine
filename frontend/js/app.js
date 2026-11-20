@@ -7,6 +7,7 @@ import { ModeSwitch } from './components/ModeSwitch.js';
 import { MatterGauge } from './components/MatterGauge.js';
 import { Abyss } from './components/Abyss.js';
 import { Sigil } from './components/PanelTitle.js';
+import { ADVENTURE_TYPES } from './lifecycle.js';
 
 /** Status light for the live connection. @param {FeedStatus} status */
 function feedLight(status) {
@@ -26,6 +27,8 @@ function App() {
     const initWorkspace = useWorkspaceStore((s) => s.initWorkspace);
     const resetWorkspace = useWorkspaceStore((s) => s.resetWorkspace);
     const reopenPanel = useWorkspaceStore((s) => s.reopenPanel);
+    const createAdventure = useWorkspaceStore((s) => s.createAdventure);
+    const showPanel = useWorkspaceStore((s) => s.showPanel);
 
     useEffect(() => {
         initWorkspace();
@@ -46,6 +49,22 @@ function App() {
                 <${ModeSwitch} />
                 <span className="topbar-spacer"></span>
                 <span className=${`light ${light.cls}`}><i></i>${light.label}</span>
+                <select
+                    className="btn new-adventure"
+                    aria-label="Make an adventure from scratch"
+                    onChange=${(e) => {
+                        const type = e.target.value;
+                        e.target.value = '';
+                        if (!type) return;
+                        showPanel('node'); // the new adventure opens there, in edit mode
+                        createAdventure(type);
+                    }}
+                >
+                    <option value="">✦ New adventure</option>
+                    ${Object.entries(ADVENTURE_TYPES).map(([key, t]) => html`
+                        <option key=${key} value=${key}>${t.glyph} ${t.label}</option>
+                    `)}
+                </select>
                 ${unmounted.length > 0 && html`
                     <select
                         className="btn"

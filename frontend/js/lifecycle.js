@@ -27,6 +27,23 @@ export const PHASE_STAGES = {
     decommissioned: { module: 'Archive',    matter: 'relic',      color: '#7a6a55', deep: '#2f281f', light: '#a89a85', hint: 'Old and out of sight' },
 };
 
+/**
+ * Adventure types. Only events have a when/where: items and songs are exempt from the
+ * calendar, map, date/proximity filters and the missed-adventure sweeper (the server
+ * sends their when/where as null). Same list in backend/db/models.py.
+ * @type {Record<AdventureType, { label: string, glyph: string, hint: string }>}
+ */
+export const ADVENTURE_TYPES = {
+    event: { label: 'Event', glyph: '◷', hint: 'Happens at a time and place' },
+    item: { label: 'Item', glyph: '◆', hint: 'A thing to make or get: no when/where' },
+    song: { label: 'Song', glyph: '♪', hint: 'A song to write or learn: no when/where' },
+};
+
+/** True if this item can have a when/where (an omen, or an event-type adventure). @param {PoolItem} item */
+export function hasWhenWhere(item) {
+    return item.kind !== 'adventure' || item.type === 'event';
+}
+
 /** Matter name -> color, for titles that name a matter (e.g. "ore ⟶ essence"). */
 export const MATTER_COLORS = Object.fromEntries(
     [...Object.values(REVIEW_STAGES), ...Object.values(PHASE_STAGES)].map((s) => [s.matter, s.light]),

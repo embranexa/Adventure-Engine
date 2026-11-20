@@ -511,6 +511,57 @@ const workspaceStore = (set, get) => ({
         await callAction(set, `/api/adventures/${adventureId}/phase`, 'PUT', { phase });
     },
 
+    editingAdventureId: null,
+    setEditingAdventure: (adventureId) => set({ editingAdventureId: adventureId }),
+
+    createAdventure: async (type) => {
+        set({ actionError: null });
+        let record;
+        try {
+            const res = await fetch('/api/adventures', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type }),
+            });
+            if (!res.ok) {
+                const detail = (await res.json().catch(() => null))?.detail;
+                set({ actionError: typeof detail === 'string' ? detail : `Not created (${res.status})` });
+                return;
+            }
+            record = /** @type {AdventureRecord} */ (await res.json());
+        } catch {
+            set({ actionError: 'Server unreachable' });
+            return;
+        }
+        // hand-made adventures live in the Adventures pool; don't wait for the broadcast
+        get().setMode('adventures');
+        const { adventures } = get();
+        if (!adventures.some((a) => a.id === record.id)) get().setAdventures([...adventures, record]);
+        set({ editingAdventureId: record.id });
+        get().selectItem(record.id, 'create');
+    },
+
+    updateAdventure: async (adventureId, changes) => {
+        try {
+            const res = await fetch(`/api/adventures/${adventureId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(changes),
+            });
+            if (!res.ok) {
+                const detail = (await res.json().catch(() => null))?.detail;
+                if (typeof detail === 'string') return detail;
+                if (Array.isArray(detail) && detail[0]?.msg) return `${detail[0].loc?.at(-1) ?? 'field'}: ${detail[0].msg}`;
+                return `Not saved (${res.status})`;
+            }
+            const record = /** @type {AdventureRecord} */ (await res.json());
+            get().setAdventures(get().adventures.map((a) => (a.id === record.id ? record : a)));
+            return null;
+        } catch {
+            return 'Not saved: server unreachable';
+        }
+    },
+
     roadmapError: null,
 
     saveRoadmap: (adventureId, roadmap) => {

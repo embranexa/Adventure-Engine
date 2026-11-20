@@ -19,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.base import SessionLocal, utcnow
-from backend.db.models import MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, Adventure, Event
+from backend.db.models import MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, WHEN_WHERE_TYPES, Adventure, Event
 from backend.db.queries import list_adventures, list_events
 from backend.services.hub import hub
 
@@ -177,18 +177,20 @@ async def set_phase(adventure_id: uuid.UUID, phase: str) -> None:
 async def sweep_missed() -> int:
     """Kill adventures that were still pre-Arena when their event ended.
 
-    "Ended" = end time, else start time. Only adventures whose phase was last set
+    Events only (items and songs have no when/where), crawled or hand-made. "Ended" = end
+    time, else start time, the adventure's own (set by hand) over its raw event's. Only adventures whose phase was last set
     *before* the event ended count as missed: reviving one afterwards, or passing an
     event that is already over, is a deliberate choice and isn't undone.
     Returns how many moved; broadcasts if any did.
     """
     now = utcnow()
     async with SessionLocal() as session:
-        ended_at = func.coalesce(Event.end_time, Event.start_time)
+        ended_at = func.coalesce(Adventure.end_time, Adventure.start_time, Event.end_time, Event.start_time)
         missed = (await session.scalars(
             select(Adventure)
-            .join(Event, Adventure.event_id == Event.id)
+            .outerjoin(Event, Adventure.event_id == Event.id)
             .where(
+                Adventure.type.in_(WHEN_WHERE_TYPES),
                 Adventure.phase.in_(PRE_ARENA_PHASES),
                 ended_at < now,
                 Adventure.phase_changed_at < ended_at,
@@ -197,7 +199,7 @@ async def sweep_missed() -> int:
         for adventure in missed:
             adventure.phase_before_kill = adventure.phase
             _set_phase(adventure, "killed")
-            event = await session.get(Event, adventure.event_id)
+            event = await session.get(Event, adventure.event_id) if adventure.event_id else None
             if event:
                 event.review, event.reviewed_at = "ignored", now
         await session.commit()

@@ -11,7 +11,7 @@ from typing import Any
 PANELS_METADATA = {
     "node": {
         "id": "node", "kind": "node", "icon": "eye",
-        "name": "Node", "question": "what", "flow": ["matter", "details"],
+        "name": "Refiner", "question": "what", "flow": ["matter", "details"],
     },
     "classifier": {
         "id": "classifier", "kind": "classifier", "icon": "flask",

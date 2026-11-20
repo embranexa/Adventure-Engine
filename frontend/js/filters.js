@@ -4,7 +4,7 @@
 // combine with OR and any exclude removes; different facets (and the date range, ring
 // and Hermetic Seal) combine with AND. The result is the subset every view shows.
 
-import { PHASE_STAGES, REVIEW_STAGES } from './lifecycle.js';
+import { ADVENTURE_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
 
 /** @type {FilterState} */
 export const DEFAULT_FILTERS = { facets: {}, date_range: null, ring: null, seal: true, units: 'mi' };
@@ -22,6 +22,11 @@ export const FACETS = [
     {
         key: 'registration', label: 'Registration', modes: ['adventures', 'discovery'],
         value: (i) => (typeof i.details?.registration === 'string' ? i.details.registration : null),
+    },
+    {
+        key: 'type', label: 'Type', modes: ['adventures'],
+        value: (i) => (i.kind === 'adventure' ? i.type : null),
+        display: (v) => ADVENTURE_TYPES[/** @type {AdventureType} */ (v)]?.label ?? v,
     },
     {
         key: 'phase', label: 'Matter', modes: ['adventures'],
@@ -128,6 +133,8 @@ export function passes(item, filters, mode, now) {
         if (includes && setting !== 'include') return false;
     }
 
+    // items and songs have no when/where: date and proximity filters don't apply to them
+    if (!hasWhenWhere(item)) return true;
     if (filters.date_range) {
         const inside = inDateRange(item, filters.date_range);
         if (inside !== (filters.date_range.mode === 'include')) return false;

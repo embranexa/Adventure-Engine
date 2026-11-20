@@ -33,6 +33,11 @@ PHASES = (
     "killed",          # Necropolis  / vestige
     "decommissioned",  # Archive     / relic
 )
+# Adventure types. Only events have a when/where; items and songs are exempt from everything
+# that uses one (calendar, map, date/proximity filters, the missed-adventure sweeper).
+ADVENTURE_TYPES = ("event", "item", "song")
+WHEN_WHERE_TYPES = ("event",)
+
 # Phases set by hand from the node card; "killed" only via kill, "decommissioned" only from "completed".
 MANUAL_PHASES = ("queued", "classifying", "decomposing", "constructing", "consuming", "completed")
 # An adventure still in one of these when its event ends was missed (-> killed automatically).
@@ -77,7 +82,12 @@ class Event(Base):
 
 
 class Adventure(Base):
-    """An adventure. Linked to its raw event (no copy): event fields are read through."""
+    """An adventure: crawled (linked to its raw event) or made by hand (no event).
+
+    Event fields are read through, not copied. The adventure's own fields below are set by
+    hand and win over the event's when not null: on a hand-made adventure they're all
+    there is; on a crawled one they correct the source (see queries.adventure_to_dict).
+    """
 
     __tablename__ = "adventures"
 
@@ -86,7 +96,19 @@ class Adventure(Base):
     event_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("events.id", ondelete="SET NULL"), unique=True)
     type: Mapped[str] = mapped_column(String(20), default="event")  # event | song | item | ...
-    title: Mapped[str | None] = mapped_column(String(500))  # for adventures without an event
+    title: Mapped[str | None] = mapped_column(String(500))
+    description: Mapped[str | None] = mapped_column(Text)
+    # when/where: events only (WHEN_WHERE_TYPES)
+    start_time: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    end_time: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    timezone: Mapped[str | None] = mapped_column(String(64))
+    venue: Mapped[str | None] = mapped_column(String(500))  # free text for now (venue objects later)
+    address: Mapped[str | None] = mapped_column(String(500))
+    city: Mapped[str | None] = mapped_column(String(200))
+    lat: Mapped[float | None] = mapped_column(Float)
+    lon: Mapped[float | None] = mapped_column(Float)
+    url: Mapped[str | None] = mapped_column(Text)
+    cover_url: Mapped[str | None] = mapped_column(Text)
     phase: Mapped[str] = mapped_column(String(20), default="queued")
     phase_before_kill: Mapped[str | None] = mapped_column(String(20))  # restored on revive
     stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # set by hand (HP, ATK, ...)

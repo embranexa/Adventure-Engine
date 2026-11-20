@@ -9,7 +9,7 @@
  *   scene.setHover(id)
  *   scene.dispose()
  *
- * Callbacks: onSelect(itemId), onHover(itemId | null), onStarClick(star), onStarContext(star).
+ * Callbacks: onSelect(itemId | null: empty space clicked), onHover(itemId | null), onStarClick(star), onStarContext(star).
  * Labels and cards are HTML overlays projected from 3D positions (any image URL works,
  * text stays crisp). Styles: frontend/styles.css under "Classifier".
  */
@@ -590,6 +590,7 @@ export class ClassifierScene {
             if (hit?.item) this.onSelect(hit.item);
             else if (hit?.galaxy) this._flyToGalaxy(hit.galaxy);
             else if (hit?.star) this.onStarClick(this.stars.get(hit.star)?.star);
+            else if (!hit) this.onSelect(null); // empty space: clear the selection
         };
         this._onMove = (ev) => {
             const hit = this._pick(ev);

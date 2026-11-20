@@ -147,7 +147,7 @@ export function ClassifierPanel() {
             .then(({ ClassifierScene }) => {
                 if (disposed || !hostRef.current) return;
                 sceneRef.current = new ClassifierScene(hostRef.current, {
-                    onSelect: (/** @type {string} */ id) => useWorkspaceStore.getState().selectItem(id, 'classifier'),
+                    onSelect: (/** @type {string | null} */ id) => useWorkspaceStore.getState().selectItem(id, 'classifier'),
                     onHover: (/** @type {string | null} */ id) => useWorkspaceStore.getState().hoverItem(id),
                     onStarClick: cycleStar,
                     onStarContext: (/** @type {{ id: string } | undefined} */ star) => {

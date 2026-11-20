@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 FilterMode = Literal["include", "exclude"]
-FacetKey = Literal["source", "city", "registration", "phase", "review"]
+FacetKey = Literal["source", "city", "registration", "type", "phase", "review"]
 
 
 class DateRange(BaseModel):

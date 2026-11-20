@@ -89,13 +89,43 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     url: string | null;
     review: ReviewState | null;
     event_id: string | null;
-    type: string;
+    type: AdventureType;
+    description: string | null;
+    /** The adventure's own values (set by hand), which win over its event's; null = not set.
+     *  On a hand-made adventure (no event_id) they're all there is. */
+    own: AdventureOwnFields;
     phase: Phase;
     phase_before_kill: Phase | null;
     stats: Record<string, unknown>;
     /** Action roadmap (Alembic), or null before one is drafted. */
     roadmap: Roadmap | null;
 }
+
+/** event | item | song; only events have a when/where (js/lifecycle.js ADVENTURE_TYPES). */
+type AdventureType = 'event' | 'item' | 'song';
+
+/** Fields an adventure can set itself (backend/services/adventures.py). */
+interface AdventureOwnFields {
+    title: string | null;
+    description: string | null;
+    url: string | null;
+    cover_url: string | null;
+    start: string | null;
+    end: string | null;
+    timezone: string | null;
+    venue: string | null;
+    address: string | null;
+    city: string | null;
+    lat: number | null;
+    lon: number | null;
+}
+
+/** A change sent to PATCH /api/adventures/{id}: only the keys present change; null clears. */
+type AdventureChanges = Partial<{
+    type: AdventureType; title: string | null; description: string | null; url: string | null;
+    cover_url: string | null; start_time: string | null; end_time: string | null; timezone: string | null;
+    venue: string | null; address: string | null; city: string | null; lat: number | null; lon: number | null;
+}>;
 
 /** An adventure's action roadmap: a dependency graph (backend/services/roadmap.py). */
 interface Roadmap {
@@ -120,7 +150,7 @@ type PoolMode = 'adventures' | 'discovery';
 // --- filters (logic in js/filters.js; persisted via /api/state/filters) ---
 
 type FilterMode = 'include' | 'exclude';
-type FacetKey = 'source' | 'city' | 'registration' | 'phase' | 'review';
+type FacetKey = 'source' | 'city' | 'registration' | 'type' | 'phase' | 'review';
 
 /** Local calendar days, inclusive. */
 interface DateRange { start: string; end: string; mode: FilterMode }
@@ -234,6 +264,13 @@ interface WorkspaceState {
     killAdventure(adventureId: string): Promise<void>;
     reviveAdventure(adventureId: string): Promise<void>;
     setPhase(adventureId: string, phase: Phase): Promise<void>;
+    /** Make a hand-made adventure (in ore), switch to Adventures and select it for editing. */
+    createAdventure(type: AdventureType): Promise<void>;
+    /** Set or clear the adventure's own fields. Resolves to an error message, or null. */
+    updateAdventure(adventureId: string, changes: AdventureChanges): Promise<string | null>;
+    /** The adventure whose node card opened in edit mode (just created); null otherwise. */
+    editingAdventureId: string | null;
+    setEditingAdventure(adventureId: string | null): void;
     /** Replace an adventure's roadmap: shown at once, saved shortly after (latest wins). */
     saveRoadmap(adventureId: string, roadmap: Roadmap): void;
     /** Last roadmap save error (shown in the Alembic); cleared by the next save. */
