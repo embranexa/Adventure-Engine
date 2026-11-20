@@ -1,29 +1,11 @@
 // Pure helpers for pool items: omens (raw events) and adventures. No React, no store.
 
-// Same neon palette as the legacy map.
-export const EVENT_PALETTE = ['#00f0ff', '#ff2bd6', '#fcee0a', '#39ff14', '#b026ff', '#ff6a00'];
-
-/** Small stable string hash (djb2). @param {string} s */
-function hash(s) {
-    let h = 5381;
-    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-    return Math.abs(h);
-}
-
-/**
- * Color derived from the event id, so an event keeps its color across syncs
- * (the legacy hub used list position, which shifted whenever events changed).
- * @param {string} id
- */
-export function colorForId(id) {
-    return EVENT_PALETTE[hash(id) % EVENT_PALETTE.length];
-}
+import { stageColor } from './lifecycle.js';
 
 /**
  * Turn a list of pool records (omens or adventures) into store state. Items whose
  * data didn't change keep the same object, so memoized components showing them skip
- * re-rendering. The color comes from the raw event when there is one, so an omen
- * keeps its color after it passes through and becomes an adventure.
+ * re-rendering. The color is the item's stage (matter) color, the same in every view.
  * @param {PoolRecord[]} incoming
  * @param {Record<string, PoolItem>} previous
  * @returns {{ items: PoolItem[], itemsById: Record<string, PoolItem> }}
@@ -35,7 +17,7 @@ export function indexItems(incoming, previous) {
         const old = previous[record.id];
         const item = old && sameRecord(old, record)
             ? old
-            : { ...record, color: colorForId(record.event_id ?? record.id) };
+            : { ...record, color: stageColor(record) };
         itemsById[item.id] = item;
         return item;
     });

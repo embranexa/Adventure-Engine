@@ -17,6 +17,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { galaxyRadius, layout } from './classifierGraph.js';
+import { stageOf } from '../lifecycle.js';
+import { deferredResize, isResizing } from './resizing.js';
 
 const EXPAND_BASE = 170;     // a galaxy breaks apart when the camera is closer than this (+ size)
 const CARD_DISTANCE = 120;   // adventures closer than this show their card
@@ -66,13 +68,13 @@ export class ClassifierScene {
         this.container = el('div', 'cls-root');
         parent.appendChild(this.container);
 
-        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-        this.renderer.setClearColor(0x05050b, 1);
+        this.renderer.setClearColor(0x000000, 0); // transparent: the panel's glass shows through
         this.container.appendChild(this.renderer.domElement);
 
         this.scene = new THREE.Scene();
-        this.scene.fog = new THREE.FogExp2(0x05050b, 0.0011);
+        this.scene.fog = new THREE.FogExp2(0x030405, 0.0009);
         this.camera = new THREE.PerspectiveCamera(55, 1, 1, 6000);
         this.camera.position.set(0, 300, 360);
         this._fitted = false; // frame the content once, on the first update with something in it
@@ -82,6 +84,8 @@ export class ClassifierScene {
         this.controls.dampingFactor = 0.08;
         this.controls.minDistance = 25;
         this.controls.maxDistance = 1500;
+        // Same convention as the map: left-drag rotates, right-drag moves.
+        this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
         this.controls.addEventListener('start', () => { this._fly = null; });
 
         this.labels = el('div', 'cls-labels');
@@ -112,13 +116,15 @@ export class ClassifierScene {
         this._buildLinks();
         this._bindEvents();
 
-        this._ro = new ResizeObserver(() => this._resize());
+        this._ro = new ResizeObserver(deferredResize(() => this._resize()));
         this._ro.observe(this.container);
         this._resize();
 
         this._last = performance.now();
         const loop = (t) => {
             this._raf = requestAnimationFrame(loop);
+            // Hold still while a splitter is dragged: the GPU time goes to the resize instead.
+            if (isResizing()) { this._last = t; return; }
             this._frame(t);
         };
         this._raf = requestAnimationFrame(loop);
@@ -154,42 +160,91 @@ export class ClassifierScene {
     }
 
     _buildBackdrop() {
-        // a deterministic starfield
-        const n = 2400, pos = new Float32Array(n * 3);
-        let seed = 7;
+        // a faint ritual circle on the chamber floor: rings and two interlocked triangles
+        const floor = new THREE.Group();
+        const mat = new THREE.LineBasicMaterial({ color: 0x9aa0aa, transparent: true, opacity: 0.1 });
+        const loop = (pts) => floor.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), mat));
+        const circle = (r) => Array.from({ length: 128 }, (_, i) => {
+            const a = (i / 128) * Math.PI * 2;
+            return new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r);
+        });
+        for (const r of [95, 150, 205, 262]) loop(circle(r));
+        for (const rot of [0, Math.PI]) {
+            loop([0, 1, 2].map((k) => {
+                const a = rot + (k / 3) * Math.PI * 2 - Math.PI / 2;
+                return new THREE.Vector3(Math.cos(a) * 205, 0, Math.sin(a) * 205);
+            }));
+        }
+        floor.position.y = -60;
+        this.floor = floor;
+        this.scene.add(floor);
+
+        // a few motes rising slowly through the chamber
+        const n = 140;
+        this.motePos = new Float32Array(n * 3);
+        let seed = 11;
         const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
         for (let i = 0; i < n; i++) {
-            const r = 900 + rnd() * 1800, th = rnd() * Math.PI * 2, ph = Math.acos(2 * rnd() - 1);
-            pos.set([r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph), r * Math.sin(ph) * Math.sin(th)], i * 3);
+            const r = 40 + rnd() * 260, a = rnd() * Math.PI * 2;
+            this.motePos.set([Math.cos(a) * r, -60 + rnd() * 220, Math.sin(a) * r], i * 3);
         }
         const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-        this.starfield = new THREE.Points(geo, new THREE.PointsMaterial({
-            color: 0x9fb4ff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0.55, fog: false,
+        geo.setAttribute('position', new THREE.BufferAttribute(this.motePos, 3));
+        this.motes = new THREE.Points(geo, new THREE.PointsMaterial({
+            color: 0xbdf5f7, size: 1.8, sizeAttenuation: false, transparent: true, opacity: 0.35,
+            blending: THREE.AdditiveBlending, depthWrite: false,
         }));
-        this.scene.add(this.starfield);
+        this.scene.add(this.motes);
+    }
 
-        // faint disc grid marking the plane
-        const grid = new THREE.PolarGridHelper(320, 12, 6, 96, 0x1e1b4b, 0x13112e);
-        grid.material.transparent = true;
-        grid.material.opacity = 0.35;
-        grid.position.y = -40;
-        this.scene.add(grid);
+    /** Card face texture for a matter color (cached): foil frame, dark body, banner, art, strip. */
+    _cardTexture(color) {
+        this._cardTex ??= new Map();
+        let tex = this._cardTex.get(color);
+        if (tex) return tex;
+        const c = document.createElement('canvas');
+        c.width = 96; c.height = 136;
+        const g = c.getContext('2d');
+        const base = new THREE.Color(color);
+        const css = (col) => '#' + col.getHexString();
+        const light = css(base.clone().lerp(this._white, 0.55));
+        const deep = css(base.clone().multiplyScalar(0.35));
+        const foil = g.createLinearGradient(0, 0, 96, 136);
+        foil.addColorStop(0, light); foil.addColorStop(0.3, color); foil.addColorStop(0.6, deep); foil.addColorStop(0.85, color); foil.addColorStop(1, light);
+        g.fillStyle = foil;
+        g.beginPath(); g.roundRect(0, 0, 96, 136, 10); g.fill();
+        g.fillStyle = '#0a0b0e';
+        g.beginPath(); g.roundRect(5, 5, 86, 126, 7); g.fill();
+        g.fillStyle = '#3a3f47';                                    // banner (pillar)
+        g.beginPath(); g.roundRect(10, 10, 76, 14, 3); g.fill();
+        const art = g.createRadialGradient(48, 62, 2, 48, 62, 40);   // art window
+        art.addColorStop(0, light); art.addColorStop(0.35, color); art.addColorStop(1, '#07080a');
+        g.fillStyle = art;
+        g.beginPath(); g.roundRect(10, 30, 76, 66, 4); g.fill();
+        g.fillStyle = '#16181c';                                    // matter strip
+        g.beginPath(); g.roundRect(10, 102, 76, 10, 2); g.fill();
+        g.fillStyle = color;
+        g.fillRect(14, 105, 40, 4);
+        for (let i = 0; i < 3; i++) { g.fillStyle = '#16181c'; g.beginPath(); g.roundRect(10 + i * 26, 116, 24, 10, 2); g.fill(); }
+        tex = new THREE.CanvasTexture(c);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        this._cardTex.set(color, tex);
+        return tex;
     }
 
     _buildPortal() {
         const g = new THREE.Group();
-        const ring = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: 0x00f0ff }));
+        const ring = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: 0xe6e8ec, transparent: true, opacity: 0.75 }));
         ring.scale.setScalar(13);
         ring.rotation.x = Math.PI / 2;
-        const ring2 = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.8 }));
+        const ring2 = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: 0x5fe0e6, transparent: true, opacity: 0.7 }));
         ring2.scale.setScalar(17);
         ring2.rotation.x = Math.PI / 2;
         const disc = new THREE.Mesh(new THREE.CircleGeometry(12, 48), new THREE.MeshBasicMaterial({
-            color: 0x1a0b3d, transparent: true, opacity: 0.85, side: THREE.DoubleSide,
+            color: 0x06171a, transparent: true, opacity: 0.85, side: THREE.DoubleSide,
         }));
         disc.rotation.x = -Math.PI / 2;
-        g.add(ring, ring2, disc, this._glowSprite('#7c3aed', 70, 0.5), this._glowSprite('#00f0ff', 30, 0.55));
+        g.add(ring, ring2, disc, this._glowSprite('#1fc2c9', 74, 0.4), this._glowSprite('#ffffff', 26, 0.45));
 
         // swirl of motes
         const n = 220, pos = new Float32Array(n * 3);
@@ -200,7 +255,7 @@ export class ClassifierScene {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         this.portalSwirl = new THREE.Points(geo, new THREE.PointsMaterial({
-            color: 0x67e8f9, size: 2.5, sizeAttenuation: false, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false,
+            color: 0xbdf5f7, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false,
         }));
         g.add(this.portalSwirl);
         this.portal = { group: g, ring, ring2 };
@@ -309,17 +364,23 @@ export class ClassifierScene {
         const ring = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: star.color, transparent: true, opacity: 0.9 }));
         ring.scale.setScalar(10);
         const glow = this._glowSprite(star.color, 46, 0.75);
-        group.add(core, ring, glow);
+        const ring2 = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: star.color, transparent: true, opacity: 0.3 }));
+        ring2.scale.setScalar(14);
+        const ping = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: star.color, transparent: true, opacity: 0 }));
+        ping.rotation.x = Math.PI / 2;
+        const spark = this._glowSprite('#ffffff', 5, 0.9);
+        group.add(core, ring, ring2, ping, spark, glow);
         core.userData.star = star.id;
         this.scene.add(group);
 
         const label = el('div', 'cls-star');
+        label.style.display = 'none'; // shown once the scene has placed it
         label.append(el('b'), el('small'));
         label.addEventListener('click', () => this.onStarClick(this.stars.get(star.id)?.star));
         label.addEventListener('contextmenu', (ev) => { ev.preventDefault(); this.onStarContext(this.stars.get(star.id)?.star); });
         this.labels.appendChild(label);
 
-        const e = { star, group, core, ring, glow, label, pos: null, target: null };
+        const e = { star, group, core, ring, ring2, ping, spark, glow, label, pos: null, target: null, phase: Math.random() * Math.PI * 2 };
         this.stars.set(star.id, e);
         return e;
     }
@@ -329,9 +390,14 @@ export class ClassifierScene {
         const color = new THREE.Color(star.color);
         e.core.material.color.copy(color);
         e.ring.material.color.copy(color);
+        e.ring2.material.color.copy(color);
+        e.ping.material.color.copy(color);
         e.glow.material.color.copy(color);
         const active = star.role !== 'off';
-        e.ring.visible = active;
+        e.ring.material.opacity = active ? 0.85 : 0.35;
+        e.ring2.visible = star.role !== 'exclude';
+        e.spark.visible = star.role !== 'exclude';
+        e.ping.visible = star.role === 'include' || star.role === 'seal';
         e.glow.scale.setScalar(star.collapsed ? 80 : active ? 58 : 40);
         e.label.dataset.role = star.role;
         e.label.style.setProperty('--c', star.color);
@@ -342,7 +408,7 @@ export class ClassifierScene {
 
     _removeStar(id, e) {
         this.scene.remove(e.group);
-        e.core.material.dispose(); e.ring.material.dispose(); e.glow.material.dispose();
+        for (const o of [e.core, e.ring, e.ring2, e.ping, e.spark, e.glow]) o.material.dispose();
         e.label.remove();
         this.stars.delete(id);
     }
@@ -364,18 +430,20 @@ export class ClassifierScene {
         const members = new Map();
         const offsets = spherePoints(galaxy.members.length, r * 2.4 + 12);
         galaxy.members.forEach((item, i) => {
-            const orb = new THREE.Mesh(this.shared.sphere, new THREE.MeshBasicMaterial({ color: item.color, transparent: true, opacity: 1 }));
-            orb.scale.setScalar(2.6);
-            orb.userData.item = item.id;
-            orb.visible = false;
-            const halo = this._glowSprite(item.color, 14, 0.6);
+            // a small trading card in the item's matter color, always facing the camera
+            const card = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._cardTexture(item.color), transparent: true }));
+            card.scale.set(5.6, 7.9, 1);
+            card.userData.item = item.id;
+            card.visible = false;
+            const halo = this._glowSprite(item.color, 16, 0.45);
             halo.visible = false;
-            group.add(orb, halo);
-            members.set(item.id, { item, orb, halo, offset: offsets[i] });
+            group.add(halo, card);
+            members.set(item.id, { item, card, halo, offset: offsets[i] });
         });
         this.scene.add(group);
 
         const label = el('div', 'cls-galaxy');
+        label.style.display = 'none'; // shown once the scene has placed it
         label.addEventListener('click', () => this._flyToGalaxy(galaxy.id));
         this.labels.appendChild(label);
 
@@ -391,8 +459,9 @@ export class ClassifierScene {
         e.glow.material.opacity = g.passes ? 0.7 : 0.18;
         for (const m of e.members.values()) {
             m.item = g.members.find((x) => x.id === m.item.id) ?? m.item;
-            m.orb.material.opacity = g.passes ? 1 : 0.3;
-            m.halo.material.opacity = g.passes ? 0.6 : 0.12;
+            m.card.material.opacity = g.passes ? 1 : 0.35;
+            m.card.material.color.setScalar(g.passes ? 1 : 0.55);
+            m.halo.material.opacity = g.passes ? 0.45 : 0.08;
         }
         e.label.textContent = String(g.members.length);
         e.label.classList.toggle('dim', !g.passes);
@@ -404,7 +473,7 @@ export class ClassifierScene {
         this.scene.remove(e.group);
         e.body.material.dispose(); e.glow.material.dispose();
         for (const m of e.members.values()) {
-            m.orb.material.dispose(); m.halo.material.dispose();
+            m.card.material.dispose(); m.halo.material.dispose();
             if (!keepCards) { this.cards.get(m.item.id)?.remove(); this.cards.delete(m.item.id); }
         }
         e.label.remove();
@@ -416,16 +485,19 @@ export class ClassifierScene {
         if (card) return card;
         card = el('div', 'cls-card');
         card.style.setProperty('--c', item.color);
+        const inner = el('div', 'cls-card-inner');
         const img = el('div', 'cls-card-img');
         const src = safeUrl(item.cover_url);
         if (src) {
             const i = document.createElement('img');
             i.alt = ''; i.loading = 'lazy'; i.decoding = 'async'; i.referrerPolicy = 'no-referrer';
-            i.onerror = () => { i.remove(); img.classList.add('empty'); };
+            i.onerror = () => i.remove();
             i.src = src;
             img.appendChild(i);
-        } else img.classList.add('empty');
-        card.append(img, el('div', 'cls-card-title', item.title));
+        }
+        const stage = stageOf(item);
+        inner.append(el('div', 'cls-card-banner', item.title), img, el('div', 'cls-card-strip', `★ ${stage ? stage.matter : 'matter'}`));
+        card.append(inner);
         card.addEventListener('click', (ev) => { ev.stopPropagation(); this.onSelect(item.id); });
         card.addEventListener('mouseenter', () => this.onHover(item.id));
         card.addEventListener('mouseleave', () => this.onHover(null));
@@ -466,8 +538,9 @@ export class ClassifierScene {
         for (const e of this.galaxies.values()) {
             for (const [id, m] of e.members) {
                 const sel = id === this.selectedId, hov = id === this.hoveredId;
-                m.orb.scale.setScalar(sel ? 4.6 : hov ? 3.6 : 2.6);
-                m.halo.scale.setScalar(sel ? 30 : hov ? 22 : 14);
+                const k = sel ? 1.55 : hov ? 1.28 : 1;
+                m.card.scale.set(5.6 * k, 7.9 * k, 1);
+                m.halo.scale.setScalar(sel ? 34 : hov ? 24 : 16);
                 const card = this.cards.get(id);
                 if (card) { card.classList.toggle('selected', sel); card.classList.toggle('hover', hov); }
             }
@@ -500,7 +573,7 @@ export class ClassifierScene {
         const targets = [];
         for (const e of this.stars.values()) targets.push(e.core);
         for (const e of this.galaxies.values()) {
-            if (e.expanded) for (const m of e.members.values()) targets.push(m.orb);
+            if (e.expanded) for (const m of e.members.values()) targets.push(m.card);
             else targets.push(e.body);
         }
         const hit = this.raycaster.intersectObjects(targets, false)[0];
@@ -580,12 +653,18 @@ export class ClassifierScene {
         }
         this.controls.update();
 
+        // rising motes (wrap back to the floor)
+        const mp = this.motePos;
+        for (let i = 1; i < mp.length; i += 3) { mp[i] += dt * 4; if (mp[i] > 170) mp[i] = -60; }
+        this.motes.geometry.attributes.position.needsUpdate = true;
+        this.floor.rotation.y += dt * 0.01;
+
         // portal
         this.portal.ring.rotation.z += dt * 0.6;
         this.portal.ring2.rotation.z -= dt * 0.35;
         this.portalSwirl.rotation.y += dt * 0.9;
         this._place(this.portalLabel, new THREE.Vector3(0, 22, 0));
-        this.portalLabel.textContent = `◈ ${this.passCount} / ${this.total} pass`;
+        this.portalLabel.textContent = `${this.passCount} / ${this.total} pass`;
 
         // stars
         for (const e of this.stars.values()) {
@@ -594,6 +673,13 @@ export class ClassifierScene {
             e.group.position.copy(e.pos);
             e.ring.rotation.x = this.time * 0.8;
             e.ring.rotation.y = this.time * 0.5;
+            e.ring2.rotation.x = -this.time * 0.5 + 1;
+            e.ring2.rotation.z = this.time * 0.3;
+            const sa = this.time * 1.6 + e.phase;
+            e.spark.position.set(Math.cos(sa) * 12, Math.sin(sa * 0.7) * 4, Math.sin(sa) * 12);
+            const pf = ((this.time * 0.4 + e.phase) % 1);
+            e.ping.scale.setScalar(6 + pf * 26);
+            e.ping.material.opacity = (1 - pf) * 0.5;
             this._place(e.label, e.pos.clone().add(new THREE.Vector3(0, 14, 0)));
         }
 
@@ -615,13 +701,13 @@ export class ClassifierScene {
             const spin = this.time * 0.15;
             const cos = Math.cos(spin), sin = Math.sin(spin);
             for (const m of e.members.values()) {
-                m.orb.visible = expanded;
+                m.card.visible = expanded;
                 m.halo.visible = expanded;
                 if (!expanded) continue;
                 const o = m.offset;
-                m.orb.position.set(o.x * cos - o.z * sin, o.y, o.x * sin + o.z * cos);
-                m.halo.position.copy(m.orb.position);
-                const world = m.orb.position.clone().add(e.group.position);
+                m.card.position.set(o.x * cos - o.z * sin, o.y, o.x * sin + o.z * cos);
+                m.halo.position.copy(m.card.position);
+                const world = m.card.position.clone().add(e.group.position);
                 const d = cam.distanceTo(world);
                 if (m.item.id === this.selectedId || d < CARD_DISTANCE) cardCandidates.push({ m, world, d, passes: e.galaxy.passes });
             }
@@ -679,6 +765,7 @@ export class ClassifierScene {
             if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
         });
         for (const v of Object.values(this.shared)) v.dispose?.();
+        for (const t of this._cardTex?.values() ?? []) t.dispose();
         this.renderer.dispose();
         this.container.remove();
     }

@@ -3,6 +3,7 @@ import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { addDays, hourOf, layoutWeek, sameDay, startOfWeek } from './calendarLayout.js';
 import { dayKey, parseDay } from '../../filters.js';
+import { stageOf } from '../../lifecycle.js';
 
 const FIRST_HOUR = 6;   // visible range: 06:00 ...
 const LAST_HOUR = 24;   // ... to midnight
@@ -51,7 +52,7 @@ function CalendarBlockImpl({ block, selected, hovered, selectItem, hoverItem }) 
             onPointerLeave=${() => hoverItem(null)}
         >
             <b>${event.title}</b>
-            <span>${fmtTime(block.start)}</span>
+            <span>${stageOf(event)?.matter ?? ''} · ${fmtTime(block.start)}</span>
         </div>
     `;
 }

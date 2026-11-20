@@ -1,4 +1,4 @@
-"""Persisted settings: the active filter and saved places (survive server restarts)."""
+"""Persisted settings: applied + draft filters and saved places (survive server restarts)."""
 
 from typing import Any
 
@@ -14,7 +14,8 @@ router = APIRouter(prefix="/state", tags=["state"])
 
 # key -> schema; only these keys can be read or written
 SCHEMAS: dict[str, type[BaseModel]] = {
-    "filters": FilterState,
+    "filters": FilterState,        # applied: what the calendar and map show
+    "filters_draft": FilterState,  # the Nexus's pending edits, until "pass through"
     "places": PlacesState,
 }
 
@@ -27,12 +28,13 @@ def _schema(key: str) -> type[BaseModel]:
 
 
 @router.get("/{key}")
-async def get_state(key: str, session: AsyncSession = Depends(get_session)):
-    """The stored value, or the defaults if nothing has been saved yet."""
+async def get_state(key: str, or_null: bool = False, session: AsyncSession = Depends(get_session)):
+    """The stored value, or the defaults if nothing has been saved yet
+    (or null, with `?or_null=true`, so a caller can tell "never saved" apart)."""
     schema = _schema(key)
     row = await session.get(AppState, key)
     if row is None:
-        return schema().model_dump(mode="json")
+        return None if or_null else schema().model_dump(mode="json")
     try:
         return schema.model_validate(row.value).model_dump(mode="json")
     except ValueError:

@@ -180,3 +180,18 @@ export function formatDistance(km, units) {
     const v = units === 'mi' ? km / KM_PER_MI : km;
     return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units}`;
 }
+
+/**
+ * How many facet / Seal settings differ between the draft and the applied filters
+ * (ranges apply immediately, so they never differ).
+ * @param {FilterState} draft @param {FilterState} applied
+ */
+export function pendingChanges(draft, applied) {
+    let n = draft.seal === applied.seal ? 0 : 1;
+    const keys = new Set([...Object.keys(draft.facets), ...Object.keys(applied.facets)]);
+    for (const k of keys) {
+        const a = draft.facets[/** @type {FacetKey} */ (k)] ?? {}, b = applied.facets[/** @type {FacetKey} */ (k)] ?? {};
+        for (const v of new Set([...Object.keys(a), ...Object.keys(b)])) if (a[v] !== b[v]) n++;
+    }
+    return n;
+}

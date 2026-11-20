@@ -2,6 +2,7 @@ import { memo, useRef, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { PanelGroup } from './PanelGroup.js';
+import { RESIZING_CLASS } from '../lib/resizing.js';
 
 /** @param {{ node: LayoutNode | null }} props */
 function DockNodeImpl({ node }) {
@@ -18,21 +19,31 @@ function DockNodeImpl({ node }) {
 
     const isHorizontal = node.direction === 'horizontal';
 
+    /** @param {MouseEvent} e */
     const startResize = (e) => {
         e.preventDefault();
+        if (!containerRef.current) return;
         setDragging(true);
+        document.body.classList.add(RESIZING_CLASS); // cheap rendering while dragging (see lib/resizing.js)
 
-        const onMouseMove = (moveEvent) => {
-            if (!containerRef.current) return;
-            const rect = containerRef.current.getBoundingClientRect();
-            const ratio = isHorizontal
+        // The split's own box doesn't move during its drag: measure once, not per event.
+        const rect = containerRef.current.getBoundingClientRect();
+        let raf = 0;
+        let latest = 0;
+
+        // Coalesce mouse events: at most one layout update per animation frame.
+        const onMouseMove = (/** @type {MouseEvent} */ moveEvent) => {
+            latest = isHorizontal
                 ? ((moveEvent.clientX - rect.left) / rect.width) * 100
                 : ((moveEvent.clientY - rect.top) / rect.height) * 100;
-            resizeSplit(node.id, ratio);
+            if (!raf) raf = requestAnimationFrame(() => { raf = 0; resizeSplit(node.id, latest); });
         };
 
         const onMouseUp = () => {
+            cancelAnimationFrame(raf);
+            if (latest) resizeSplit(node.id, latest);
             setDragging(false);
+            document.body.classList.remove(RESIZING_CLASS);
             commitResize();
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
@@ -49,7 +60,9 @@ function DockNodeImpl({ node }) {
                 flexBasis: `${node.ratio}%`,
                 flexGrow: 0,
                 flexShrink: 0,
-                overflow: 'hidden'
+                minWidth: 0,
+                minHeight: 0,
+                overflow: 'visible' // corner ornaments and frame shadows extend past the box
             }}>
                 <${DockNode} node=${node.first} />
             </div>
@@ -64,7 +77,9 @@ function DockNodeImpl({ node }) {
                 flexBasis: `${100 - node.ratio}%`,
                 flexGrow: 1,
                 flexShrink: 1,
-                overflow: 'hidden'
+                minWidth: 0,
+                minHeight: 0,
+                overflow: 'visible' // corner ornaments and frame shadows extend past the box
             }}>
                 <${DockNode} node=${node.second} />
             </div>

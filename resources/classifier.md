@@ -1,11 +1,11 @@
 # Classifier & Discovery — design
 
-Status: concept agreed 2026-11-19; parts 1–3 built (see section 8).
+Status: concept agreed 2026-11-19; parts 1–3 built, then restyled (see sections 6–7).
 Related: `features.md` (adventure lifecycle phases, panel list).
 
 ## 1. Purpose
 
-Adventures are the core objects of Adventure Engine. The **classifier** (the Assay) is a
+Adventures are the core objects of Adventure Engine. The **classifier** (the **Nexus**, formerly the Assay) is a
 3D view of the knowledge graph around them: adventures plus the virtual objects they are
 associated with. Applying filters there (and in the calendar and map) carves the full
 pool of adventures into a subset, which every other module then works with.
@@ -26,7 +26,7 @@ stages are vessels or places.
 | discovery review | **Augur** | judges omens | — | (Discovery mode) |
 | rejected | **Limbo** | **shade** | raw: `ignored` | ignore in Discovery |
 | passed, waiting | **Hopper** | **ore** | `queued` | pass in Discovery |
-| classification | **Assay** | **essence** | `classifying` | by hand |
+| classification | **Nexus** | **essence** | `classifying` | by hand |
 | decomposition | **Alembic** | **distillate** | `decomposing` | by hand |
 | construction | **Crucible** | **alloy** | `constructing` | by hand |
 | consumption | **Arena** | **animus** | `consuming` | by hand |
@@ -39,11 +39,15 @@ stages are vessels or places.
 - **Arena** is the one stage that isn't a machine: it's real life, where the refined
   adventure leaves the factory.
 - Read as a journey: omen (Sensorium) → judged by the Augur → ore (Hopper) → essence
-  (Assay) → distillate (Alembic) → alloy (Crucible) → animus (Arena) → artifact
+  (Nexus) → distillate (Alembic) → alloy (Crucible) → animus (Arena) → artifact
   (Treasury) → relic (Archive). Side paths: shade (Limbo), vestige (Necropolis).
 - The future analyzer (the **Spectrometer**) can chart the count of adventures per stage.
 - Module ↔ panel: Sensorium = crawler and sync, Augur = Discovery mode and inbox,
-  Assay = classifier, Alembic = action roadmap, Crucible = quest log, Arena = real life.
+  Nexus = classifier, Alembic = action roadmap, Crucible = quest log, Arena = real life.
+- Matter colors run cold to warm along the lifecycle: omen slate, ore blue, essence cyan,
+  distillate amber, alloy orange, animus red, artifact violet; side paths are desaturated
+  (shade grey, vestige ash, relic bronze). Every view colors items by stage
+  (`frontend/js/lifecycle.js`, `frontend/styles.css`).
 
 ## 3. Core objects
 
@@ -100,7 +104,7 @@ raw event:  new ──pass──▶ passed ◀──revive── ignored
   the Necropolis, that adventure is restored to its previous phase with all its data;
   otherwise a new adventure is created in the Hopper, the same as a first pass.
 - **Missed events**: an adventure whose event ends before it reaches the Arena (still in
-  the Hopper, Assay, Alembic or Crucible) moves to the Necropolis automatically.
+  the Hopper, Nexus, Alembic or Crucible) moves to the Necropolis automatically.
 - **Decommission** (artifact → relic): by hand, for completed adventures old enough to
   be irrelevant.
 - Pass, ignore, kill and revive will also work **in bulk on a filtered set** (later).
@@ -124,8 +128,14 @@ raw event:  new ──pass──▶ passed ◀──revive── ignored
 - Parents of the **same type combine with OR** (Luma OR RA); **different types combine
   with AND** (Luma AND this date range).
 - The result is **one global subset**. The calendar and map always show the same subset.
+- **Draft and pass-through (as built):** the Nexus edits a *draft*. Facet and Hermetic Seal
+  changes stay pending (shown in the Nexus's filter tray and status light) until **Pass
+  through** sends the draft's subset to the calendar and map; **Discard** drops them.
+  Ranges made in the calendar or map (date range, proximity ring) apply immediately.
+  The separate Filters panel was removed: the Nexus's tray replaces it.
 - Collapsing a parent in the classifier is visual only. It never filters.
-- The active filter is saved on the server, so it survives a reload.
+- The applied filter and the draft are both saved on the server (`filters`,
+  `filters_draft`), so they survive a reload.
 
 ### Views filter themselves, separately from navigation
 Every view applies the shared filter, including its own filter type. Navigating
@@ -162,6 +172,10 @@ A hybrid look: **space at a distance, trading cards up close.**
 - **Detail changes with zoom:** zoomed out, each galaxy is one glowing body showing its
   count; zooming in breaks it into its adventures. Exploring the classifier is like
   travelling through space.
+- **As built (restyle):** no space imagery. Parents are particles (core, counter-rotating
+  rings, orbiting spark, pulse) in monochrome roles: include white, exclude dim, Seal gold.
+  Adventures are small trading cards in their matter color; clusters far away show a
+  floating count. A faint ritual circle marks the floor and a few motes rise.
 - **Up close, adventures are cards** showing the cover image and title (more fields later).
   As built, cards are HTML overlays positioned over the 3D scene (like the map's cards),
   so any image URL works without the backend fetching and re-serving images.

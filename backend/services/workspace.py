@@ -6,33 +6,38 @@ The layout lives in memory, so it resets to DEFAULT_LAYOUT_TREE on server restar
 import copy
 from typing import Any
 
-# `kind` picks the frontend component (frontend/js/components/panels/index.js).
+# Each panel: `kind` picks the frontend component (frontend/js/components/panels/index.js);
+# `icon`, `name`, `question` and `flow` (input -> output) make its two-line title.
 PANELS_METADATA = {
-    "node":     {"id": "node",     "title": "Node // What",     "category": "EVENT-LOCK", "status": "LIVE", "kind": "node"},
-    "calendar": {"id": "calendar", "title": "Calendar // When", "category": "CHRONO-MAP", "status": "LIVE", "kind": "calendar"},
-    "map":      {"id": "map",      "title": "Map // Where",     "category": "LEY-GRID",   "status": "LIVE", "kind": "map"},
-    "filters":  {"id": "filters",  "title": "Filters // Which", "category": "SIEVE",      "status": "LIVE", "kind": "filters"},
-    "classifier": {"id": "classifier", "title": "Assay // Why", "category": "KNOWLEDGE-GRAPH", "status": "LIVE", "kind": "classifier"},
+    "node": {
+        "id": "node", "kind": "node", "icon": "eye",
+        "name": "Node", "question": "what", "flow": ["matter", "details"],
+    },
+    "classifier": {
+        "id": "classifier", "kind": "classifier", "icon": "flask",
+        "name": "Nexus", "question": "why", "flow": ["ore", "essence"],
+    },
+    "map": {
+        "id": "map", "kind": "map", "icon": "compass",
+        "name": "Map", "question": "where", "flow": ["matter", "where"],
+    },
+    "calendar": {
+        "id": "calendar", "kind": "calendar", "icon": "clock",
+        "name": "Calendar", "question": "when", "flow": ["matter", "time"],
+    },
 }
 
 DEFAULT_LAYOUT_TREE: dict[str, Any] = {
     "id": "root-split",
     "type": "split",
     "direction": "horizontal",
-    "ratio": 26,
-    "first": {
-        "id": "left-split",
-        "type": "split",
-        "direction": "vertical",
-        "ratio": 58,
-        "first": {"id": "leaf-node", "type": "leaf", "tabs": ["node"], "activeTab": "node"},
-        "second": {"id": "leaf-filters", "type": "leaf", "tabs": ["filters"], "activeTab": "filters"},
-    },
+    "ratio": 25,
+    "first": {"id": "leaf-node", "type": "leaf", "tabs": ["node"], "activeTab": "node"},
     "second": {
         "id": "main-split",
         "type": "split",
         "direction": "vertical",
-        "ratio": 60,
+        "ratio": 64,
         "first": {
             "id": "top-split",
             "type": "split",

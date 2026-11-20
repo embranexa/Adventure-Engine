@@ -25,14 +25,20 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'filters' | 'classifier';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier';
 
+/** Icon names drawn by components/PanelTitle.js. */
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock';
+
+/** A panel's definition (backend/services/workspace.py). Its title reads:
+ *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
 interface PanelMeta {
     id: PanelId;
-    title: string;
-    category: string;
-    status: string;
     kind: PanelKind;
+    icon: PanelIcon;
+    name: string;
+    question: string;
+    flow: [string, string];
 }
 
 // --- crawled events (shapes from backend/db/queries.py) ---
@@ -180,8 +186,11 @@ interface WorkspaceState {
     /** Last triage/phase action error, shown in the node card; cleared by the next action. */
     actionError: string | null;
 
+    /** Applied filters: what the calendar and map show. */
     filters: FilterState;
-    /** The pool after filtering: what the calendar and map show. */
+    /** The Nexus's working copy. Facet/Seal edits wait here until passFilters(). */
+    draftFilters: FilterState;
+    /** The pool after the applied filters: what the calendar and map show. */
     visibleItems: PoolItem[];
     places: SavedPlace[];
 
@@ -214,15 +223,22 @@ interface WorkspaceState {
     setPhase(adventureId: string, phase: Phase): Promise<void>;
 
     // filters (saved to the server, debounced)
-    /** Cycle one facet value: off -> include -> exclude -> off. */
+    /** Draft: cycle one facet value off -> include -> exclude -> off. */
     cycleFacet(facet: FacetKey, value: string): void;
+    /** Draft: turn one facet value off. */
+    removeFacet(facet: FacetKey, value: string): void;
+    /** Apply the draft: the calendar and map switch to its subset. */
+    passFilters(): void;
+    /** Throw away pending draft edits. */
+    discardDraft(): void;
     setDateRange(range: DateRange | null): void;
     setRing(ring: Ring | null): void;
     /** Flip a range filter between include and exclude. */
     toggleRangeMode(which: 'date_range' | 'ring'): void;
+    /** Draft: seal / break the Hermetic Seal. */
     toggleSeal(): void;
     setUnits(units: 'mi' | 'km'): void;
-    /** Clear every filter except the Seal and units. */
+    /** Clear facets (pending) and ranges (immediately); keeps the Seal and units. */
     clearFilters(): void;
     savePlace(label: string, lat: number, lon: number): void;
     deletePlace(id: string): void;

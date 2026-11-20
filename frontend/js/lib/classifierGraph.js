@@ -11,8 +11,9 @@
 import { FACETS, UNKNOWN, facetValue, inDateRange, inRing, isSealed, passes } from '../filters.js';
 
 /** Facet star colours (off state). */
-const FACET_COLORS = { source: '#38bdf8', city: '#a78bfa', registration: '#34d399', phase: '#f59e0b', review: '#c084fc' };
-export const ROLE_COLORS = { include: '#00f0ff', exclude: '#ff2a85', seal: '#fcee0a' };
+/** Parent colors: monochrome (matter colors are for adventures). Off parents are steel. */
+const FACET_COLORS = { source: '#9aa0aa', city: '#9aa0aa', registration: '#9aa0aa', phase: '#9aa0aa', review: '#9aa0aa' };
+export const ROLE_COLORS = { include: '#f2f3f5', exclude: '#4a4f58', seal: '#e9c43b' };
 
 /**
  * @typedef {{
@@ -83,7 +84,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
     if (mode === 'adventures') {
         stars.push({
             id: 'seal', kind: 'seal', group: 'Hermetic Seal', label: filters.seal ? 'Sealed' : 'Seal broken',
-            role: filters.seal ? 'seal' : 'off', color: filters.seal ? ROLE_COLORS.seal : '#78716c',
+            role: filters.seal ? 'seal' : 'off', color: filters.seal ? ROLE_COLORS.seal : '#5c626c',
             count: 0, collapsed: collapsed.has('seal'),
         });
         membership.set('seal', (item) => isSealed(item, now));

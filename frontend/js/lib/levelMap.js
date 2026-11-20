@@ -22,6 +22,8 @@
  */
 
 import { loadScript, loadStylesheet } from './loadScript.js';
+import { stageOf } from '../lifecycle.js';
+import { deferredResize, isResizing } from './resizing.js';
 
 const VENDOR = '/frontend/vendor';
 
@@ -100,7 +102,7 @@ export class LevelMap {
     }
 
     _watchSize() {
-        this._ro = new ResizeObserver(() => this.map.resize());
+        this._ro = new ResizeObserver(deferredResize(() => this.map?.resize()));
         this._ro.observe(this.container);
     }
 
@@ -159,6 +161,74 @@ export class LevelMap {
         });
 
         this.map.addControl(new maplibregl.NavigationControl());
+        this._bindMouseDrag();
+    }
+
+    /**
+     * Mouse drag, matching the Nexus: left-drag rotates (bearing + tilt), right-drag
+     * moves. MapLibre hard-wires the opposite, so its mouse drag handlers are turned
+     * off and replaced here. Touch, wheel, pinch and the buttons are unchanged.
+     */
+    _bindMouseDrag() {
+        const map = this.map;
+        map.dragRotate.disable(); // mouse-only handler
+        // Keep one-finger touch pan: disable only the mouse half of drag-pan when we can reach it.
+        const mousePan = /** @type {any} */ (map.dragPan)._mousePan;
+        if (mousePan?.disable) mousePan.disable();
+        else map.dragPan.disable();
+
+        const canvas = map.getCanvas();
+        /** @type {{ id: number, mode: 'rotate' | 'pan', x: number, y: number, anchor: any } | null} */
+        let drag = null;
+
+        this._onDragDown = (/** @type {PointerEvent} */ e) => {
+            if (e.pointerType !== 'mouse' || (e.button !== 0 && e.button !== 2)) return;
+            const p = this._canvasPoint(e);
+            drag = {
+                id: e.pointerId, x: e.clientX, y: e.clientY,
+                mode: e.button === 0 ? 'rotate' : 'pan',
+                anchor: e.button === 2 ? map.unproject(p) : null, // the ground point held under the cursor
+            };
+            canvas.setPointerCapture(e.pointerId);
+            map.stop(); // cancel any fly-to in progress
+        };
+        this._onDragMove = (/** @type {PointerEvent} */ e) => {
+            if (!drag || e.pointerId !== drag.id) return;
+            const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+            if (!dx && !dy) return;
+            drag.x = e.clientX; drag.y = e.clientY;
+            canvas.classList.add('lm-dragging');
+            if (drag.mode === 'rotate') {
+                // Same rates as MapLibre's own rotate-drag
+                map.jumpTo({ bearing: map.getBearing() + dx * 0.8, pitch: map.getPitch() + dy * 0.5 });
+            } else {
+                // Keep the grabbed ground point under the cursor (falls back to a plain shift near the horizon)
+                const p = this._canvasPoint(e);
+                const at = map.project(drag.anchor);
+                let ox = at.x - p.x, oy = at.y - p.y;
+                if (!Number.isFinite(ox) || !Number.isFinite(oy) || Math.hypot(ox, oy) > 400) { ox = -dx; oy = -dy; }
+                map.panBy([ox, oy], { duration: 0 });
+            }
+        };
+        this._onDragUp = (/** @type {PointerEvent} */ e) => {
+            if (!drag || e.pointerId !== drag.id) return;
+            drag = null;
+            canvas.classList.remove('lm-dragging');
+            if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+        };
+        this._onContextMenu = (/** @type {MouseEvent} */ e) => e.preventDefault();
+
+        canvas.addEventListener('pointerdown', this._onDragDown);
+        canvas.addEventListener('pointermove', this._onDragMove);
+        canvas.addEventListener('pointerup', this._onDragUp);
+        canvas.addEventListener('pointercancel', this._onDragUp);
+        canvas.addEventListener('contextmenu', this._onContextMenu);
+    }
+
+    /** Pointer position relative to the map canvas. @param {PointerEvent} e */
+    _canvasPoint(e) {
+        const r = this.map.getCanvas().getBoundingClientRect();
+        return [e.clientX - r.left, e.clientY - r.top];
     }
 
     _addBuildings() {
@@ -196,9 +266,8 @@ export class LevelMap {
             return el;
         };
 
-        // Scanlines, vignette, corner brackets.
+        // Soft vignette over the map.
         this.fx = div('lm-fx');
-        ['tl', 'tr', 'bl', 'br'].forEach((pos) => div(`lm-corner ${pos}`, this.fx));
 
         // Cards live here, above the canvas.
         this.labelLayer = div('lm-labels');
@@ -206,10 +275,8 @@ export class LevelMap {
         // HUD (static markup only; dynamic values are set via textContent).
         this.panel = div('lm-hud');
         this.panel.innerHTML = `
-            <div class="lm-hud-title">Level select</div>
-            <div class="lm-row"><span>Events</span><b data-ref="count">0</b></div>
+            <div class="lm-row"><span>Shown</span><b data-ref="count">0</b></div>
             <div class="lm-row"><span>Target</span><b data-ref="target">None</b></div>
-            <div class="lm-hint">Click a beacon to lock on</div>
         `;
         this.nodeCount = this.panel.querySelector('[data-ref="count"]');
         this.selectedLabel = this.panel.querySelector('[data-ref="target"]');
@@ -271,8 +338,9 @@ export class LevelMap {
 
                 this._updateLabels();
 
-                // Keep animating.
-                this.map.triggerRepaint();
+                // Keep animating; while a splitter is dragged, just check back now and then.
+                if (isResizing()) setTimeout(() => this.map?.triggerRepaint(), 100);
+                else this.map.triggerRepaint();
             },
 
             onRemove: () => {
@@ -540,7 +608,7 @@ export class LevelMap {
 
         const head = el('div', 'lm-head');
         head.append(
-            el('span', 'lm-tag', `LV.${String(entry.index + 1).padStart(2, '0')}`),
+            el('span', 'lm-tag', stageOf(node.raw)?.matter ?? 'matter'),
             el('span', 'lm-title', node.title),
         );
 
@@ -962,6 +1030,12 @@ export class LevelMap {
         this._ringCenter?.remove();
         this._ringEdge?.remove();
         this._ro?.disconnect();
+        const canvas = this.map.getCanvas();
+        canvas.removeEventListener('pointerdown', this._onDragDown);
+        canvas.removeEventListener('pointermove', this._onDragMove);
+        canvas.removeEventListener('pointerup', this._onDragUp);
+        canvas.removeEventListener('pointercancel', this._onDragUp);
+        canvas.removeEventListener('contextmenu', this._onContextMenu);
         this.map.off('click', this._onClick);
         this.map.off('mousemove', this._onMove);
         this.map.off('error', this._onError);

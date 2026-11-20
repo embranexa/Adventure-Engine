@@ -193,27 +193,41 @@ async function saveState(key, value, keepalive = false) {
     }
 }
 
-/** @param {() => WorkspaceState} get */
-function scheduleFilterSave(get) {
-    clearTimeout(filterSaveTimer);
-    filterSaveTimer = setTimeout(() => {
-        filterSaveTimer = undefined;
-        saveState('filters', get().filters);
+/** @type {Record<string, ReturnType<typeof setTimeout>>} */
+const saveTimers = {};
+/** @type {Record<string, () => unknown>} */
+const pendingSaves = {};
+
+/**
+ * Save `key` after a short pause (rapid edits collapse into one request). Anything
+ * still waiting is sent right away when the page goes away, so no edit is lost.
+ * @param {string} key @param {() => unknown} value
+ */
+function scheduleSave(key, value) {
+    clearTimeout(saveTimers[key]);
+    pendingSaves[key] = value;
+    saveTimers[key] = setTimeout(() => {
+        delete pendingSaves[key];
+        saveState(key, value());
     }, FILTER_SAVE_DEBOUNCE_MS);
-    // A change made just before closing or reloading the tab must not be lost:
-    // send the pending save right away when the page goes away.
     if (!flushOnExit) {
         flushOnExit = () => {
-            if (filterSaveTimer === undefined) return;
-            clearTimeout(filterSaveTimer);
-            filterSaveTimer = undefined;
-            saveState('filters', get().filters, true);
+            for (const [k, v] of Object.entries(pendingSaves)) {
+                clearTimeout(saveTimers[k]);
+                delete pendingSaves[k];
+                saveState(k, v(), true);
+            }
         };
         window.addEventListener('pagehide', flushOnExit);
     }
 }
 /** @type {(() => void) | undefined} */
 let flushOnExit;
+
+/** @param {() => WorkspaceState} get */
+const saveApplied = (get) => scheduleSave('filters', () => get().filters);
+/** @param {() => WorkspaceState} get */
+const saveDraft = (get) => scheduleSave('filters_draft', () => get().draftFilters);
 
 /**
  * Call the API for a triage/phase action. Errors land in `actionError` (shown in the
@@ -280,6 +294,7 @@ const workspaceStore = (set, get) => ({
     sources: {},
     actionError: null,
     filters: DEFAULT_FILTERS,
+    draftFilters: DEFAULT_FILTERS,
     visibleItems: [],
     places: [],
 
@@ -293,12 +308,15 @@ const workspaceStore = (set, get) => ({
         }
         // saved filters and places, loaded before the first pool arrives
         try {
-            const [filters, places] = await Promise.all([
+            const [filters, draft, places] = await Promise.all([
                 fetch('/api/state/filters').then((r) => r.json()),
+                fetch('/api/state/filters_draft?or_null=true').then((r) => r.json()),
                 fetch('/api/state/places').then((r) => r.json()),
             ]);
+            const applied = { ...DEFAULT_FILTERS, ...filters };
             set((state) => withVisible(state, {
-                filters: { ...DEFAULT_FILTERS, ...filters },
+                filters: applied,
+                draftFilters: draft ? { ...DEFAULT_FILTERS, ...draft } : applied, // never saved: start equal
                 places: places.places ?? [],
             }));
         } catch (err) {
@@ -330,28 +348,62 @@ const workspaceStore = (set, get) => ({
         }),
 
     // --- filters ---
+    // Facets and the Seal are edited in the Nexus as a draft (pending until passFilters).
+    // Ranges (date, ring) and units apply immediately, to both the draft and the applied set.
 
     cycleFacet: (facet, value) => {
         set((state) => {
-            const current = { ...(state.filters.facets[facet] ?? {}) };
+            const current = { ...(state.draftFilters.facets[facet] ?? {}) };
             const mode = nextMode(current[value]);
             if (mode) current[value] = mode;
             else delete current[value];
-            const facets = { ...state.filters.facets, [facet]: current };
+            const facets = { ...state.draftFilters.facets, [facet]: current };
             if (!Object.keys(current).length) delete facets[facet];
-            return withVisible(state, { filters: { ...state.filters, facets } });
+            return { draftFilters: { ...state.draftFilters, facets } };
         });
-        scheduleFilterSave(get);
+        saveDraft(get);
+    },
+
+    removeFacet: (facet, value) => {
+        set((state) => {
+            const current = { ...(state.draftFilters.facets[facet] ?? {}) };
+            delete current[value];
+            const facets = { ...state.draftFilters.facets, [facet]: current };
+            if (!Object.keys(current).length) delete facets[facet];
+            return { draftFilters: { ...state.draftFilters, facets } };
+        });
+        saveDraft(get);
+    },
+
+    toggleSeal: () => {
+        set((state) => ({ draftFilters: { ...state.draftFilters, seal: !state.draftFilters.seal } }));
+        saveDraft(get);
+    },
+
+    passFilters: () => {
+        set((state) => withVisible(state, { filters: { ...state.draftFilters } }));
+        saveApplied(get);
+    },
+
+    discardDraft: () => {
+        set((state) => ({ draftFilters: { ...state.filters } }));
+        saveDraft(get);
     },
 
     setDateRange: (range) => {
-        set((state) => withVisible(state, { filters: { ...state.filters, date_range: range } }));
-        scheduleFilterSave(get);
+        set((state) => withVisible(state, {
+            filters: { ...state.filters, date_range: range },
+            draftFilters: { ...state.draftFilters, date_range: range },
+        }));
+        saveApplied(get); saveDraft(get);
     },
 
     setRing: (ring) => {
-        set((state) => withVisible(state, { filters: { ...state.filters, ring } }));
-        scheduleFilterSave(get);
+        set((state) => withVisible(state, {
+            filters: { ...state.filters, ring },
+            draftFilters: { ...state.draftFilters, ring },
+        }));
+        saveApplied(get); saveDraft(get);
     },
 
     toggleRangeMode: (which) => {
@@ -360,26 +412,30 @@ const workspaceStore = (set, get) => ({
             if (!range) return {};
             /** @type {FilterMode} */
             const mode = range.mode === 'include' ? 'exclude' : 'include';
-            return withVisible(state, { filters: { ...state.filters, [which]: { ...range, mode } } });
+            const next = { ...range, mode };
+            return withVisible(state, {
+                filters: { ...state.filters, [which]: next },
+                draftFilters: { ...state.draftFilters, [which]: next },
+            });
         });
-        scheduleFilterSave(get);
-    },
-
-    toggleSeal: () => {
-        set((state) => withVisible(state, { filters: { ...state.filters, seal: !state.filters.seal } }));
-        scheduleFilterSave(get);
+        saveApplied(get); saveDraft(get);
     },
 
     setUnits: (units) => {
-        set((state) => ({ filters: { ...state.filters, units } }));
-        scheduleFilterSave(get);
+        set((state) => ({
+            filters: { ...state.filters, units },
+            draftFilters: { ...state.draftFilters, units },
+        }));
+        saveApplied(get); saveDraft(get);
     },
 
     clearFilters: () => {
+        // facets go pending (draft); ranges clear immediately everywhere
         set((state) => withVisible(state, {
-            filters: { ...DEFAULT_FILTERS, seal: state.filters.seal, units: state.filters.units },
+            filters: { ...state.filters, date_range: null, ring: null },
+            draftFilters: { ...state.draftFilters, facets: {}, date_range: null, ring: null },
         }));
-        scheduleFilterSave(get);
+        saveApplied(get); saveDraft(get);
     },
 
     savePlace: (label, lat, lon) => {

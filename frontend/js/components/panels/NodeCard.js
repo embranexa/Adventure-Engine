@@ -10,40 +10,99 @@ const KNOWN_DETAILS = new Set([
     'sold_out', 'registration', 'hosts', 'guest_count',
 ]);
 
+// Alchemical element glyphs (18×18): fire, water, air, earth, aether
+const ELEMENT_PATHS = {
+    fire: 'M9 2.5 L16 15 H2 Z',
+    water: 'M2 3 H16 L9 15.5 Z',
+    air: 'M9 2.5 L16 15 H2 Z M4.6 10.4 H13.4',
+    earth: 'M2 3 H16 L9 15.5 Z M4.6 7.6 H13.4',
+    aether: 'M9 2.5 A6.5 6.5 0 1 1 8.99 2.5 Z M9 7.2 A1.8 1.8 0 1 1 8.99 7.2 Z',
+};
+
 /** @param {unknown} value */
 function formatValue(value) {
     const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
     return text.length > 300 ? text.slice(0, 300) + '…' : text;
 }
 
-/** @param {{ src: string }} props */
-function CoverImage({ src }) {
+/** A stat set by hand on the adventure (empty until then). @param {Record<string, unknown> | undefined} stats @param {string} key */
+function stat(stats, key) {
+    const v = stats?.[key];
+    return v == null || v === '' ? null : v;
+}
+
+/** @param {{ src: string | null }} props */
+function CardArt({ src }) {
     const [failed, setFailed] = useState(false);
-    if (failed) return html`<div className="nc-img empty" />`;
     return html`
-        <div className="nc-img">
-            <img src=${src} alt="" loading="lazy" referrerPolicy="no-referrer" onError=${() => setFailed(true)} />
+        <div className="tcard-art">
+            ${src && !failed
+                ? html`<img src=${src} alt="" loading="lazy" referrerPolicy="no-referrer" onError=${() => setFailed(true)} />`
+                : html`<span>NO IMAGE</span>`}
         </div>
     `;
 }
 
-/** @param {{ event: PoolItem }} props */
-function EventDetails({ event }) {
+/**
+ * The selected item as a trading card. Four designators: matter (foil frame + strip),
+ * pillar (banner), difficulty (pips), element (corner badge). Pillar, difficulty,
+ * element and HP/ATK/DEF are set by hand later; until then they show as empty.
+ * @param {{ item: PoolItem }} props
+ */
+function TradingCard({ item }) {
+    const stage = stageOf(item);
+    const stats = item.kind === 'adventure' ? item.stats : undefined;
+    const element = /** @type {keyof typeof ELEMENT_PATHS | null} */ (stat(stats, 'element'));
+    const pillar = /** @type {string | null} */ (stat(stats, 'pillar'));
+    const difficulty = Math.max(0, Math.min(5, Number(stat(stats, 'difficulty')) || 0));
+    const when = item.start ? formatEventWhen(item) : 'Undated';
+    const place = item.location_approximate ? item.city : (item.venue || item.city);
+
+    return html`
+        <div
+            className="tcard"
+            style=${{ '--c': stage?.color, '--d': stage?.deep, '--l': stage?.light }}
+        >
+            <div className="tcard-element" title=${element ? `Element: ${element}` : 'Element not set'}>
+                ${element && ELEMENT_PATHS[element]
+                    ? html`<svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#e6e8ec" stroke-width="1.5"><path d=${ELEMENT_PATHS[element]}></path></svg>`
+                    : '?'}
+            </div>
+            <div className="tcard-body">
+                <div className="tcard-banner">
+                    <span className="tcard-title">${item.title}</span>
+                    ${pillar && html`<span className="tcard-pillar">${pillar}</span>`}
+                </div>
+                <${CardArt} key=${item.id} src=${safeHttpUrl(item.cover_url)} />
+                <div className="tcard-strip">
+                    <span>★ ${stage ? `${stage.matter} — ${stage.module}` : 'unknown'}</span>
+                    <span className="pips" title=${difficulty ? `Difficulty ${difficulty} of 5` : 'Difficulty not set'}>
+                        ${[1, 2, 3, 4, 5].map((n) => html`<span key=${n} className=${`pip ${n <= difficulty ? 'on' : ''}`}></span>`)}
+                    </span>
+                </div>
+                <div className="tcard-lore">${when}${place ? ` · ${place}` : ''}</div>
+                <div className="tcard-stats">
+                    <span>HP ${stat(stats, 'hp') ?? '—'}</span>
+                    <span>ATK ${stat(stats, 'atk') ?? '—'}</span>
+                    <span>DEF ${stat(stats, 'def') ?? '—'}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/** Detail rows under the card. @param {{ event: PoolItem }} props */
+function EventRows({ event }) {
     const details = event.details || {};
-    const image = safeHttpUrl(event.cover_url);
     const link = safeHttpUrl(event.url);
     const price = formatPrice(details);
     const hosts = Array.isArray(details.hosts) ? details.hosts.join(', ') : null;
-
     const where = event.location_approximate
         ? `Approximate location${event.city ? ` · ${event.city}` : ''}`
         : [event.venue, event.address].filter(Boolean).join(' — ') || event.city || 'Unknown';
 
     /** @type {[string, string][]} */
-    const rows = [
-        ['When', formatEventWhen(event)],
-        ['Where', where],
-    ];
+    const rows = [['When', formatEventWhen(event)], ['Where', where]];
     if (event.lat != null && event.lon != null) rows.push(['Coords', `${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}`]);
     if (price) rows.push(['Price', details.sold_out ? `${price} (sold out)` : price]);
     else if (details.sold_out) rows.push(['Price', 'Sold out']);
@@ -55,34 +114,19 @@ function EventDetails({ event }) {
         if (!KNOWN_DETAILS.has(key) && value != null) rows.push([key.replace(/_/g, ' '), formatValue(value)]);
     }
 
-    const stage = stageOf(event);
-
     return html`
-        <div className="nc-head">
-            <span className="nc-tag" style=${stage ? { background: stage.color } : undefined}>
-                ${stage ? stage.matter.toUpperCase() : 'LOCKED'}
-            </span>
-            <span className="nc-title">${event.title}</span>
-        </div>
-        ${stage && html`<div className="nc-stage">${stage.module} · ${stage.hint}</div>`}
-        <${ItemActions} item=${event} />
-        ${image ? html`<${CoverImage} key=${image} src=${image} />` : html`<div className="nc-img empty" />`}
         <dl className="nc-rows">
             ${rows.map(([label, value], i) => html`
                 <dt key=${'k' + i}>${label}</dt>
                 <dd key=${'v' + i}>${value}</dd>
             `)}
         </dl>
-        ${link && html`
-            <a className="btn nc-link" href=${link} target="_blank" rel="noopener noreferrer">
-                Open event page ↗
-            </a>
-        `}
+        ${link && html`<a className="btn nc-link" href=${link} target="_blank" rel="noopener noreferrer">Open event page ↗</a>`}
     `;
 }
 
 /**
- * Triage and phase controls for the selected item.
+ * Triage and stage controls for the selected item.
  * @param {{ item: PoolItem }} props
  */
 function ItemActions({ item }) {
@@ -115,7 +159,7 @@ function ItemActions({ item }) {
                         style=${{ '--s': PHASE_STAGES[phase].color }}
                         title=${`${PHASE_STAGES[phase].module} (${PHASE_STAGES[phase].matter}): ${PHASE_STAGES[phase].hint}`}
                         onClick=${() => setPhase(item.id, phase)}
-                    >${PHASE_STAGES[phase].module}</button>
+                    >${PHASE_STAGES[phase].module.slice(0, 3)}</button>
                 `)}
             </div>
             ${item.phase === 'completed' && html`
@@ -133,24 +177,29 @@ function ItemActions({ item }) {
     `;
 }
 
-/** Details of the selected item, with its triage / phase controls. */
+/** The selected item: its trading card, triage / stage controls and details. */
 export function NodeCard() {
     const event = useWorkspaceStore((s) => (s.selectedItemId ? s.itemsById[s.selectedItemId] : null));
     const hoverItem = useWorkspaceStore((s) => s.hoverItem);
     const mode = useWorkspaceStore((s) => s.mode);
+    const stage = event ? stageOf(event) : null;
 
     return html`
         <div
             className="panel-body node-card"
-            style=${event ? { '--c': event.color } : undefined}
             onPointerEnter=${() => event && hoverItem(event.id)}
             onPointerLeave=${() => event && hoverItem(null)}
         >
             ${event
-                ? html`<${EventDetails} event=${event} />`
-                : html`<div className="nc-empty">No target locked<small>${mode === 'discovery'
+                ? html`
+                    <${TradingCard} item=${event} />
+                    ${stage && html`<div className="nc-stage">${stage.module} · ${stage.hint}</div>`}
+                    <${ItemActions} item=${event} />
+                    <${EventRows} event=${event} />
+                `
+                : html`<div className="nc-empty">Nothing selected<small>${mode === 'discovery'
                     ? 'Select an omen to review it'
-                    : 'Select an adventure in the calendar or map'}</small></div>`}
+                    : 'Select an adventure in the Nexus, map or calendar'}</small></div>`}
         </div>
     `;
 }
