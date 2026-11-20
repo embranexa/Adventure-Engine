@@ -26,10 +26,10 @@ function useNow(ms) {
  * @param {{
  *   block: import('./calendarLayout.js').CalendarBlock,
  *   selected: boolean, hovered: boolean,
- *   selectEvent: WorkspaceState['selectEvent'], hoverEvent: WorkspaceState['hoverEvent'],
+ *   selectItem: WorkspaceState['selectItem'], hoverItem: WorkspaceState['hoverItem'],
  * }} props
  */
-function CalendarBlockImpl({ block, selected, hovered, selectEvent, hoverEvent }) {
+function CalendarBlockImpl({ block, selected, hovered, selectItem, hoverItem }) {
     const { event } = block;
     const className = ['cal-block', selected && 'sel', hovered && 'hov',
         block.clippedTop && 'clip-top', block.clippedBottom && 'clip-bottom'].filter(Boolean).join(' ');
@@ -45,9 +45,9 @@ function CalendarBlockImpl({ block, selected, hovered, selectEvent, hoverEvent }
                 left: `${(block.lane / block.lanes) * 100}%`,
                 width: `${100 / block.lanes}%`,
             }}
-            onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); selectEvent(event.id, 'calendar'); }}
-            onPointerEnter=${() => hoverEvent(event.id)}
-            onPointerLeave=${() => hoverEvent(null)}
+            onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); selectItem(event.id, 'calendar'); }}
+            onPointerEnter=${() => hoverItem(event.id)}
+            onPointerLeave=${() => hoverItem(null)}
         >
             <b>${event.title}</b>
             <span>${fmtTime(block.start)}</span>
@@ -58,13 +58,13 @@ const CalendarBlock = memo(CalendarBlockImpl);
 
 /** Week view of crawled events (Mon–Sun, viewer's local time). */
 export function CalendarPanel() {
-    const events = useWorkspaceStore((s) => s.events);
-    const eventsById = useWorkspaceStore((s) => s.eventsById);
-    const selectedId = useWorkspaceStore((s) => s.selectedEventId);
+    const events = useWorkspaceStore((s) => s.items);
+    const itemsById = useWorkspaceStore((s) => s.itemsById);
+    const selectedId = useWorkspaceStore((s) => s.selectedItemId);
     const selectionSource = useWorkspaceStore((s) => s.selectionSource);
-    const hoveredId = useWorkspaceStore((s) => s.hoveredEventId);
-    const selectEvent = useWorkspaceStore((s) => s.selectEvent);
-    const hoverEvent = useWorkspaceStore((s) => s.hoverEvent);
+    const hoveredId = useWorkspaceStore((s) => s.hoveredItemId);
+    const selectItem = useWorkspaceStore((s) => s.selectItem);
+    const hoverItem = useWorkspaceStore((s) => s.hoverItem);
 
     const now = useNow(60_000);
     const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
@@ -77,8 +77,8 @@ export function CalendarPanel() {
     // A selection made in another view: jump to that event's week, then scroll to it.
     useEffect(() => {
         if (!selectedId || selectionSource === 'calendar') return;
-        const event = eventsById[selectedId];
-        if (!event) return;
+        const event = itemsById[selectedId];
+        if (!event?.start) return;
         const target = startOfWeek(new Date(event.start));
         if (target.getTime() !== weekStart.getTime()) setWeekStart(target);
         revealRef.current = selectedId;
@@ -133,7 +133,7 @@ export function CalendarPanel() {
                 `)}
             </div>
 
-            <div className="cal-scroll" ref=${scrollRef} onClick=${() => selectEvent(null, 'calendar')}>
+            <div className="cal-scroll" ref=${scrollRef} onClick=${() => selectItem(null, 'calendar')}>
                 <div className="cal-grid" style=${{ height: `${(LAST_HOUR - FIRST_HOUR) * HOUR_PX}px` }}>
                     <div className="cal-gutter">
                         ${hours.map((h) => html`
@@ -148,8 +148,8 @@ export function CalendarPanel() {
                                     block=${b}
                                     selected=${b.event.id === selectedId}
                                     hovered=${b.event.id === hoveredId}
-                                    selectEvent=${selectEvent}
-                                    hoverEvent=${hoverEvent}
+                                    selectItem=${selectItem}
+                                    hoverItem=${hoverItem}
                                 />
                             `)}
                             ${showNow && sameDay(d.date, now) && html`

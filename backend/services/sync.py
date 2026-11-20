@@ -19,9 +19,10 @@ from sqlalchemy.dialects.sqlite import insert
 from backend.crawlers import CRAWLERS
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import EVENT_FIELDS, Event, EventSource
-from backend.db.queries import get_source, list_events
+from backend.db.queries import get_source
 from backend.schemas.events import EventIn
 from backend.services.hub import hub
+from backend.services.triage import broadcast_pools, sweep_missed
 
 log = logging.getLogger(__name__)
 
@@ -112,5 +113,7 @@ async def sync_source(name: str) -> None:
 
         log.info("[%s] sync done: %d events stored (%d fetched)", name, count, len(raw_events))
         await _set_status(name, status="idle", last_sync_time=utcnow(), last_error=None)
-        async with SessionLocal() as session:
-            await hub.broadcast("events", events=await list_events(session))
+        # event times may have changed: check for missed adventures, then send both pools
+        # (adventures read their event's fields, so they change too)
+        await sweep_missed()
+        await broadcast_pools()

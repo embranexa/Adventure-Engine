@@ -1,7 +1,8 @@
 """WebSocket hub: tracks connected browsers and pushes typed messages to them.
 
 Every message is a JSON object with a "type" field:
-    events         {"events": [...]}  full event list, on connect and after each sync
+    events         {"events": [...]}  all raw events (omens), on connect and after changes
+    adventures     {"adventures": [...]}  all adventures (flattened), on connect and after changes
     source_status  {"source": {...}}  a crawler's status changed
 """
 

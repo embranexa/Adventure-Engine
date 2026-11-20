@@ -30,7 +30,7 @@ export function hourOf(d) {
 
 /**
  * @typedef {{
- *   event: EventItem, start: Date, end: Date,
+ *   event: PoolItem, start: Date, end: Date,
  *   top: number, height: number,      // hours from the top of the visible range
  *   lane: number, lanes: number,      // side-by-side position among overlapping events
  *   clippedTop: boolean, clippedBottom: boolean,
@@ -42,7 +42,7 @@ export function hourOf(d) {
  * Place events into the 7 days of the week starting at `weekStart`.
  * Events are shown on the day they start; anything outside [firstHour, lastHour)
  * is clipped to the visible range (an event spanning midnight ends at the bottom).
- * @param {EventItem[]} events
+ * @param {PoolItem[]} events
  * @param {Date} weekStart  Monday 00:00 local
  * @param {number} firstHour  e.g. 6
  * @param {number} lastHour   e.g. 24
@@ -54,6 +54,7 @@ export function layoutWeek(events, weekStart, firstHour, lastHour) {
     const weekEnd = addDays(weekStart, 7);
 
     for (const event of events) {
+        if (!event.start) continue; // undated (e.g. a hand-made adventure)
         const start = new Date(event.start);
         if (Number.isNaN(start.getTime()) || start < weekStart || start >= weekEnd) continue;
         let end = event.end ? new Date(event.end) : null;

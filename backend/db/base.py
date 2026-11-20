@@ -1,5 +1,6 @@
 """Database engine, sessions, and shared column types (SQLAlchemy async + aiosqlite)."""
 
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator
@@ -9,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
-DB_PATH = DATA_DIR / "adventure.db"
+# ADVENTURE_DB_PATH overrides the location (e.g. to test against a copy of the database).
+DB_PATH = Path(os.environ.get("ADVENTURE_DB_PATH") or DATA_DIR / "adventure.db")
 
 engine = create_async_engine(f"sqlite+aiosqlite:///{DB_PATH}")
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)

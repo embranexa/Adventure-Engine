@@ -10,10 +10,10 @@ import { LevelMap, loadMapLibraries } from '../../lib/levelMap.js';
  * The map libraries (~1.7 MB) load the first time a map panel opens.
  */
 export function MapPanel() {
-    const events = useWorkspaceStore((s) => s.events);
-    const selectedId = useWorkspaceStore((s) => s.selectedEventId);
+    const events = useWorkspaceStore((s) => s.items);
+    const selectedId = useWorkspaceStore((s) => s.selectedItemId);
     const selectionSource = useWorkspaceStore((s) => s.selectionSource);
-    const hoveredId = useWorkspaceStore((s) => s.hoveredEventId);
+    const hoveredId = useWorkspaceStore((s) => s.hoveredItemId);
 
     const hostRef = useRef(/** @type {HTMLDivElement | null} */ (null));
     const mapRef = useRef(/** @type {LevelMap | null} */ (null));
@@ -26,8 +26,8 @@ export function MapPanel() {
             .then(() => {
                 if (disposed || !hostRef.current) return;
                 mapRef.current = new LevelMap(hostRef.current, {
-                    onSelect: (id) => useWorkspaceStore.getState().selectEvent(id, 'map'),
-                    onHover: (id) => useWorkspaceStore.getState().hoverEvent(id),
+                    onSelect: (id) => useWorkspaceStore.getState().selectItem(id, 'map'),
+                    onHover: (id) => useWorkspaceStore.getState().hoverItem(id),
                 });
                 setStatus('ready'); // re-runs the sync effects below with the new map
             })

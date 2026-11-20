@@ -13,7 +13,7 @@
  * Usage:
  *   await loadMapLibraries();
  *   const map = new LevelMap(parentEl, { onSelect(id), onHover(id | null) });
- *   map.updateNodes(events);            // EventItem[]
+ *   map.updateNodes(events);            // PoolItem[]
  *   map.select(id, { fly, emit });      // emit=false when the change came from elsewhere
  *   map.highlight(id);                  // hover from another view
  *   map.dispose();
@@ -97,7 +97,7 @@ export class LevelMap {
     /*  Data                                                               */
     /* ------------------------------------------------------------------ */
 
-    /** EventItem -> internal node. Tower height grows with the guest count. */
+    /** PoolItem -> internal node. Tower height grows with the guest count. */
     _normalizeNode(raw, index) {
         const fallback = LevelMap.PALETTE[index % LevelMap.PALETTE.length];
         let color;
@@ -829,7 +829,7 @@ export class LevelMap {
     /*  Data updates                                                       */
     /* ------------------------------------------------------------------ */
 
-    /** Replace the events shown (EventItem[]). Events without valid coordinates are skipped. */
+    /** Replace the events shown (PoolItem[]). Events without valid coordinates are skipped. */
     updateNodes(data) {
         if (!Array.isArray(data)) {
             console.warn('[Map] Expected an array of events.', data);

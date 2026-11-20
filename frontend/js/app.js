@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { html } from './html.js';
 import { useWorkspaceStore, collectMountedPanels } from './store.js';
 import { DockNode } from './components/DockNode.js';
+import { ModeSwitch } from './components/ModeSwitch.js';
 
 /** @param {FeedStatus} status */
 function feedLabel(status) {
@@ -20,7 +21,6 @@ function App() {
     const tree = useWorkspaceStore((s) => s.tree);
     const layoutStatus = useWorkspaceStore((s) => s.layoutStatus);
     const feedStatus = useWorkspaceStore((s) => s.feedStatus);
-    const eventCount = useWorkspaceStore((s) => s.events.length);
     const initWorkspace = useWorkspaceStore((s) => s.initWorkspace);
     const resetWorkspace = useWorkspaceStore((s) => s.resetWorkspace);
     const reopenPanel = useWorkspaceStore((s) => s.reopenPanel);
@@ -40,7 +40,7 @@ function App() {
                 <div className="topbar-left">
                     <span className="brand">❖ AETHER//NEXUS GRIMOIRE OS</span>
                     <span className="badge cyan">${feedLabel(feedStatus)}</span>
-                    <span className="badge">EVENTS: ${eventCount}</span>
+                    <${ModeSwitch} />
                     <span className="badge">RUNE-STATE: ${layoutStatus}</span>
                 </div>
 

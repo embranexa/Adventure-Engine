@@ -1,5 +1,6 @@
 """The FastAPI app: startup/shutdown, API routes, and the static frontend."""
 
+import asyncio
 import contextlib
 import logging
 from pathlib import Path
@@ -12,6 +13,7 @@ from backend.crawlers import CRAWLERS
 from backend.db.base import engine
 from backend.db.setup import init_db
 from backend.routers import api_router
+from backend.services.triage import run_sweeper
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     [%(name)s] %(message)s")
 
@@ -21,7 +23,11 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db({name: crawler.URL for name, crawler in CRAWLERS.items()})
+    sweeper = asyncio.create_task(run_sweeper())  # moves missed adventures to the Necropolis
     yield
+    sweeper.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await sweeper
     await engine.dispose()
 
 

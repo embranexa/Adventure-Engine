@@ -1,13 +1,16 @@
-"""Crawled events."""
+"""Raw crawled events ("omens") and their review: pass, ignore, revive."""
+
+import uuid
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.base import get_session
-from backend.db.models import Event
+from backend.db.models import Adventure, Event
 from backend.db.queries import list_events
-from backend.services.hub import hub
+from backend.routers.errors import triage_errors
+from backend.services import triage
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -19,8 +22,34 @@ async def get_events(session: AsyncSession = Depends(get_session)):
 
 @router.delete("")
 async def clear_events(session: AsyncSession = Depends(get_session)):
-    """Delete every stored event (sources stay registered). Mainly for development."""
-    result = await session.execute(delete(Event))
+    """Delete raw events that have no adventure (those keep their event data).
+
+    Mainly for development: the next sync brings them back as new omens.
+    """
+    linked = select(Adventure.event_id).where(Adventure.event_id.is_not(None))
+    result = await session.execute(delete(Event).where(Event.id.not_in(linked)))
     await session.commit()
-    await hub.broadcast("events", events=[])
+    await triage.broadcast_pools()
     return {"deleted": result.rowcount}
+
+
+@router.post("/{event_id}/pass")
+async def pass_event(event_id: uuid.UUID):
+    """Omen -> ore: creates an adventure in the Hopper."""
+    with triage_errors():
+        return {"adventure_id": await triage.pass_event(event_id)}
+
+
+@router.post("/{event_id}/ignore")
+async def ignore_event(event_id: uuid.UUID):
+    """Omen -> shade (Limbo)."""
+    with triage_errors():
+        await triage.ignore_event(event_id)
+    return {"status": "ignored"}
+
+
+@router.post("/{event_id}/revive")
+async def revive_event(event_id: uuid.UUID):
+    """Shade -> passed: restores its adventure from the Necropolis, or creates one."""
+    with triage_errors():
+        return {"adventure_id": await triage.revive_event(event_id)}

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import * as feed from './feed.js';
-import { indexEvents, sameList } from './events.js';
+import { indexItems, sameList } from './events.js';
 
 // --- Pure Tree Helpers ---
 /** @template T @param {T} obj @returns {T} */
@@ -122,8 +122,82 @@ let feedWired = false;
 function startFeed(get) {
     if (feedWired) return;
     feedWired = true;
-    feed.on('events', (msg) => get().setEvents(msg.events));
+    feed.on('events', (msg) => get().setRawEvents(msg.events));
+    feed.on('adventures', (msg) => get().setAdventures(msg.adventures));
     feed.on('source_status', (msg) => get().setSourceStatus(msg.source));
+}
+
+// --- the pool: what every view shows, depending on the mode ---
+
+/** @param {WorkspaceState} state @returns {PoolRecord[]} */
+function poolRecords(state) {
+    if (state.mode === 'discovery') {
+        return state.rawEvents
+            .filter((e) => e.review === 'new' || (state.showShades && e.review === 'ignored'))
+            .map((e) => /** @type {PoolRecord} */ ({ ...e, kind: 'omen' }));
+    }
+    return state.adventures.map((a) => /** @type {PoolRecord} */ ({ ...a, kind: 'adventure' }));
+}
+
+/**
+ * Store changes that bring the pool in line with `state` (pass the state *after* the
+ * change being made). Unchanged items keep their objects; a selection or hover on an
+ * item that left the pool is cleared.
+ * @param {WorkspaceState} state
+ * @returns {Partial<WorkspaceState>}
+ */
+function poolUpdate(state) {
+    const next = indexItems(poolRecords(state), state.itemsById);
+    /** @type {Partial<WorkspaceState>} */
+    const update = sameList(next.items, state.items) ? {} : next;
+    if (state.selectedItemId != null && !next.itemsById[state.selectedItemId]) {
+        update.selectedItemId = null;
+        update.selectionSource = null;
+    }
+    if (state.hoveredItemId != null && !next.itemsById[state.hoveredItemId]) update.hoveredItemId = null;
+    return update;
+}
+
+/**
+ * Call the API for a triage/phase action. Errors land in `actionError` (shown in the
+ * node card); success needs no handling, since the server broadcasts the new pools.
+ * @param {(partial: Partial<WorkspaceState>) => void} set
+ * @param {string} url @param {'POST' | 'PUT'} [method] @param {unknown} [body]
+ * @returns {Promise<boolean>} whether it succeeded
+ */
+async function callAction(set, url, method = 'POST', body = undefined) {
+    set({ actionError: null });
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+            body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        if (res.ok) return true;
+        const detail = (await res.json().catch(() => null))?.detail;
+        set({ actionError: typeof detail === 'string' ? detail : `Request failed (${res.status})` });
+    } catch {
+        set({ actionError: 'Server unreachable' });
+    }
+    return false;
+}
+
+/**
+ * Run an action that removes `id` from the pool (pass/ignore/revive in Discovery), then
+ * move the selection to its neighbour so you can keep reviewing.
+ * @param {() => WorkspaceState} get @param {string} id @param {() => Promise<boolean>} action
+ */
+async function actAndAdvance(get, id, action) {
+    const { items, selectedItemId } = get();
+    const wasSelected = selectedItemId === id;
+    const index = items.findIndex((item) => item.id === id);
+    const neighbour = items[index + 1]?.id ?? items[index - 1]?.id ?? null;
+    const ok = await action();
+    const current = get().selectedItemId;
+    // only if the user hasn't picked something else in the meantime
+    if (ok && wasSelected && neighbour && (current === null || current === id) && get().itemsById[neighbour]) {
+        get().selectItem(neighbour, 'triage');
+    }
 }
 
 /** @type {import('zustand').StateCreator<WorkspaceState>} */
@@ -136,13 +210,18 @@ const workspaceStore = (set, get) => ({
     // UI-level state subscriptions
     feedStatus: { state: 'connecting' },
 
-    // crawled events + shared selection (every event view reads these)
-    events: [],
-    eventsById: {},
-    selectedEventId: null,
-    hoveredEventId: null,
+    // the two pools from the server, and the one currently shown (see poolUpdate)
+    rawEvents: [],
+    adventures: [],
+    mode: 'adventures',
+    showShades: false,
+    items: [],
+    itemsById: {},
+    selectedItemId: null,
+    hoveredItemId: null,
     selectionSource: null,
     sources: {},
+    actionError: null,
 
     initWorkspace: async () => {
         try {
@@ -158,27 +237,51 @@ const workspaceStore = (set, get) => ({
 
     // --- events & sources ---
 
-    setEvents: (records) => {
-        const { events, eventsById, selectedEventId, hoveredEventId } = get();
-        const next = indexEvents(records, eventsById);
-        if (sameList(next.events, events)) return; // identical broadcast: nothing re-renders
-        /** @type {Partial<WorkspaceState>} */
-        const update = { ...next };
-        if (selectedEventId != null && !next.eventsById[selectedEventId]) {
-            update.selectedEventId = null;
-            update.selectionSource = null;
-        }
-        if (hoveredEventId != null && !next.eventsById[hoveredEventId]) update.hoveredEventId = null;
-        set(update);
+    setRawEvents: (records) =>
+        set((state) => ({ rawEvents: records, ...poolUpdate({ ...state, rawEvents: records }) })),
+
+    setAdventures: (records) =>
+        set((state) => ({ adventures: records, ...poolUpdate({ ...state, adventures: records }) })),
+
+    setMode: (mode) =>
+        set((state) => (state.mode === mode ? {} : { mode, actionError: null, ...poolUpdate({ ...state, mode }) })),
+
+    toggleShades: () =>
+        set((state) => {
+            const showShades = !state.showShades;
+            return { showShades, ...poolUpdate({ ...state, showShades }) };
+        }),
+
+    selectItem: (id, source) => {
+        if (id === get().selectedItemId) return;
+        set({ selectedItemId: id, selectionSource: id == null ? null : source, actionError: null });
     },
 
-    selectEvent: (id, source) => {
-        if (id === get().selectedEventId) return;
-        set({ selectedEventId: id, selectionSource: id == null ? null : source });
+    hoverItem: (id) => {
+        if (id !== get().hoveredItemId) set({ hoveredItemId: id });
     },
 
-    hoverEvent: (id) => {
-        if (id !== get().hoveredEventId) set({ hoveredEventId: id });
+    // --- triage & phases (the server broadcasts both pools after each change) ---
+
+    passEvent: (eventId) =>
+        actAndAdvance(get, eventId, () => callAction(set, `/api/events/${eventId}/pass`)),
+
+    ignoreEvent: (eventId) =>
+        actAndAdvance(get, eventId, () => callAction(set, `/api/events/${eventId}/ignore`)),
+
+    reviveEvent: (eventId) =>
+        actAndAdvance(get, eventId, () => callAction(set, `/api/events/${eventId}/revive`)),
+
+    killAdventure: async (adventureId) => {
+        await callAction(set, `/api/adventures/${adventureId}/kill`);
+    },
+
+    reviveAdventure: async (adventureId) => {
+        await callAction(set, `/api/adventures/${adventureId}/revive`);
+    },
+
+    setPhase: async (adventureId, phase) => {
+        await callAction(set, `/api/adventures/${adventureId}/phase`, 'PUT', { phase });
     },
 
     setSourceStatus: (source) =>

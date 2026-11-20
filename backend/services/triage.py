@@ -1,0 +1,217 @@
+"""Moving matter through the refinery: review raw events and change adventure phases.
+
+Rules (resources/classifier.md, section 4):
+    pass     new raw event            -> passed;  new adventure in the Hopper (queued)
+    ignore   new raw event            -> ignored (Limbo)
+    revive   ignored raw event        -> passed;  its killed adventure is restored, else a new one
+    kill     adventure (any phase)    -> killed (Necropolis); its raw event -> ignored; data kept
+    phase    adventure, by hand       -> any of MANUAL_PHASES, or completed -> decommissioned
+    missed   pre-Arena adventure whose event has ended -> killed (automatic, see sweep_missed)
+
+Every change is followed by a broadcast of the updated lists.
+"""
+
+import asyncio
+import logging
+import uuid
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.db.base import SessionLocal, utcnow
+from backend.db.models import MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, Adventure, Event
+from backend.db.queries import list_adventures, list_events
+from backend.services.hub import hub
+
+log = logging.getLogger(__name__)
+
+SWEEP_INTERVAL_S = 300  # how often to check for missed adventures
+
+
+class NotFound(Exception):
+    pass
+
+
+class InvalidTransition(Exception):
+    pass
+
+
+async def broadcast_pools() -> None:
+    """Send both pools to every browser after a change."""
+    async with SessionLocal() as session:
+        await hub.broadcast("events", events=await list_events(session))
+        await hub.broadcast("adventures", adventures=await list_adventures(session))
+
+
+async def _get_event(session: AsyncSession, event_id: uuid.UUID) -> Event:
+    event = await session.get(Event, event_id)
+    if not event:
+        raise NotFound(f"no raw event {event_id}")
+    return event
+
+
+async def _get_adventure(session: AsyncSession, adventure_id: uuid.UUID) -> Adventure:
+    adventure = await session.get(Adventure, adventure_id)
+    if not adventure:
+        raise NotFound(f"no adventure {adventure_id}")
+    return adventure
+
+
+def _set_phase(adventure: Adventure, phase: str) -> None:
+    adventure.phase = phase
+    adventure.phase_changed_at = utcnow()
+
+
+def _restore(adventure: Adventure) -> None:
+    """Bring a killed adventure back to the phase it was killed from."""
+    _set_phase(adventure, adventure.phase_before_kill or "queued")
+    adventure.phase_before_kill = None
+
+
+# --- raw events ---
+
+async def pass_event(event_id: uuid.UUID) -> str:
+    """Omen -> ore. Returns the new adventure's id."""
+    async with SessionLocal() as session:
+        event = await _get_event(session, event_id)
+        if event.review != "new":
+            raise InvalidTransition(f"can only pass a new event (this one is {event.review})")
+        existing = await session.scalar(select(Adventure).where(Adventure.event_id == event.id))
+        if existing:  # shouldn't happen for a new event, but never create a second link
+            raise InvalidTransition("this event already has an adventure")
+        adventure = Adventure(event_id=event.id, type="event", phase="queued")
+        session.add(adventure)
+        event.review, event.reviewed_at = "passed", utcnow()
+        await session.commit()
+        adventure_id = str(adventure.id)
+    await broadcast_pools()
+    return adventure_id
+
+
+async def ignore_event(event_id: uuid.UUID) -> None:
+    """Omen -> shade."""
+    async with SessionLocal() as session:
+        event = await _get_event(session, event_id)
+        if event.review != "new":
+            raise InvalidTransition(f"can only ignore a new event (this one is {event.review})")
+        event.review, event.reviewed_at = "ignored", utcnow()
+        await session.commit()
+    await broadcast_pools()
+
+
+async def revive_event(event_id: uuid.UUID) -> str:
+    """Shade -> passed. Restores its killed adventure, or creates one. Returns its id."""
+    async with SessionLocal() as session:
+        event = await _get_event(session, event_id)
+        if event.review != "ignored":
+            raise InvalidTransition(f"can only revive an ignored event (this one is {event.review})")
+        adventure = await session.scalar(select(Adventure).where(Adventure.event_id == event.id))
+        if adventure:
+            _restore(adventure)
+        else:
+            adventure = Adventure(event_id=event.id, type="event", phase="queued")
+            session.add(adventure)
+        event.review, event.reviewed_at = "passed", utcnow()
+        await session.commit()
+        adventure_id = str(adventure.id)
+    await broadcast_pools()
+    return adventure_id
+
+
+# --- adventures ---
+
+async def kill_adventure(adventure_id: uuid.UUID) -> None:
+    """Any phase -> Necropolis. Keeps the data and the phase it came from."""
+    async with SessionLocal() as session:
+        adventure = await _get_adventure(session, adventure_id)
+        if adventure.phase == "killed":
+            raise InvalidTransition("already in the Necropolis")
+        adventure.phase_before_kill = adventure.phase
+        _set_phase(adventure, "killed")
+        if adventure.event_id:
+            event = await session.get(Event, adventure.event_id)
+            if event:
+                event.review, event.reviewed_at = "ignored", utcnow()
+        await session.commit()
+    await broadcast_pools()
+
+
+async def revive_adventure(adventure_id: uuid.UUID) -> None:
+    """Necropolis -> the phase it was killed from (its raw event becomes passed again)."""
+    async with SessionLocal() as session:
+        adventure = await _get_adventure(session, adventure_id)
+        if adventure.phase != "killed":
+            raise InvalidTransition("only adventures in the Necropolis can be revived")
+        _restore(adventure)
+        if adventure.event_id:
+            event = await session.get(Event, adventure.event_id)
+            if event:
+                event.review, event.reviewed_at = "passed", utcnow()
+        await session.commit()
+    await broadcast_pools()
+
+
+async def set_phase(adventure_id: uuid.UUID, phase: str) -> None:
+    """Move an adventure by hand (node card)."""
+    if phase not in PHASES:
+        raise InvalidTransition(f"unknown phase: {phase}")
+    async with SessionLocal() as session:
+        adventure = await _get_adventure(session, adventure_id)
+        if adventure.phase == phase:
+            return
+        if phase == "killed":
+            raise InvalidTransition("use kill to send an adventure to the Necropolis")
+        if adventure.phase == "killed":
+            raise InvalidTransition("revive it first")
+        if phase == "decommissioned" and adventure.phase != "completed":
+            raise InvalidTransition("only completed adventures (Treasury) can be decommissioned")
+        if phase not in MANUAL_PHASES and phase != "decommissioned":
+            raise InvalidTransition(f"can't move to {phase} by hand")
+        _set_phase(adventure, phase)
+        await session.commit()
+    await broadcast_pools()
+
+
+# --- automatic ---
+
+async def sweep_missed() -> int:
+    """Kill adventures that were still pre-Arena when their event ended.
+
+    "Ended" = end time, else start time. Only adventures whose phase was last set
+    *before* the event ended count as missed: reviving one afterwards, or passing an
+    event that is already over, is a deliberate choice and isn't undone.
+    Returns how many moved; broadcasts if any did.
+    """
+    now = utcnow()
+    async with SessionLocal() as session:
+        ended_at = func.coalesce(Event.end_time, Event.start_time)
+        missed = (await session.scalars(
+            select(Adventure)
+            .join(Event, Adventure.event_id == Event.id)
+            .where(
+                Adventure.phase.in_(PRE_ARENA_PHASES),
+                ended_at < now,
+                Adventure.phase_changed_at < ended_at,
+            )
+        )).all()
+        for adventure in missed:
+            adventure.phase_before_kill = adventure.phase
+            _set_phase(adventure, "killed")
+            event = await session.get(Event, adventure.event_id)
+            if event:
+                event.review, event.reviewed_at = "ignored", now
+        await session.commit()
+    if missed:
+        log.info("moved %d missed adventure(s) to the Necropolis", len(missed))
+        await broadcast_pools()
+    return len(missed)
+
+
+async def run_sweeper() -> None:
+    """Background loop: check for missed adventures every SWEEP_INTERVAL_S."""
+    while True:
+        try:
+            await sweep_missed()
+        except Exception:  # noqa: BLE001 - keep the loop alive; the next run may succeed
+            log.exception("missed-adventure sweep failed")
+        await asyncio.sleep(SWEEP_INTERVAL_S)

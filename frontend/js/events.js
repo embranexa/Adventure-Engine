@@ -1,4 +1,4 @@
-// Pure helpers for crawled events (no React, no store).
+// Pure helpers for pool items: omens (raw events) and adventures. No React, no store.
 
 // Same neon palette as the legacy map.
 export const EVENT_PALETTE = ['#00f0ff', '#ff2bd6', '#fcee0a', '#39ff14', '#b026ff', '#ff6a00'];
@@ -20,25 +20,29 @@ export function colorForId(id) {
 }
 
 /**
- * Turn a server event list into store state. Events whose data didn't change keep
- * the same object, so memoized components showing them skip re-rendering.
- * @param {EventRecord[]} incoming
- * @param {Record<string, EventItem>} previous
- * @returns {{ events: EventItem[], eventsById: Record<string, EventItem> }}
+ * Turn a list of pool records (omens or adventures) into store state. Items whose
+ * data didn't change keep the same object, so memoized components showing them skip
+ * re-rendering. The color comes from the raw event when there is one, so an omen
+ * keeps its color after it passes through and becomes an adventure.
+ * @param {PoolRecord[]} incoming
+ * @param {Record<string, PoolItem>} previous
+ * @returns {{ items: PoolItem[], itemsById: Record<string, PoolItem> }}
  */
-export function indexEvents(incoming, previous) {
-    /** @type {Record<string, EventItem>} */
-    const eventsById = {};
-    const events = incoming.map((record) => {
+export function indexItems(incoming, previous) {
+    /** @type {Record<string, PoolItem>} */
+    const itemsById = {};
+    const items = incoming.map((record) => {
         const old = previous[record.id];
-        const item = old && sameRecord(old, record) ? old : { ...record, color: colorForId(record.id) };
-        eventsById[item.id] = item;
+        const item = old && sameRecord(old, record)
+            ? old
+            : { ...record, color: colorForId(record.event_id ?? record.id) };
+        itemsById[item.id] = item;
         return item;
     });
-    return { events, eventsById };
+    return { items, itemsById };
 }
 
-/** @param {EventItem} item @param {EventRecord} record */
+/** @param {PoolItem} item @param {PoolRecord} record */
 function sameRecord(item, record) {
     const { color, ...rest } = item;
     return JSON.stringify(rest) === JSON.stringify(record);
@@ -46,7 +50,7 @@ function sameRecord(item, record) {
 
 /**
  * True when two lists hold the same items in the same order (by reference).
- * @param {EventItem[]} a @param {EventItem[]} b
+ * @param {PoolItem[]} a @param {PoolItem[]} b
  */
 export function sameList(a, b) {
     return a.length === b.length && a.every((item, i) => item === b[i]);
@@ -90,7 +94,7 @@ function formatter(timeZone, options) {
 
 /**
  * "Thu, Nov 20, 5:00 PM – 7:00 PM PST" in the event's timezone.
- * @param {EventRecord} ev
+ * @param {PoolRecord} ev
  */
 export function formatEventWhen(ev) {
     const start = parseTime(ev.start);

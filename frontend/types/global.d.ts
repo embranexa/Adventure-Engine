@@ -58,12 +58,47 @@ interface EventRecord {
     cover_url: string | null;
     /** Source-specific extras (price, hosts, guest count, ...). */
     details: Record<string, unknown>;
+    review: ReviewState;
 }
 
-/** An event in the store: the server record plus a stable display color. */
-interface EventItem extends EventRecord {
-    color: string;
+// --- the refinery (stored values; display names in js/lifecycle.js) ---
+
+/** Raw event review: new (omen, Sensorium) | passed (became an adventure) | ignored (shade, Limbo). */
+type ReviewState = 'new' | 'passed' | 'ignored';
+
+/** Adventure phase: Hopper, Assay, Alembic, Crucible, Arena, Treasury, Necropolis, Archive. */
+type Phase =
+    | 'queued' | 'classifying' | 'decomposing' | 'constructing'
+    | 'consuming' | 'completed' | 'killed' | 'decommissioned';
+
+/**
+ * An adventure as sent by the server: its linked raw event's fields (read through) plus
+ * its own. `id` is the adventure's id; the raw event's is `event_id`. Adventures without
+ * an event (made by hand, later) have null event fields.
+ */
+interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start' | 'url' | 'review'> {
+    source: string | null;
+    api_id: string | null;
+    start: string | null;
+    url: string | null;
+    review: ReviewState | null;
+    event_id: string | null;
+    type: string;
+    phase: Phase;
+    phase_before_kill: Phase | null;
+    stats: Record<string, unknown>;
 }
+
+/** Something in the current pool: an omen (Discovery mode) or an adventure. */
+type PoolRecord =
+    | (EventRecord & { kind: 'omen'; event_id?: undefined; phase?: undefined })
+    | (AdventureRecord & { kind: 'adventure' });
+
+/** A pool record in the store, plus a stable display color. */
+type PoolItem = PoolRecord & { color: string };
+
+/** adventures = normal use; discovery = reviewing raw events (the Augur). */
+type PoolMode = 'adventures' | 'discovery';
 
 interface SourceStatus {
     name: string;
@@ -77,6 +112,7 @@ interface SourceStatus {
 
 interface FeedMessages {
     events: { type: 'events'; events: EventRecord[] };
+    adventures: { type: 'adventures'; adventures: AdventureRecord[] };
     source_status: { type: 'source_status'; source: SourceStatus };
 }
 
@@ -100,14 +136,23 @@ interface WorkspaceState {
     layoutStatus: string;
     feedStatus: FeedStatus;
 
-    /** Sorted by start time (server order). */
-    events: EventItem[];
-    eventsById: Record<string, EventItem>;
-    selectedEventId: string | null;
-    hoveredEventId: string | null;
+    /** Every raw event (all review states), as last sent by the server. */
+    rawEvents: EventRecord[];
+    adventures: AdventureRecord[];
+    mode: PoolMode;
+    /** Discovery mode: also show ignored raw events (shades), so they can be revived. */
+    showShades: boolean;
+
+    /** The current pool (depends on mode), sorted by start time. Every view shows this. */
+    items: PoolItem[];
+    itemsById: Record<string, PoolItem>;
+    selectedItemId: string | null;
+    hoveredItemId: string | null;
     /** Who made the current selection; null when nothing is selected. */
     selectionSource: SelectionSource | null;
     sources: Record<string, SourceStatus>;
+    /** Last triage/phase action error, shown in the node card; cleared by the next action. */
+    actionError: string | null;
 
     initWorkspace(): Promise<void>;
     persistLayout(nextTree: LayoutNode | null): void;
@@ -120,10 +165,22 @@ interface WorkspaceState {
     reopenPanel(panelId: PanelId): void;
     resetWorkspace(): Promise<void>;
 
-    /** Replace the event list (from an `events` message); drops a selection/hover whose event is gone. */
-    setEvents(records: EventRecord[]): void;
-    selectEvent(id: string | null, source: SelectionSource): void;
-    hoverEvent(id: string | null): void;
+    /** From an `events` message. */
+    setRawEvents(records: EventRecord[]): void;
+    /** From an `adventures` message. */
+    setAdventures(records: AdventureRecord[]): void;
+    setMode(mode: PoolMode): void;
+    toggleShades(): void;
+    selectItem(id: string | null, source: SelectionSource): void;
+    hoverItem(id: string | null): void;
+
+    // triage (raw events) and phases (adventures); the server broadcasts the result
+    passEvent(eventId: string): Promise<void>;
+    ignoreEvent(eventId: string): Promise<void>;
+    reviveEvent(eventId: string): Promise<void>;
+    killAdventure(adventureId: string): Promise<void>;
+    reviveAdventure(adventureId: string): Promise<void>;
+    setPhase(adventureId: string, phase: Phase): Promise<void>;
     setSourceStatus(source: SourceStatus): void;
     /** Ask the server to crawl a source; progress arrives as source_status messages. */
     syncSource(name: string): Promise<void>;
