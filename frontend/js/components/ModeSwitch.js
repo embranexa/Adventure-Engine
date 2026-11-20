@@ -46,7 +46,7 @@ export function ModeSwitch() {
             <button
                 className=${`mode-btn discovery ${mode === 'discovery' ? 'active' : ''}`}
                 onClick=${() => setMode('discovery')}
-                title=${`Review new omens from the Sensorium (last sync ${ago(lastSync, now)})`}
+                title=${`Review new omens (last sync ${ago(lastSync, now)})`}
             >
                 Discovery
                 <span className=${`inbox ${omenCount ? 'has-omens' : ''}`}>${omenCount} omen${omenCount === 1 ? '' : 's'}</span>
@@ -54,7 +54,7 @@ export function ModeSwitch() {
             </button>
         </div>
         ${mode === 'discovery' && html`
-            <label className="shade-toggle" title="Also show ignored events (shades in Limbo) so they can be revived">
+            <label className="shade-toggle" title="Also show ignored events (shades) so they can be revived">
                 <input type="checkbox" checked=${showShades} onChange=${toggleShades} />
                 Show shades
             </label>

@@ -25,10 +25,10 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'quests';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests';
 
 /** Icon names drawn by components/PanelTitle.js. */
-type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'scroll';
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll';
 
 /** A panel's definition (backend/services/workspace.py). Its title reads:
  *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
@@ -214,6 +214,8 @@ interface WorkspaceState {
     dockPanel(panelId: PanelId, targetLeafId: string, zone: DropZone): void;
     closePanel(panelId: PanelId): void;
     reopenPanel(panelId: PanelId): void;
+    /** Bring a panel to the front: select its tab, or reopen it if it was closed. */
+    showPanel(panelId: PanelId): void;
     resetWorkspace(): Promise<void>;
 
     /** From an `events` message. */

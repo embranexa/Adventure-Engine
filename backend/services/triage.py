@@ -125,7 +125,7 @@ async def kill_adventure(adventure_id: uuid.UUID) -> None:
     async with SessionLocal() as session:
         adventure = await _get_adventure(session, adventure_id)
         if adventure.phase == "killed":
-            raise InvalidTransition("already in the Necropolis")
+            raise InvalidTransition("already a vestige")
         adventure.phase_before_kill = adventure.phase
         _set_phase(adventure, "killed")
         if adventure.event_id:
@@ -141,7 +141,7 @@ async def revive_adventure(adventure_id: uuid.UUID) -> None:
     async with SessionLocal() as session:
         adventure = await _get_adventure(session, adventure_id)
         if adventure.phase != "killed":
-            raise InvalidTransition("only adventures in the Necropolis can be revived")
+            raise InvalidTransition("only vestiges (killed adventures) can be revived")
         _restore(adventure)
         if adventure.event_id:
             event = await session.get(Event, adventure.event_id)
@@ -160,11 +160,11 @@ async def set_phase(adventure_id: uuid.UUID, phase: str) -> None:
         if adventure.phase == phase:
             return
         if phase == "killed":
-            raise InvalidTransition("use kill to send an adventure to the Necropolis")
+            raise InvalidTransition("use kill to turn an adventure into a vestige")
         if adventure.phase == "killed":
             raise InvalidTransition("revive it first")
         if phase == "decommissioned" and adventure.phase != "completed":
-            raise InvalidTransition("only completed adventures (Treasury) can be decommissioned")
+            raise InvalidTransition("only artifacts (completed adventures) can be decommissioned")
         if phase not in MANUAL_PHASES and phase != "decommissioned":
             raise InvalidTransition(f"can't move to {phase} by hand")
         _set_phase(adventure, phase)

@@ -5,9 +5,9 @@
  * AlembicScene — an adventure's action roadmap as a distillery seen from above:
  * each action is a still (steel base, glass column, liquid), each link a steel pipe.
  *
- *   locked  empty glass, dim steel ring        (waiting on another action)
- *   ready   half full, pulsing distillate      (a bottleneck: the next thing to do)
- *   done    full and glowing; its pipes carry distillate onward
+ *   locked  near-empty glass, dim alloy       (waiting on another action)
+ *   ready   half full of pulsing alloy        (a bottleneck: the next thing to do)
+ *   done    full of glowing animus; its pipes carry it onward
  *
  *   scene.update(analysis, { selectedId, linkFromId, refit })
  *   scene.celebrate()      // every still flares (the roadmap is complete)
@@ -29,16 +29,22 @@ const BASE_H = 3;
 const FRUSTUM = 240;      // world units shown vertically at zoom 1
 const VIEW_DIR = new THREE.Vector3(1, 0.95, 1.05).normalize();
 
-const AMBER = 0xe9c43b;
-const AMBER_BRIGHT = 0xf7dd7a;
+// incomplete actions burn in the Crucible's alloy, completed ones in the Arena's animus
+// (matter colors: js/lifecycle.js)
+const ALLOY = 0xf28a2e;
+const ALLOY_DEEP = 0x7a3a0c;
+const ANIMUS = 0xef3e4a;
+const ANIMUS_BRIGHT = 0xff7a84;
+const ANIMUS_DEEP = 0x7a1a20;
 const SHADE = 0x5d6070;
 const STEEL = 0x23262b;
 const STEEL_EDGE = 0x7a808a;
 
 const LOOK = {
-    locked: { fill: 0.05, liquid: SHADE, emissive: 0.0, ring: 0x3a3e45, ringOpacity: 0.55, glow: 0 },
-    ready: { fill: 0.45, liquid: AMBER, emissive: 0.5, ring: AMBER, ringOpacity: 0.9, glow: 0.55 },
-    done: { fill: 1, liquid: AMBER_BRIGHT, emissive: 0.95, ring: AMBER_BRIGHT, ringOpacity: 1, glow: 0.8 },
+    // liquid: the dark body color; light: the energy it glows with (carries the hue)
+    locked: { fill: 0.05, liquid: 0x2a1406, light: ALLOY_DEEP, emissive: 0.5, ring: 0x5a3a22, ringOpacity: 0.55, glow: 0 },
+    ready: { fill: 0.45, liquid: ALLOY_DEEP, light: ALLOY, emissive: 0.85, ring: ALLOY, ringOpacity: 0.9, glow: 0.38 },
+    done: { fill: 1, liquid: ANIMUS_DEEP, light: ANIMUS, emissive: 1, ring: ANIMUS_BRIGHT, ringOpacity: 1, glow: 0.5 },
 };
 
 function el(tag, cls, text) {
@@ -163,10 +169,10 @@ export class AlembicScene {
             cone,
             steel: new THREE.MeshStandardMaterial({ color: STEEL, metalness: 0.75, roughness: 0.42 }),
             pipeIdle: new THREE.MeshStandardMaterial({ color: 0x3a3e45, metalness: 0.7, roughness: 0.45 }),
-            pipeLit: new THREE.MeshStandardMaterial({ color: 0x6b5414, emissive: AMBER, emissiveIntensity: 0.55, metalness: 0.4, roughness: 0.4 }),
+            pipeLit: new THREE.MeshStandardMaterial({ color: 0x6b1a20, emissive: ANIMUS, emissiveIntensity: 0.55, metalness: 0.4, roughness: 0.4 }),
             edgeLine: new THREE.LineBasicMaterial({ color: STEEL_EDGE, transparent: true, opacity: 0.4 }),
-            packet: new THREE.SpriteMaterial({ map: glow, color: AMBER_BRIGHT, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
-            spark: new THREE.SpriteMaterial({ map: glow, color: AMBER_BRIGHT, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }),
+            packet: new THREE.SpriteMaterial({ map: glow, color: ANIMUS_BRIGHT, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
+            spark: new THREE.SpriteMaterial({ map: glow, color: ANIMUS_BRIGHT, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }),
         };
     }
 
@@ -265,8 +271,8 @@ export class AlembicScene {
         edges.position.copy(glass.position);
 
         const liquidMat = new THREE.MeshStandardMaterial({
-            color: SHADE, emissive: AMBER, emissiveIntensity: 0, transparent: true, opacity: 0.88,
-            metalness: 0.1, roughness: 0.3,
+            color: SHADE, emissive: ALLOY, emissiveIntensity: 0, transparent: true, opacity: 0.9,
+            metalness: 0, roughness: 0.65, // matte, so white highlights don't wash the hue out
         });
         const liquid = new THREE.Mesh(S.liquid, liquidMat);
         liquid.position.y = BASE_H + 0.4;
@@ -275,7 +281,7 @@ export class AlembicScene {
         const cap = new THREE.Mesh(S.cap, S.steel);
         cap.position.y = BASE_H + COLUMN_H + 0.8;
 
-        const glow = this._glow(AMBER, 34, 0);
+        const glow = this._glow(ALLOY, 34, 0);
         glow.position.y = BASE_H + COLUMN_H + 3;
         const halo = this._glow(0xffffff, 40, 0); // selection / link-source halo at the base
         halo.position.y = 2;
@@ -320,6 +326,8 @@ export class AlembicScene {
         const look = LOOK[state];
         node.look = look;
         node.liquid.material.color.setHex(look.liquid);
+        node.liquid.material.emissive.setHex(look.light);
+        node.glow.material.color.setHex(look.light);
         node.ring.material.color.setHex(look.ring);
         node.glass.material.opacity = state === 'locked' ? 0.07 : 0.12;
         node.label.dataset.state = state;
@@ -454,7 +462,8 @@ export class AlembicScene {
             node.flare = Math.max(0, node.flare - dt * 0.9);
 
             const pulse = node.state === 'ready' ? 0.5 + 0.5 * Math.sin(this.time * 3 + node.phase) : 1;
-            node.liquid.material.emissiveIntensity = look.emissive * (node.state === 'ready' ? 0.55 + 0.45 * pulse : 1) + node.flare;
+            // capped: past ~1.1 the red channel clips and the hue drifts toward yellow-white
+            node.liquid.material.emissiveIntensity = Math.min(1.1, look.emissive * (node.state === 'ready' ? 0.6 + 0.4 * pulse : 1) + node.flare * 0.3);
             node.glow.material.opacity = look.glow * (node.state === 'ready' ? 0.45 + 0.55 * pulse : 1) + node.flare * 0.8;
             node.glow.scale.setScalar(34 + node.flare * 30);
             node.glow.position.y = BASE_H + Math.max(4, node.fill * COLUMN_H) + 2;

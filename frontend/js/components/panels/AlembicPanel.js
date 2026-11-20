@@ -2,62 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import {
-    addAction, analyze, orEmpty, parseScript, promotionTarget, removeAction, renameAction,
-    toggleDone, toggleLink, toScript,
+    addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, toggleDone, toggleLink,
 } from '../../lib/roadmap.js';
 import { PromoteButton } from '../PromoteButton.js';
-
-const SCRIPT_HELP = 'A1[Buy tickets] --> A2[Book hotel]   ·   A1 --> A3   ·   # comment';
-
-/**
- * Write the roadmap as script text. Changes apply on Compile (or Ctrl+Enter); until
- * then the text is yours, otherwise it follows edits made in the 3D view.
- * @param {{ roadmap: Roadmap, onSave: (r: Roadmap) => void, onClose: () => void }} props
- */
-function ScriptDrawer({ roadmap, onSave, onClose }) {
-    const [text, setText] = useState(() => toScript(roadmap));
-    const [dirty, setDirty] = useState(false);
-    const [error, setError] = useState(/** @type {string | null} */ (null));
-
-    useEffect(() => {
-        if (!dirty) setText(toScript(roadmap));
-    }, [roadmap, dirty]);
-
-    const compile = () => {
-        const result = parseScript(text, roadmap);
-        if (result.error !== null) { setError(result.error); return; }
-        setError(null);
-        setDirty(false);
-        onSave(result.roadmap);
-    };
-
-    return html`
-        <div className="alm-script" onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
-            <div className="alm-script-head">
-                <span>Script</span>
-                ${dirty && html`<em>edited</em>`}
-                <button className="pclose" title="Close script" aria-label="Close script" onClick=${onClose}>✕</button>
-            </div>
-            <textarea
-                className="alm-script-text"
-                spellCheck=${false}
-                value=${text}
-                placeholder=${'A1[First step] --> A2[Second step]'}
-                onInput=${(/** @type {any} */ e) => { setText(e.target.value); setDirty(true); setError(null); }}
-                onKeyDown=${(/** @type {KeyboardEvent} */ e) => {
-                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); compile(); }
-                }}
-            ></textarea>
-            ${error
-                ? html`<div className="alm-script-error">${error}</div>`
-                : html`<div className="alm-script-help">${SCRIPT_HELP}</div>`}
-            <div className="alm-script-actions">
-                <button className="btn" onClick=${compile} disabled=${!dirty} title="Ctrl+Enter">Compile</button>
-                ${dirty && html`<button className="btn ghost" onClick=${() => { setDirty(false); setError(null); }}>Revert</button>`}
-            </div>
-        </div>
-    `;
-}
 
 /**
  * Controls for the selected action: rename, complete/undo, link, add the next action, delete.
@@ -106,12 +53,13 @@ function ActionBar({ info, linking, waiting, onRename, onToggle, onLink, onAddNe
 
 /**
  * The Alembic: the selected adventure's action roadmap. Follows the selection like the
- * node card. Edit in 3D (select, link, add, complete) or as script text.
+ * node card. Edit in 3D (select, link, add, complete) or as text in the Scripter panel.
  */
 export function AlembicPanel() {
     const item = useWorkspaceStore((s) => (s.selectedItemId ? s.itemsById[s.selectedItemId] : null));
     const saveRoadmap = useWorkspaceStore((s) => s.saveRoadmap);
     const roadmapError = useWorkspaceStore((s) => s.roadmapError);
+    const showPanel = useWorkspaceStore((s) => s.showPanel);
 
     const adventure = item?.kind === 'adventure' ? item : null;
     const roadmap = orEmpty(adventure?.roadmap);
@@ -123,7 +71,6 @@ export function AlembicPanel() {
     const [status, setStatus] = useState(/** @type {'loading' | 'ready' | 'error'} */ ('loading'));
     const [selected, setSelected] = useState(/** @type {string | null} */ (null));
     const [linkFrom, setLinkFrom] = useState(/** @type {string | null} */ (null));
-    const [scriptOpen, setScriptOpen] = useState(false);
     const [notice, setNotice] = useState(/** @type {string | null} */ (null));
     const [focusTitle, setFocusTitle] = useState(false);
 
@@ -178,7 +125,10 @@ export function AlembicPanel() {
     // Load three.js + the scene only when this panel opens.
     useEffect(() => {
         let disposed = false;
-        import('../../lib/alembicScene.js')
+        // ?v= forces one fresh download past a copy cached before the server sent
+        // Cache-Control: no-cache (a hard reload doesn't bypass the cache for lazy imports).
+        // @ts-ignore -- the query string hides the module's path from the type checker
+        import('../../lib/alembicScene.js?v=2')
             .then(({ AlembicScene }) => {
                 if (disposed || !hostRef.current) return;
                 sceneRef.current = new AlembicScene(hostRef.current, {
@@ -245,7 +195,7 @@ export function AlembicPanel() {
             ${status === 'ready' && !adventure && html`
                 <div className="nc-empty alm-overlay-empty">
                     ${item ? 'Omens have no roadmap' : 'Nothing selected'}
-                    <small>${item ? 'Pass it to the Hopper first' : 'Select an adventure to break it into actions'}</small>
+                    <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to break it into actions'}</small>
                 </div>
             `}
 
@@ -258,21 +208,19 @@ export function AlembicPanel() {
                         </span>
                     `}
                     <button className="cls-layer" onClick=${() => add(null)} title="Add an action that doesn't depend on anything">+ Action</button>
-                    <button className=${`cls-layer ${scriptOpen ? 'on' : ''}`} onClick=${() => setScriptOpen(!scriptOpen)}>Script</button>
+                    <button className="cls-layer" onClick=${() => showPanel('scripter')} title="Edit the roadmap as text in the Scripter">Script ⟶</button>
                 </div>
 
-                ${analysis.total === 0 && !scriptOpen && html`
+                ${analysis.total === 0 && html`
                     <div className="alm-empty" onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
                         <span>No roadmap yet</span>
                         <small>Break this adventure into actions: what has to happen, and in what order?</small>
                         <div>
                             <button className="btn" onClick=${() => add(null)}>+ First action</button>
-                            <button className="btn ghost" onClick=${() => setScriptOpen(true)}>Write a script</button>
+                            <button className="btn ghost" onClick=${() => showPanel('scripter')}>Write a script</button>
                         </div>
                     </div>
                 `}
-
-                ${scriptOpen && html`<${ScriptDrawer} roadmap=${roadmap} onSave=${save} onClose=${() => setScriptOpen(false)} />`}
 
                 ${linkFrom && html`<div className="alm-notice link">Click the action that comes after ${linkFrom} · click a linked one to unlink · Esc to cancel</div>`}
                 ${!linkFrom && notice && html`<div className="alm-notice">${notice}</div>`}

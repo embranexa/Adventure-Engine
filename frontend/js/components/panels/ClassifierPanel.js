@@ -91,7 +91,7 @@ function FilterTray({ passCount }) {
             `}
             ${mode === 'adventures' && html`
                 <button className=${`chip ${draft.seal ? 'seal' : ''}`} onClick=${toggleSeal}
-                    title="Hermetic Seal: hides past adventures and those in the Treasury, Necropolis and Archive">
+                    title="Hermetic Seal: hides past adventures, artifacts, vestiges and relics">
                     ⛬ ${draft.seal ? 'Sealed' : 'Seal broken'}
                     ${draft.seal !== applied.seal && html`<span className="chip-tag">PENDING</span>`}
                 </button>

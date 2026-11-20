@@ -29,9 +29,13 @@ PANELS_METADATA = {
         "id": "alembic", "kind": "alembic", "icon": "alembic",
         "name": "Alembic", "question": "how", "flow": ["essence", "distillate"],
     },
+    "scripter": {
+        "id": "scripter", "kind": "scripter", "icon": "quill",
+        "name": "Scripter", "question": "how", "flow": ["essence", "distillate"],
+    },
     "quests": {
         "id": "quests", "kind": "quests", "icon": "scroll",
-        "name": "Quests", "question": "now", "flow": ["alloy", "animus"],
+        "name": "Crucible", "question": "now", "flow": ["alloy", "animus"],
     },
 }
 
@@ -40,21 +44,21 @@ DEFAULT_LAYOUT_TREE: dict[str, Any] = {
     "type": "split",
     "direction": "horizontal",
     "ratio": 25,
-    "first": {"id": "leaf-node", "type": "leaf", "tabs": ["node"], "activeTab": "node"},
+    "first": {"id": "leaf-node", "type": "leaf", "tabs": ["node", "scripter", "quests"], "activeTab": "quests"},
     "second": {
-        "id": "main-split",
+        "id": "top-split",
         "type": "split",
-        "direction": "vertical",
-        "ratio": 64,
-        "first": {
-            "id": "top-split",
+        "direction": "horizontal",
+        "ratio": 50,
+        "first": {"id": "leaf-classifier", "type": "leaf", "tabs": ["classifier", "alembic"], "activeTab": "alembic"},
+        "second": {
+            "id": "split-map-calendar",
             "type": "split",
-            "direction": "horizontal",
+            "direction": "vertical",
             "ratio": 50,
-            "first": {"id": "leaf-classifier", "type": "leaf", "tabs": ["classifier", "alembic"], "activeTab": "classifier"},
-            "second": {"id": "leaf-map", "type": "leaf", "tabs": ["map"], "activeTab": "map"},
+            "first": {"id": "leaf-map", "type": "leaf", "tabs": ["map"], "activeTab": "map"},
+            "second": {"id": "leaf-calendar", "type": "leaf", "tabs": ["calendar"], "activeTab": "calendar"},
         },
-        "second": {"id": "leaf-calendar", "type": "leaf", "tabs": ["calendar", "quests"], "activeTab": "calendar"},
     },
 }
 

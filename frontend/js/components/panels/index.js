@@ -8,6 +8,7 @@ import { ClassifierPanel } from './ClassifierPanel.js';
 import { MapPanel } from './MapPanel.js';
 import { NodeCard } from './NodeCard.js';
 import { QuestsPanel } from './QuestsPanel.js';
+import { ScripterPanel } from './ScripterPanel.js';
 
 /** @type {Record<PanelKind, (props: { panelId: PanelId }) => any>} */
 export const PANEL_COMPONENTS = {
@@ -16,5 +17,6 @@ export const PANEL_COMPONENTS = {
     map: MapPanel,
     classifier: ClassifierPanel,
     alembic: AlembicPanel,
+    scripter: ScripterPanel,
     quests: QuestsPanel,
 };

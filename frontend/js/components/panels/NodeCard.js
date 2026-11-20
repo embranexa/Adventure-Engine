@@ -75,7 +75,7 @@ function TradingCard({ item }) {
                 </div>
                 <${CardArt} key=${item.id} src=${safeHttpUrl(item.cover_url)} />
                 <div className="tcard-strip">
-                    <span>★ ${stage ? `${stage.matter} — ${stage.module}` : 'unknown'}</span>
+                    <span>★ ${stage ? stage.matter : 'unknown'}</span>
                     <span className="pips" title=${difficulty ? `Difficulty ${difficulty} of 5` : 'Difficulty not set'}>
                         ${[1, 2, 3, 4, 5].map((n) => html`<span key=${n} className=${`pip ${n <= difficulty ? 'on' : ''}`}></span>`)}
                     </span>
@@ -141,13 +141,13 @@ function ItemActions({ item }) {
     let controls;
     if (item.kind === 'omen') {
         controls = item.review === 'ignored'
-            ? html`<button className="btn nc-act" onClick=${() => reviveEvent(item.id)}>↺ Revive from Limbo</button>`
+            ? html`<button className="btn nc-act" onClick=${() => reviveEvent(item.id)}>↺ Revive → Omen</button>`
             : html`
-                <button className="btn nc-act pass" onClick=${() => passEvent(item.id)} title="Becomes an adventure (ore in the Hopper)">✦ Pass → Hopper</button>
-                <button className="btn nc-act" onClick=${() => ignoreEvent(item.id)} title="Rejected; can be revived later">✕ Ignore → Limbo</button>
+                <button className="btn nc-act pass" onClick=${() => passEvent(item.id)} title="Becomes an adventure: ore">✦ Pass → Ore</button>
+                <button className="btn nc-act" onClick=${() => ignoreEvent(item.id)} title="Rejected, a shade; can be revived later">✕ Ignore → Shade</button>
             `;
     } else if (item.phase === 'killed') {
-        const from = item.phase_before_kill ? PHASE_STAGES[item.phase_before_kill].module : 'the Hopper';
+        const from = item.phase_before_kill ? PHASE_STAGES[item.phase_before_kill].matter : 'ore';
         controls = html`<button className="btn nc-act" onClick=${() => reviveAdventure(item.id)}>↺ Revive → ${from}</button>`;
     } else {
         controls = html`
@@ -157,15 +157,15 @@ function ItemActions({ item }) {
                         key=${phase}
                         className=${`nc-step ${phase === item.phase ? 'current' : ''}`}
                         style=${{ '--s': PHASE_STAGES[phase].color }}
-                        title=${`${PHASE_STAGES[phase].module} (${PHASE_STAGES[phase].matter}): ${PHASE_STAGES[phase].hint}`}
+                        title=${`${PHASE_STAGES[phase].matter}: ${PHASE_STAGES[phase].hint}`}
                         onClick=${() => setPhase(item.id, phase)}
-                    >${PHASE_STAGES[phase].module.slice(0, 3)}</button>
+                    >${PHASE_STAGES[phase].matter}</button>
                 `)}
             </div>
             ${item.phase === 'completed' && html`
-                <button className="btn nc-act" onClick=${() => setPhase(item.id, 'decommissioned')}>⌛ Decommission → Archive</button>
+                <button className="btn nc-act" onClick=${() => setPhase(item.id, 'decommissioned')}>⌛ Decommission → Relic</button>
             `}
-            <button className="btn nc-act kill" onClick=${() => killAdventure(item.id)} title="Kept in the Necropolis; can be revived">☠ Kill → Necropolis</button>
+            <button className="btn nc-act kill" onClick=${() => killAdventure(item.id)} title="Becomes a vestige; can be revived">☠ Kill → Vestige</button>
         `;
     }
 
@@ -193,7 +193,7 @@ export function NodeCard() {
             ${event
                 ? html`
                     <${TradingCard} item=${event} />
-                    ${stage && html`<div className="nc-stage">${stage.module} · ${stage.hint}</div>`}
+                    ${stage && html`<div className="nc-stage">${stage.matter} · ${stage.hint}</div>`}
                     <${ItemActions} item=${event} />
                     <${EventRows} event=${event} />
                 `

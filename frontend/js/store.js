@@ -110,6 +110,13 @@ function findFirstLeafId(node) {
     return findFirstLeafId(node.first) || findFirstLeafId(node.second);
 }
 
+/** The id of the leaf holding a panel, or null. @param {LayoutNode | null} node @param {PanelId} panelId @returns {string | null} */
+function findLeafWithPanel(node, panelId) {
+    if (!node) return null;
+    if (node.type === 'leaf') return node.tabs.includes(panelId) ? node.id : null;
+    return findLeafWithPanel(node.first, panelId) || findLeafWithPanel(node.second, panelId);
+}
+
 const PERSIST_DEBOUNCE_MS = 300;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let persistTimer;
@@ -622,6 +629,12 @@ const workspaceStore = (set, get) => ({
         const firstLeafId = findFirstLeafId(currentTree);
         const nextTree = insertPanelAtTarget(currentTree, firstLeafId, panelId, 'right');
         get().persistLayout(nextTree);
+    },
+
+    showPanel: (panelId) => {
+        const leafId = findLeafWithPanel(get().tree, panelId);
+        if (leafId) get().selectTab(leafId, panelId);
+        else get().reopenPanel(panelId);
     },
 
     resetWorkspace: async () => {

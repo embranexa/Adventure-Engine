@@ -25,15 +25,18 @@ function dueLabel(iso) {
 }
 
 /**
- * The quest log (the Crucible): for every adventure in the Crucible, its bottlenecks —
+ * The quest log: for every adventure that is alloy (constructing), its bottlenecks —
  * the first unfinished actions of its roadmap, the ones not waiting on anything else.
  * Completing one may unlock the next. A finished roadmap offers its promotion.
+ * Each adventure card hovers and selects like the other panels.
  */
 export function QuestsPanel() {
     const adventures = useWorkspaceStore((s) => s.adventures);
-    const mode = useWorkspaceStore((s) => s.mode);
+    const itemsById = useWorkspaceStore((s) => s.itemsById);
     const selectedId = useWorkspaceStore((s) => s.selectedItemId);
+    const hoveredId = useWorkspaceStore((s) => s.hoveredItemId);
     const selectItem = useWorkspaceStore((s) => s.selectItem);
+    const hoverItem = useWorkspaceStore((s) => s.hoverItem);
     const saveRoadmap = useWorkspaceStore((s) => s.saveRoadmap);
     const [completing, setCompleting] = useState(() => new Set(/** @type {string[]} */ ([])));
 
@@ -58,14 +61,16 @@ export function QuestsPanel() {
         }, COMPLETE_DELAY_MS);
     };
 
+    // Like the other panels: hover highlights the adventure everywhere, click selects it.
+    // Only for adventures in the current pool (not in Discovery mode, not filtered out).
     /** @param {string} id */
-    const select = (id) => { if (mode === 'adventures') selectItem(id, 'quests'); };
+    const inPool = (id) => Boolean(itemsById[id]);
 
     if (!groups.length) {
         return html`
             <div className="panel-body quests">
-                <div className="nc-empty">The Crucible is empty
-                    <small>Adventures moved to the Crucible list their next actions here</small>
+                <div className="nc-empty">No alloy yet
+                    <small>Adventures that become alloy list their next actions here</small>
                 </div>
             </div>
         `;
@@ -75,20 +80,29 @@ export function QuestsPanel() {
         <div className="panel-body quests">
             <div className="ql-head">
                 <b>${questCount}</b> ${questCount === 1 ? 'quest' : 'quests'}
-                <span>· ${groups.length} in the ${crucible.module}</span>
+                <span>· ${groups.length} ${crucible.matter}</span>
             </div>
             <div className="ql-list">
                 ${groups.map(({ adventure, analysis }) => {
                     const due = dueLabel(adventure.start);
                     const target = promotionTarget(adventure.phase);
                     const pct = analysis.total ? Math.round((analysis.doneCount / analysis.total) * 100) : 0;
+                    const pooled = inPool(adventure.id);
+                    const className = ['ql-group', pooled && 'pooled', adventure.id === selectedId && 'selected',
+                        adventure.id === hoveredId && 'hovered'].filter(Boolean).join(' ');
                     return html`
-                        <section key=${adventure.id} className=${`ql-group ${adventure.id === selectedId ? 'selected' : ''}`}>
-                            <button className="ql-adventure" onClick=${() => select(adventure.id)}
-                                disabled=${mode !== 'adventures'} title=${mode === 'adventures' ? 'Select this adventure' : 'Switch to Adventures to select it'}>
+                        <section
+                            key=${adventure.id}
+                            className=${className}
+                            title=${pooled ? '' : 'Not in the current pool (Discovery mode or filtered out)'}
+                            onClick=${() => pooled && selectItem(adventure.id, 'quests')}
+                            onPointerEnter=${() => pooled && hoverItem(adventure.id)}
+                            onPointerLeave=${() => pooled && hoverItem(null)}
+                        >
+                            <div className="ql-adventure">
                                 <span className="ql-title">${adventure.title}</span>
                                 ${due && html`<span className="ql-due">${due}</span>`}
-                            </button>
+                            </div>
                             ${analysis.total > 0 && html`
                                 <div className="ql-progress" title=${`${analysis.doneCount} of ${analysis.total} actions done`}>
                                     <span className="alm-meter"><i style=${{ width: `${pct}%` }}></i></span>
@@ -96,16 +110,14 @@ export function QuestsPanel() {
                                 </div>
                             `}
                             ${analysis.total === 0 && html`
-                                <button className="ql-none" onClick=${() => select(adventure.id)} disabled=${mode !== 'adventures'}>
-                                    No roadmap yet — draft one in the Alembic
-                                </button>
+                                <div className="ql-none">No roadmap yet — draft one in the Alembic</div>
                             `}
                             ${analysis.complete && target && html`<${PromoteButton} adventureId=${adventure.id} target=${target} compact=${true} />`}
                             ${analysis.bottlenecks.map((quest) => {
                                 const key = `${adventure.id}:${quest.id}`;
                                 return html`
                                     <div key=${quest.id} className=${`ql-quest ${completing.has(key) ? 'completing' : ''}`}>
-                                        <button className="ql-check" onClick=${() => complete(adventure, quest.id)}
+                                        <button className="ql-check" onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); complete(adventure, quest.id); }}
                                             aria-label=${`Complete ${quest.title}`} title="Complete">
                                             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"></path></svg>
                                         </button>

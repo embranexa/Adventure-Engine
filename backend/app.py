@@ -34,9 +34,24 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AetherNet // Arcane-Cyberpunk Topology Engine", lifespan=lifespan)
 
 app.include_router(api_router, prefix="/api")
-app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend")
+
+
+class FreshStaticFiles(StaticFiles):
+    """Static files the browser must revalidate on every load (a cheap 304 when unchanged).
+
+    Without a Cache-Control header, browsers may reuse cached JS modules for a while,
+    so an edited file (e.g. a dynamically imported scene) can keep running stale.
+    """
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+app.mount("/frontend", FreshStaticFiles(directory=FRONTEND_DIR), name="frontend")
 
 
 @app.get("/", include_in_schema=False)
 async def serve_index():
-    return FileResponse(FRONTEND_DIR / "index.html")
+    return FileResponse(FRONTEND_DIR / "index.html", headers={"Cache-Control": "no-cache"})

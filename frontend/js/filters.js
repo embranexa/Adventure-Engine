@@ -24,14 +24,14 @@ export const FACETS = [
         value: (i) => (typeof i.details?.registration === 'string' ? i.details.registration : null),
     },
     {
-        key: 'phase', label: 'Phase', modes: ['adventures'],
+        key: 'phase', label: 'Matter', modes: ['adventures'],
         value: (i) => (i.kind === 'adventure' ? i.phase : null),
-        display: (v) => PHASE_STAGES[/** @type {Phase} */ (v)]?.module ?? v,
+        display: (v) => PHASE_STAGES[/** @type {Phase} */ (v)]?.matter ?? v,
     },
     {
         key: 'review', label: 'Review', modes: ['discovery'],
         value: (i) => (i.kind === 'omen' ? i.review : null),
-        display: (v) => REVIEW_STAGES[/** @type {ReviewState} */ (v)]?.module ?? v,
+        display: (v) => REVIEW_STAGES[/** @type {ReviewState} */ (v)]?.matter ?? v,
     },
 ];
 
@@ -101,7 +101,7 @@ export function inRing(item, ring) {
     return haversineKm(ring.center.lat, ring.center.lon, item.lat, item.lon) <= ring.radius_km;
 }
 
-/** True if the Hermetic Seal hides this item: past, or in the Treasury/Necropolis/Archive. @param {PoolItem} item @param {number} now */
+/** True if the Hermetic Seal hides this item: past, or an artifact, vestige or relic. @param {PoolItem} item @param {number} now */
 export function isSealed(item, now) {
     if (item.kind === 'adventure' && SEALED_PHASES.has(item.phase)) return true;
     const span = timeSpan(item);

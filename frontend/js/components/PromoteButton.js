@@ -30,12 +30,12 @@ export function PromoteButton({ adventureId, target, compact = false }) {
             className=${`promote ${compact ? 'compact' : ''} ${fired ? 'fired' : ''}`}
             style=${{ '--c': stage.color, '--l': stage.light }}
             onClick=${fire}
-            title=${`Roadmap complete: move it to the ${stage.module} (${stage.matter})`}
+            title=${`Roadmap complete: turn it into ${stage.matter}`}
         >
             <span className="promote-shine"></span>
             <span className="promote-text">
                 <small>Roadmap complete</small>
-                <span>✦ Promote → ${stage.module}</span>
+                <span>✦ Promote → ${stage.matter}</span>
             </span>
             <span className="promote-sparks" aria-hidden="true">
                 ${SPARKS.map((s, i) => html`<i key=${i} style=${{ '--dx': s.dx, '--dy': s.dy, animationDelay: s.delay }}></i>`)}
