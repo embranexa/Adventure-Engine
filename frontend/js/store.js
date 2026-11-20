@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as feed from './feed.js';
 import { indexItems, sameList } from './events.js';
+import { DEFAULT_FILTERS, applyFilters, nextMode } from './filters.js';
 
 // --- Pure Tree Helpers ---
 /** @template T @param {T} obj @returns {T} */
@@ -159,6 +160,62 @@ function poolUpdate(state) {
 }
 
 /**
+ * Add `visibleItems` (the filtered pool) to a store update, computed from the state as
+ * it will be after the update. Keeps the previous array when nothing changed.
+ * @param {WorkspaceState} state @param {Partial<WorkspaceState>} update
+ * @returns {Partial<WorkspaceState>}
+ */
+function withVisible(state, update) {
+    const next = { ...state, ...update };
+    const visibleItems = applyFilters(next.items, next.filters, next.mode, Date.now(), state.visibleItems);
+    return visibleItems === state.visibleItems ? update : { ...update, visibleItems };
+}
+
+const FILTER_SAVE_DEBOUNCE_MS = 500;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let filterSaveTimer;
+
+/**
+ * @param {string} key @param {unknown} value
+ * @param {boolean} [keepalive] let the request finish even if the page is closing
+ */
+async function saveState(key, value, keepalive = false) {
+    try {
+        const res = await fetch(`/api/state/${key}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(value),
+            keepalive,
+        });
+        if (!res.ok) console.error(`[state:${key}] save failed`, res.status, await res.text());
+    } catch (err) {
+        console.error(`[state:${key}] save failed`, err);
+    }
+}
+
+/** @param {() => WorkspaceState} get */
+function scheduleFilterSave(get) {
+    clearTimeout(filterSaveTimer);
+    filterSaveTimer = setTimeout(() => {
+        filterSaveTimer = undefined;
+        saveState('filters', get().filters);
+    }, FILTER_SAVE_DEBOUNCE_MS);
+    // A change made just before closing or reloading the tab must not be lost:
+    // send the pending save right away when the page goes away.
+    if (!flushOnExit) {
+        flushOnExit = () => {
+            if (filterSaveTimer === undefined) return;
+            clearTimeout(filterSaveTimer);
+            filterSaveTimer = undefined;
+            saveState('filters', get().filters, true);
+        };
+        window.addEventListener('pagehide', flushOnExit);
+    }
+}
+/** @type {(() => void) | undefined} */
+let flushOnExit;
+
+/**
  * Call the API for a triage/phase action. Errors land in `actionError` (shown in the
  * node card); success needs no handling, since the server broadcasts the new pools.
  * @param {(partial: Partial<WorkspaceState>) => void} set
@@ -222,6 +279,9 @@ const workspaceStore = (set, get) => ({
     selectionSource: null,
     sources: {},
     actionError: null,
+    filters: DEFAULT_FILTERS,
+    visibleItems: [],
+    places: [],
 
     initWorkspace: async () => {
         try {
@@ -231,6 +291,21 @@ const workspaceStore = (set, get) => ({
         } catch (e) {
             set({ layoutStatus: 'OFFLINE MODE' });
         }
+        // saved filters and places, loaded before the first pool arrives
+        try {
+            const [filters, places] = await Promise.all([
+                fetch('/api/state/filters').then((r) => r.json()),
+                fetch('/api/state/places').then((r) => r.json()),
+            ]);
+            set((state) => withVisible(state, {
+                filters: { ...DEFAULT_FILTERS, ...filters },
+                places: places.places ?? [],
+            }));
+        } catch (err) {
+            console.error('[state] could not load saved filters/places', err);
+        }
+        // items become past (and fall behind the Hermetic Seal) as time passes
+        setInterval(() => set((state) => withVisible(state, {})), 60_000);
         startFeed(get);
         feed.start((feedStatus) => set({ feedStatus }));
     },
@@ -238,19 +313,85 @@ const workspaceStore = (set, get) => ({
     // --- events & sources ---
 
     setRawEvents: (records) =>
-        set((state) => ({ rawEvents: records, ...poolUpdate({ ...state, rawEvents: records }) })),
+        set((state) => withVisible(state, { rawEvents: records, ...poolUpdate({ ...state, rawEvents: records }) })),
 
     setAdventures: (records) =>
-        set((state) => ({ adventures: records, ...poolUpdate({ ...state, adventures: records }) })),
+        set((state) => withVisible(state, { adventures: records, ...poolUpdate({ ...state, adventures: records }) })),
 
     setMode: (mode) =>
-        set((state) => (state.mode === mode ? {} : { mode, actionError: null, ...poolUpdate({ ...state, mode }) })),
+        set((state) => (state.mode === mode
+            ? {}
+            : withVisible(state, { mode, actionError: null, ...poolUpdate({ ...state, mode }) }))),
 
     toggleShades: () =>
         set((state) => {
             const showShades = !state.showShades;
-            return { showShades, ...poolUpdate({ ...state, showShades }) };
+            return withVisible(state, { showShades, ...poolUpdate({ ...state, showShades }) });
         }),
+
+    // --- filters ---
+
+    cycleFacet: (facet, value) => {
+        set((state) => {
+            const current = { ...(state.filters.facets[facet] ?? {}) };
+            const mode = nextMode(current[value]);
+            if (mode) current[value] = mode;
+            else delete current[value];
+            const facets = { ...state.filters.facets, [facet]: current };
+            if (!Object.keys(current).length) delete facets[facet];
+            return withVisible(state, { filters: { ...state.filters, facets } });
+        });
+        scheduleFilterSave(get);
+    },
+
+    setDateRange: (range) => {
+        set((state) => withVisible(state, { filters: { ...state.filters, date_range: range } }));
+        scheduleFilterSave(get);
+    },
+
+    setRing: (ring) => {
+        set((state) => withVisible(state, { filters: { ...state.filters, ring } }));
+        scheduleFilterSave(get);
+    },
+
+    toggleRangeMode: (which) => {
+        set((state) => {
+            const range = state.filters[which];
+            if (!range) return {};
+            /** @type {FilterMode} */
+            const mode = range.mode === 'include' ? 'exclude' : 'include';
+            return withVisible(state, { filters: { ...state.filters, [which]: { ...range, mode } } });
+        });
+        scheduleFilterSave(get);
+    },
+
+    toggleSeal: () => {
+        set((state) => withVisible(state, { filters: { ...state.filters, seal: !state.filters.seal } }));
+        scheduleFilterSave(get);
+    },
+
+    setUnits: (units) => {
+        set((state) => ({ filters: { ...state.filters, units } }));
+        scheduleFilterSave(get);
+    },
+
+    clearFilters: () => {
+        set((state) => withVisible(state, {
+            filters: { ...DEFAULT_FILTERS, seal: state.filters.seal, units: state.filters.units },
+        }));
+        scheduleFilterSave(get);
+    },
+
+    savePlace: (label, lat, lon) => {
+        const place = { id: `place-${Date.now().toString(36)}`, label: label.trim().slice(0, 100) || 'Place', lat, lon };
+        set((state) => ({ places: [...state.places, place] }));
+        saveState('places', { places: get().places });
+    },
+
+    deletePlace: (id) => {
+        set((state) => ({ places: state.places.filter((p) => p.id !== id) }));
+        saveState('places', { places: get().places });
+    },
 
     selectItem: (id, source) => {
         if (id === get().selectedItemId) return;

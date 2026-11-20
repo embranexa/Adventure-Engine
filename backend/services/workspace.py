@@ -11,6 +11,7 @@ PANELS_METADATA = {
     "node":     {"id": "node",     "title": "Node // What",     "category": "EVENT-LOCK", "status": "LIVE", "kind": "node"},
     "calendar": {"id": "calendar", "title": "Calendar // When", "category": "CHRONO-MAP", "status": "LIVE", "kind": "calendar"},
     "map":      {"id": "map",      "title": "Map // Where",     "category": "LEY-GRID",   "status": "LIVE", "kind": "map"},
+    "filters":  {"id": "filters",  "title": "Filters // Which", "category": "SIEVE",      "status": "LIVE", "kind": "filters"},
 }
 
 DEFAULT_LAYOUT_TREE: dict[str, Any] = {
@@ -18,7 +19,14 @@ DEFAULT_LAYOUT_TREE: dict[str, Any] = {
     "type": "split",
     "direction": "horizontal",
     "ratio": 26,
-    "first": {"id": "leaf-node", "type": "leaf", "tabs": ["node"], "activeTab": "node"},
+    "first": {
+        "id": "left-split",
+        "type": "split",
+        "direction": "vertical",
+        "ratio": 58,
+        "first": {"id": "leaf-node", "type": "leaf", "tabs": ["node"], "activeTab": "node"},
+        "second": {"id": "leaf-filters", "type": "leaf", "tabs": ["filters"], "activeTab": "filters"},
+    },
     "second": {
         "id": "main-split",
         "type": "split",

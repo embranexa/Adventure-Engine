@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { addDays, hourOf, layoutWeek, sameDay, startOfWeek } from './calendarLayout.js';
+import { dayKey, parseDay } from '../../filters.js';
 
 const FIRST_HOUR = 6;   // visible range: 06:00 ...
 const LAST_HOUR = 24;   // ... to midnight
@@ -58,7 +59,9 @@ const CalendarBlock = memo(CalendarBlockImpl);
 
 /** Week view of crawled events (Mon–Sun, viewer's local time). */
 export function CalendarPanel() {
-    const events = useWorkspaceStore((s) => s.items);
+    const events = useWorkspaceStore((s) => s.visibleItems); // the filtered subset
+    const dateRange = useWorkspaceStore((s) => s.filters.date_range);
+    const setDateRange = useWorkspaceStore((s) => s.setDateRange);
     const itemsById = useWorkspaceStore((s) => s.itemsById);
     const selectedId = useWorkspaceStore((s) => s.selectedItemId);
     const selectionSource = useWorkspaceStore((s) => s.selectionSource);
@@ -108,6 +111,52 @@ export function CalendarPanel() {
         scroller.scrollTop = Math.max(0, hour) * HOUR_PX;
     }, [weekStart, hasEvents]);
 
+    // --- day-range filter: drag across day headers; click = one day; shift+click extends ---
+    const [drag, setDrag] = useState(/** @type {{ anchor: Date, current: Date } | null} */ (null));
+    const dragRef = useRef(drag);
+    dragRef.current = drag;
+
+    /** @param {Date} a @param {Date} b */
+    const commitRange = (a, b) => {
+        const [from, to] = a <= b ? [a, b] : [b, a];
+        const start = dayKey(from), end = dayKey(to);
+        if (dateRange && dateRange.start === start && dateRange.end === end) setDateRange(null); // same range again: clear
+        else setDateRange({ start, end, mode: dateRange?.mode ?? 'include' });
+    };
+
+    useEffect(() => {
+        if (!drag) return;
+        const onUp = () => {
+            const d = dragRef.current;
+            setDrag(null);
+            if (d) commitRange(d.anchor, d.current);
+        };
+        window.addEventListener('pointerup', onUp, { once: true });
+        return () => window.removeEventListener('pointerup', onUp);
+    }, [drag !== null, dateRange]);
+
+    /** @param {PointerEvent} e @param {Date} day */
+    const onHeadDown = (e, day) => {
+        e.preventDefault();
+        if (e.shiftKey && dateRange) { // extend the existing range to this day
+            const start = parseDay(dateRange.start), end = parseDay(dateRange.end);
+            commitRange(day < start ? day : start, day > end ? day : end);
+            return;
+        }
+        setDrag({ anchor: day, current: day });
+    };
+
+    /** Highlighted days: the drag preview while dragging, else the active range. */
+    const shown = drag
+        ? (drag.anchor <= drag.current ? [drag.anchor, drag.current] : [drag.current, drag.anchor])
+        : dateRange ? [parseDay(dateRange.start), parseDay(dateRange.end)] : null;
+    const inShown = (/** @type {Date} */ day) => shown != null && day >= shown[0] && day <= shown[1];
+    const rangeLabel = dateRange
+        ? (dateRange.start === dateRange.end
+            ? fmtDay(parseDay(dateRange.start))
+            : `${fmtDay(parseDay(dateRange.start))} – ${fmtDay(parseDay(dateRange.end))}`)
+        : null;
+
     const nowHour = hourOf(now);
     const showNow = nowHour >= FIRST_HOUR && nowHour <= LAST_HOUR;
     const hours = Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, i) => FIRST_HOUR + i);
@@ -122,12 +171,23 @@ export function CalendarPanel() {
                 </div>
                 <button className="btn cal-btn" title="Next week" onClick=${() => setWeekStart(addDays(weekStart, 7))}>›</button>
                 <button className="btn cal-btn" onClick=${() => setWeekStart(startOfWeek(new Date()))}>Today</button>
+                ${rangeLabel && html`
+                    <span className=${`cal-filter ${dateRange?.mode}`} title="Date filter (drag across day headers to change)">
+                        ${dateRange?.mode === 'exclude' ? '⊘' : '◷'} ${rangeLabel}
+                        <button className="cal-filter-x" title="Clear date filter" onClick=${() => setDateRange(null)}>✕</button>
+                    </span>
+                `}
             </div>
 
-            <div className="cal-head">
+            <div className="cal-head" title="Drag across days to filter by date · click a day for one day · shift+click to extend">
                 <div />
                 ${days.map((d) => html`
-                    <div key=${d.date.toDateString()} className=${sameDay(d.date, now) ? 'today' : ''}>
+                    <div
+                        key=${d.date.toDateString()}
+                        className=${['cal-day', sameDay(d.date, now) && 'today', inShown(d.date) && `in-range ${drag ? 'preview' : dateRange?.mode}`].filter(Boolean).join(' ')}
+                        onPointerDown=${(/** @type {PointerEvent} */ e) => onHeadDown(e, d.date)}
+                        onPointerEnter=${() => drag && setDrag({ ...drag, current: d.date })}
+                    >
                         ${d.date.toLocaleDateString([], { weekday: 'short' }).slice(0, 2)} ${d.date.getDate()}
                     </div>
                 `)}
@@ -141,7 +201,7 @@ export function CalendarPanel() {
                         `)}
                     </div>
                     ${days.map((d) => html`
-                        <div key=${d.date.toDateString()} className="cal-col">
+                        <div key=${d.date.toDateString()} className=${`cal-col ${inShown(d.date) ? 'in-range' : ''}`}>
                             ${d.blocks.map((b) => html`
                                 <${CalendarBlock}
                                     key=${b.event.id}

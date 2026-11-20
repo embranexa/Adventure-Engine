@@ -3,6 +3,7 @@
     event_sources  one row per crawler (luma, ...) with its sync status
     events         raw crawled events ("omens"), unique per (source, api_id), each with a review state
     adventures     the events you kept (plus, later, hand-made ones), each with a lifecycle phase
+    app_state      small JSON settings that must survive restarts (filters, saved places)
 
 Stage names (Sensorium, Hopper, Assay, ...) are only for display: see
 resources/classifier.md. The database stores the plain values below.
@@ -90,6 +91,16 @@ class Adventure(Base):
     stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # set by hand (HP, ATK, ...)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     phase_changed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AppState(Base):
+    """Key/value store for small JSON settings (see backend/routers/state.py for the keys)."""
+
+    __tablename__ = "app_state"
+
+    key: Mapped[str] = mapped_column(String(50), primary_key=True)
+    value: Mapped[Any] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
 
 # Columns a crawler fills in; everything else is managed by the app.

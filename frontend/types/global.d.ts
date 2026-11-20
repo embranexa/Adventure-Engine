@@ -25,7 +25,7 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map';
+type PanelKind = 'node' | 'calendar' | 'map' | 'filters';
 
 interface PanelMeta {
     id: PanelId;
@@ -100,6 +100,32 @@ type PoolItem = PoolRecord & { color: string };
 /** adventures = normal use; discovery = reviewing raw events (the Augur). */
 type PoolMode = 'adventures' | 'discovery';
 
+// --- filters (logic in js/filters.js; persisted via /api/state/filters) ---
+
+type FilterMode = 'include' | 'exclude';
+type FacetKey = 'source' | 'city' | 'registration' | 'phase' | 'review';
+
+/** Local calendar days, inclusive. */
+interface DateRange { start: string; end: string; mode: FilterMode }
+
+interface Ring {
+    center: { lat: number; lon: number; label?: string | null };
+    radius_km: number;
+    mode: FilterMode;
+}
+
+interface FilterState {
+    /** facet -> { value: include | exclude }; values not listed are off. */
+    facets: Partial<Record<FacetKey, Record<string, FilterMode>>>;
+    date_range: DateRange | null;
+    ring: Ring | null;
+    /** Hermetic Seal: hide past / Treasury / Necropolis / Archive (Adventures mode). */
+    seal: boolean;
+    units: 'mi' | 'km';
+}
+
+interface SavedPlace { id: string; label: string; lat: number; lon: number }
+
 interface SourceStatus {
     name: string;
     url: string;
@@ -154,6 +180,11 @@ interface WorkspaceState {
     /** Last triage/phase action error, shown in the node card; cleared by the next action. */
     actionError: string | null;
 
+    filters: FilterState;
+    /** The pool after filtering: what the calendar and map show. */
+    visibleItems: PoolItem[];
+    places: SavedPlace[];
+
     initWorkspace(): Promise<void>;
     persistLayout(nextTree: LayoutNode | null): void;
     setDraggingPanel(panelId: PanelId | null): void;
@@ -181,6 +212,20 @@ interface WorkspaceState {
     killAdventure(adventureId: string): Promise<void>;
     reviveAdventure(adventureId: string): Promise<void>;
     setPhase(adventureId: string, phase: Phase): Promise<void>;
+
+    // filters (saved to the server, debounced)
+    /** Cycle one facet value: off -> include -> exclude -> off. */
+    cycleFacet(facet: FacetKey, value: string): void;
+    setDateRange(range: DateRange | null): void;
+    setRing(ring: Ring | null): void;
+    /** Flip a range filter between include and exclude. */
+    toggleRangeMode(which: 'date_range' | 'ring'): void;
+    toggleSeal(): void;
+    setUnits(units: 'mi' | 'km'): void;
+    /** Clear every filter except the Seal and units. */
+    clearFilters(): void;
+    savePlace(label: string, lat: number, lon: number): void;
+    deletePlace(id: string): void;
     setSourceStatus(source: SourceStatus): void;
     /** Ask the server to crawl a source; progress arrives as source_status messages. */
     syncSource(name: string): Promise<void>;

@@ -3,6 +3,7 @@
 // here and give a panel that kind on the server.
 
 import { CalendarPanel } from './CalendarPanel.js';
+import { FiltersPanel } from './FiltersPanel.js';
 import { MapPanel } from './MapPanel.js';
 import { NodeCard } from './NodeCard.js';
 
@@ -11,4 +12,5 @@ export const PANEL_COMPONENTS = {
     node: NodeCard,
     calendar: CalendarPanel,
     map: MapPanel,
+    filters: FiltersPanel,
 };

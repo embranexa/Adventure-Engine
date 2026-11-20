@@ -16,6 +16,8 @@
  *   map.updateNodes(events);            // PoolItem[]
  *   map.select(id, { fly, emit });      // emit=false when the change came from elsewhere
  *   map.highlight(id);                  // hover from another view
+ *   map.setRing(ring, units);           // proximity filter ring (null hides it)
+ *   map.startPlacing();                 // next map click reports a point via onRingPlace
  *   map.dispose();
  */
 
@@ -51,9 +53,18 @@ export class LevelMap {
         this.container.style.cssText = 'position:absolute;inset:0;background:#05070d';
         parent.appendChild(this.container);
 
-        const { onSelect = () => {}, onHover = () => {}, ...config } = options;
+        const {
+            onSelect = () => {}, onHover = () => {},
+            onRingChange = () => {}, onRingPlace = () => {},
+            ...config
+        } = options;
         this.onSelect = onSelect;
         this.onHover = onHover;
+        this.onRingChange = onRingChange; // (ring) after dragging the ring's center or edge
+        this.onRingPlace = onRingPlace;   // ({ lat, lon }) after startPlacing() + a map click
+        this._ring = null;
+        this._ringUnits = 'mi';
+        this._placing = false;
 
         this.config = {
             mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
@@ -273,6 +284,7 @@ export class LevelMap {
             this._styleReady = true;
             this._addBuildings();
             this.map.addLayer(this.layer);
+            this._renderRing();
             this._maybeFit();
         });
     }
@@ -715,6 +727,12 @@ export class LevelMap {
 
     _bindEvents() {
         this._onClick = (event) => {
+            if (this._placing) {
+                this._placing = false;
+                this.map.getCanvas().style.cursor = '';
+                this.onRingPlace({ lat: event.lngLat.lat, lon: event.lngLat.lng });
+                return;
+            }
             const entry = this._pick(event.point);
             if (entry) this.select(entry.node.id);
         };
@@ -812,7 +830,137 @@ export class LevelMap {
         this.renderer?.dispose();
     }
 
+    /* ------------------------------------------------------------------ */
+    /*  Proximity ring (filter)                                            */
+    /* ------------------------------------------------------------------ */
+
+    /** Show / update / hide the ring. `ring` = { center: { lat, lon }, radius_km, mode } or null. */
+    setRing(ring, units = 'mi') {
+        this._ring = ring ? { ...ring, center: { ...ring.center } } : null;
+        this._ringUnits = units;
+        this._renderRing();
+    }
+
+    /** The next click on the map reports its point via onRingPlace instead of selecting. */
+    startPlacing() {
+        this._placing = true;
+        this.map.getCanvas().style.cursor = 'crosshair';
+    }
+
+    cancelPlacing() {
+        this._placing = false;
+        this.map.getCanvas().style.cursor = '';
+    }
+
+    /** Point `km` away from (lat, lon) along `bearing` degrees, as [lon, lat]. */
+    static _destination(lat, lon, km, bearing) {
+        const R = 6371.0088, rad = Math.PI / 180;
+        const d = km / R, th = bearing * rad, p1 = lat * rad, l1 = lon * rad;
+        const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(th));
+        const l2 = l1 + Math.atan2(Math.sin(th) * Math.sin(d) * Math.cos(p1), Math.cos(d) - Math.sin(p1) * Math.sin(p2));
+        return [((l2 / rad + 540) % 360) - 180, p2 / rad];
+    }
+
+    static _distanceKm(lat1, lon1, lat2, lon2) {
+        const rad = Math.PI / 180;
+        const a = Math.sin(((lat2 - lat1) * rad) / 2) ** 2
+            + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+        return 2 * 6371.0088 * Math.asin(Math.min(1, Math.sqrt(a)));
+    }
+
+    _ringGeoJSON() {
+        const { center, radius_km } = this._ring;
+        const coords = [];
+        for (let i = 0; i <= 96; i++) coords.push(LevelMap._destination(center.lat, center.lon, radius_km, (i / 96) * 360));
+        return { type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] }, properties: {} };
+    }
+
+    _ringLabel() {
+        const km = this._ring.radius_km;
+        const v = this._ringUnits === 'mi' ? km / 1.609344 : km;
+        return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${this._ringUnits}`;
+    }
+
+    /** Draw the ring layers and its two drag handles (center, edge). */
+    _renderRing() {
+        if (!this._styleReady) return; // drawn once the style loads
+        const map = this.map;
+
+        if (!this._ring) {
+            map.getSource('lm-ring')?.setData({ type: 'FeatureCollection', features: [] });
+            this._ringCenter?.remove(); this._ringCenter = null;
+            this._ringEdge?.remove(); this._ringEdge = null;
+            return;
+        }
+
+        const color = this._ring.mode === 'exclude' ? '#ff2bd6' : '#00f0ff';
+        if (!map.getSource('lm-ring')) {
+            map.addSource('lm-ring', { type: 'geojson', data: this._ringGeoJSON() });
+            const before = map.getLayer('threejs-nodes') ? 'threejs-nodes' : undefined;
+            map.addLayer({ id: 'lm-ring-fill', type: 'fill', source: 'lm-ring',
+                paint: { 'fill-color': color, 'fill-opacity': 0.07 } }, before);
+            map.addLayer({ id: 'lm-ring-line', type: 'line', source: 'lm-ring',
+                paint: { 'line-color': color, 'line-width': 2, 'line-dasharray': [2, 1.5] } }, before);
+        } else {
+            map.getSource('lm-ring').setData(this._ringGeoJSON());
+        }
+        map.setPaintProperty('lm-ring-fill', 'fill-color', color);
+        map.setPaintProperty('lm-ring-line', 'line-color', color);
+
+        const { center } = this._ring;
+        const edgePos = LevelMap._destination(center.lat, center.lon, this._ring.radius_km, 90);
+
+        if (!this._ringCenter) {
+            const el = document.createElement('div');
+            el.className = 'lm-ring-center';
+            el.title = 'Drag to move the proximity ring';
+            this._ringCenter = new maplibregl.Marker({ element: el, draggable: true })
+                .setLngLat([center.lon, center.lat]).addTo(map);
+            this._ringCenter.on('drag', () => {
+                const p = this._ringCenter.getLngLat();
+                this._ring.center = { ...this._ring.center, lat: p.lat, lon: p.lng, label: null };
+                this._refreshRingShape();
+            });
+            this._ringCenter.on('dragend', () => this.onRingChange({ ...this._ring, center: { ...this._ring.center } }));
+
+            const handle = document.createElement('div');
+            handle.className = 'lm-ring-edge';
+            handle.title = 'Drag to resize';
+            handle.appendChild(document.createElement('span'));
+            this._ringEdge = new maplibregl.Marker({ element: handle, draggable: true })
+                .setLngLat(edgePos).addTo(map);
+            this._ringEdge.on('drag', () => {
+                const p = this._ringEdge.getLngLat();
+                const c = this._ring.center;
+                this._ring.radius_km = Math.max(0.05, LevelMap._distanceKm(c.lat, c.lon, p.lat, p.lng));
+                this._refreshRingShape(false);
+            });
+            this._ringEdge.on('dragend', () => {
+                this._refreshRingShape(); // snap the handle back onto the ring's east side
+                this.onRingChange({ ...this._ring, center: { ...this._ring.center } });
+            });
+        } else {
+            this._ringCenter.setLngLat([center.lon, center.lat]);
+            this._ringEdge.setLngLat(edgePos);
+        }
+        this._ringCenter.getElement().dataset.mode = this._ring.mode;
+        this._ringEdge.getElement().dataset.mode = this._ring.mode;
+        this._ringEdge.getElement().firstChild.textContent = this._ringLabel();
+    }
+
+    /** Live update while dragging (no store round trip). */
+    _refreshRingShape(moveEdge = true) {
+        this.map.getSource('lm-ring')?.setData(this._ringGeoJSON());
+        if (moveEdge) {
+            const c = this._ring.center;
+            this._ringEdge?.setLngLat(LevelMap._destination(c.lat, c.lon, this._ring.radius_km, 90));
+        }
+        if (this._ringEdge) this._ringEdge.getElement().firstChild.textContent = this._ringLabel();
+    }
+
     dispose() {
+        this._ringCenter?.remove();
+        this._ringEdge?.remove();
         this._ro?.disconnect();
         this.map.off('click', this._onClick);
         this.map.off('mousemove', this._onMove);
