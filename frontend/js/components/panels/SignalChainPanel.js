@@ -1,21 +1,39 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
-import { OBJECT_TYPES } from '../../lifecycle.js';
+import { OBJECT_TYPES, PHASE_NODES, PHASE_STAGES, REVIEW_STAGES } from '../../lifecycle.js';
 import { LENSES } from '../../lib/lens.js';
 import { pipeFlows, twinModel } from '../../lib/twinModel.js';
-import { OUTSIDE, twinNodes, twinPipes } from '../../lib/twinTopology.js';
+import { CENTRIFUGE, CODEX, FORGE, OUTSIDE, SUMP, twinNodes, twinPipes } from '../../lib/twinTopology.js';
 
 const ZONE_LABELS = { net: 'Net · events', core: 'Core · adventures', viewer: 'Viewers' };
 const RECENT = 15;
+const VIEW_KEY = 'signal-chain-view';
+
+/** Each machine's own color: the matter it holds, or its trade. @type {Record<string, string>} */
+const NODE_COLORS = {
+    [CENTRIFUGE]: REVIEW_STAGES.new.color,
+    [SUMP]: REVIEW_STAGES.ignored.color,
+    [FORGE]: '#ff7a3c',
+    [CODEX]: '#c8a46a',
+    entropy_market: '#c8a46a',
+    nexus: '#9fb4c8', atlas: '#9fb4c8', calendar: '#9fb4c8',
+    ...Object.fromEntries(Object.entries(PHASE_NODES).map(([phase, id]) => [id, PHASE_STAGES[/** @type {Phase} */ (phase)].color])),
+};
+/** @param {string} id */
+const nodeColor = (id) => (id.startsWith('harvester:') ? REVIEW_STAGES.harvested.light : NODE_COLORS[id] ?? '#888888');
 
 /** @param {number} n */
 const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 /** @param {string} iso */
 function clock(iso) {
-    const d = new Date(iso);
-    return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/** @returns {'3d' | 'table'} */
+function savedView() {
+    try { return localStorage.getItem(VIEW_KEY) === 'table' ? 'table' : '3d'; } catch { return '3d'; }
 }
 
 /**
@@ -33,6 +51,19 @@ function runAction(action) {
     s.showPanel(action.panel);
 }
 
+/** A harvester or centrifuge button on the twin. @param {string} command @param {string} nodeId */
+function runCommand(command, nodeId) {
+    const s = useWorkspaceStore.getState();
+    const source = nodeId.replace(/^harvester:/, '');
+    if (command === 'harvest') s.syncSource(source);
+    else if (command === 'feed') s.feedSource(source);
+    else if (command === 'siphon') s.siphonSource(source);
+    else if (command === 'purge') {
+        const n = s.rawEvents.reduce((k, e) => k + (e.review === 'new' ? 1 : 0), 0);
+        if (n && window.confirm(`Purge ${n} event${n === 1 ? '' : 's'} from the Centrifuge into the Sump? (Each can be revived.)`)) s.purgeCentrifuge();
+    }
+}
+
 /** The lit part of a level as a stacked bar, one segment per lens value. @param {{ level: import('../../lib/twinModel.js').TwinLevel }} props */
 function Bands({ level }) {
     if (!level.total) return html`<span className="sc-dim">—</span>`;
@@ -47,9 +78,92 @@ function Bands({ level }) {
 }
 
 /**
- * The Signal Chain, phase 2: the twin's model as plain tables, to check the numbers
- * before it becomes 3D. Levels per machine (lit = passes the applied filter, split by
- * the lens), flows over 7 days, the counting rules, and the latest moves.
+ * The model as tables: levels per machine, flows per pipe, the latest moves.
+ * @param {{ nodes: import('../../lib/twinTopology.js').TwinNode[], pipes: import('../../lib/twinTopology.js').TwinPipe[],
+ *           model: import('../../lib/twinModel.js').TwinModel, routed: ReturnType<typeof pipeFlows>,
+ *           io: Record<string, { in: number, out: number }>, transitions: TransitionRecord[], titleOf: Map<string, string> }} props
+ */
+function TwinTable({ nodes, pipes, model, routed, io, transitions, titleOf }) {
+    const zones = /** @type {const} */ (['net', 'core', 'viewer']);
+    const busyPipes = pipes.filter((p) => routed.byPipe[p.id].forward || routed.byPipe[p.id].backward);
+    return html`
+        <div className="sc-scroll">
+            ${zones.map((zone) => html`
+                <table key=${zone} className="sc-table sc-zone">
+                    <colgroup>
+                        <col className="c-name" /><col className="c-kind" /><col className="c-num" /><col className="c-num" />
+                        <col /><col className="c-num" /><col className="c-num" />
+                    </colgroup>
+                    <thead>
+                        <tr><th colSpan="2">${ZONE_LABELS[zone]}</th><th>Held</th><th>Lit</th><th>Lit by lens · ghost</th><th>In 7d</th><th>Out 7d</th></tr>
+                    </thead>
+                    <tbody>
+                        ${nodes.filter((n) => n.zone === zone).map((n) => {
+                            const level = model.levels[n.id] ?? { total: 0, lit: 0, bands: [] };
+                            const flow = io[n.id] ?? { in: 0, out: 0 };
+                            const action = n.action;
+                            return html`
+                                <tr key=${n.id} className=${n.locked ? 'locked' : ''}>
+                                    <td className="sc-name">
+                                        ${action && !n.locked
+                                            ? html`<button className="sc-link" onClick=${() => runAction(action)}
+                                                title=${`Open ${action.panel}${action.mode ? ` (${action.mode})` : ''}`}>${n.label}</button>`
+                                            : n.label}
+                                        ${n.locked && html`<span className="sc-lock" title="Not built yet">🔒</span>`}
+                                    </td>
+                                    <td className="sc-dim">${n.kind}${n.matter ? ` · ${n.matter}` : ''}</td>
+                                    ${n.holds === 'objects'
+                                        ? html`<td>${model.codex.total}</td><td colSpan="2" className="sc-dim">
+                                            ${Object.entries(model.codex.byType).map(([t, c]) => `${OBJECT_TYPES[/** @type {ObjectType} */ (t)].glyph} ${c}`).join('   ')}
+                                          </td>`
+                                        : n.holds
+                                            ? html`<td>${level.total}</td><td>${level.lit}</td><td><${Bands} level=${level} /></td>`
+                                            : html`<td className="sc-dim">—</td><td className="sc-dim">—</td><td></td>`}
+                                    <td>${flow.in || ''}</td><td>${flow.out || ''}</td>
+                                </tr>
+                            `;
+                        })}
+                    </tbody>
+                </table>
+            `)}
+
+            <table className="sc-table">
+                <thead><tr><th>Pipe (7 days)</th><th>⟶</th><th>⟵</th></tr></thead>
+                <tbody>
+                    ${busyPipes.map((p) => html`
+                        <tr key=${p.id}>
+                            <td>${p.a === OUTSIDE ? 'outside' : p.a} ${p.kind === 'conveyor' ? '⛓' : '—'} ${p.b}</td>
+                            <td>${routed.byPipe[p.id].forward || ''}</td>
+                            <td>${routed.byPipe[p.id].backward || ''}</td>
+                        </tr>
+                    `)}
+                    ${routed.unrouted.map((f) => html`
+                        <tr key=${`${f.from}>${f.to}`} className="bad"><td>no pipe: ${f.from} → ${f.to}</td><td>${f.count}</td><td></td></tr>
+                    `)}
+                </tbody>
+            </table>
+
+            <table className="sc-table sc-moves">
+                <thead><tr><th colSpan="3">Latest moves (${transitions.length} held)</th></tr></thead>
+                <tbody>
+                    ${transitions.slice(-RECENT).reverse().map((t) => html`
+                        <tr key=${t.id}>
+                            <td className="sc-dim">${clock(t.at)}</td>
+                            <td>${t.from} → ${t.to}</td>
+                            <td className="sc-dim">${titleOf.get(t.row_id) ?? t.entity}</td>
+                        </tr>
+                    `)}
+                    ${!transitions.length && html`<tr><td colSpan="3" className="sc-dim">No moves in the last 24 hours</td></tr>`}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+/**
+ * The Signal Chain: the whole pipeline as a refinery. 3D (machines, liquid levels, pipes,
+ * packets for every move) or as tables. Machines open their panels; harvester and
+ * centrifuge buttons sit on their labels. See BUILD_PLAN.md (same folder as ARCHITECTURE.md).
  */
 export function SignalChainPanel() {
     const rawEvents = useWorkspaceStore((s) => s.rawEvents);
@@ -59,27 +173,40 @@ export function SignalChainPanel() {
     const sources = useWorkspaceStore((s) => s.sources);
     const transitions = useWorkspaceStore((s) => s.transitions);
     const flows = useWorkspaceStore((s) => s.flows);
+    const panels = useWorkspaceStore((s) => s.panels);
     const setLens = useWorkspaceStore((s) => s.setLens);
 
+    const [view, setView] = useState(savedView);
+    const [status, setStatus] = useState(/** @type {'loading' | 'ready' | 'error'} */ ('loading'));
+    const hostRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+    const sceneRef = useRef(/** @type {any} */ (null));
+
     const sourceNames = useMemo(() => Object.keys(sources), [sources]);
-    const nodes = useMemo(() => twinNodes(sourceNames), [sourceNames]);
+    const nodes = useMemo(() => twinNodes(sourceNames).map((n) => (n.action
+        ? { ...n, action: { ...n.action, label: panels[n.action.panel]?.name ?? n.action.panel } } : n)), [sourceNames, panels]);
+    const nodesRef = useRef(nodes);
+    nodesRef.current = nodes;
     const pipes = useMemo(() => twinPipes(sourceNames), [sourceNames]);
     const model = useMemo(
         () => twinModel({ rawEvents, adventures, objects, filters, lens: filters.lens, now: Date.now() }),
         [rawEvents, adventures, objects, filters],
     );
     const routed = useMemo(() => pipeFlows(flows, pipes), [flows, pipes]);
-    const flowIn = useMemo(() => {
+    const io = useMemo(() => {
         /** @type {Record<string, { in: number, out: number }>} */
-        const io = {};
+        const out = {};
         for (const f of flows) {
-            (io[f.to] ??= { in: 0, out: 0 }).in += f.count;
-            (io[f.from] ??= { in: 0, out: 0 }).out += f.count;
+            (out[f.to] ??= { in: 0, out: 0 }).in += f.count;
+            (out[f.from] ??= { in: 0, out: 0 }).out += f.count;
         }
-        return io;
+        return out;
     }, [flows]);
-
-    // names for the latest moves
+    const centrifugeBySource = useMemo(() => {
+        /** @type {Record<string, number>} */
+        const out = {};
+        for (const e of rawEvents) if (e.review === 'new') out[e.source] = (out[e.source] ?? 0) + 1;
+        return out;
+    }, [rawEvents]);
     const titleOf = useMemo(() => {
         /** @type {Map<string, string>} */
         const m = new Map();
@@ -89,17 +216,65 @@ export function SignalChainPanel() {
         return m;
     }, [rawEvents, adventures, objects]);
 
-    const zones = /** @type {const} */ (['net', 'core', 'viewer']);
-    const busyPipes = pipes.filter((p) => routed.byPipe[p.id].forward || routed.byPipe[p.id].backward);
+    const chooseView = (/** @type {'3d' | 'table'} */ v) => {
+        setView(v);
+        try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode: not remembered */ }
+    };
+
+    // Load three.js + the scene only when the 3D view is showing.
+    useEffect(() => {
+        if (view !== '3d') return undefined;
+        let disposed = false;
+        setStatus('loading');
+        // @ts-ignore -- the query string hides the module's path from the type checker
+        import('../../lib/twinScene.js?v=1')
+            .then(({ TwinScene }) => {
+                if (disposed || !hostRef.current) return;
+                sceneRef.current = new TwinScene(hostRef.current, {
+                    onActivate: (/** @type {string} */ id) => {
+                        const action = nodesRef.current.find((n) => n.id === id)?.action;
+                        if (action) runAction(action);
+                    },
+                    onCommand: runCommand,
+                });
+                setStatus('ready');
+            })
+            .catch((err) => {
+                console.error('[signal chain] failed to start', err);
+                if (!disposed) setStatus('error');
+            });
+        return () => {
+            disposed = true;
+            sceneRef.current?.dispose();
+            sceneRef.current = null;
+        };
+    }, [view]);
+
+    // feed the scene; the first time, replay the latest moves so it doesn't open frozen
+    const replayed = useRef(false);
+    useEffect(() => {
+        const scene = sceneRef.current;
+        if (!scene || status !== 'ready') { replayed.current = false; return; }
+        const colors = Object.fromEntries(nodes.map((n) => [n.id, nodeColor(n.id)]));
+        scene.update({ nodes, pipes, levels: model.levels, codex: model.codex, flows: routed.byPipe, colors, sources, io, centrifugeBySource });
+        scene.play(transitions, { replay: !replayed.current });
+        replayed.current = true;
+    }, [status, nodes, pipes, model, routed, sources, io, centrifugeBySource, transitions]);
 
     return html`
         <div className="panel-body signal-chain">
             <div className="sc-head">
+                <div className="sc-views" role="group" aria-label="View">
+                    <button className=${`sc-view ${view === '3d' ? 'active' : ''}`} onClick=${() => chooseView('3d')}>Refinery</button>
+                    <button className=${`sc-view ${view === 'table' ? 'active' : ''}`} onClick=${() => chooseView('table')}>Table</button>
+                </div>
                 <span className=${`sc-check ${model.check.ok ? 'ok' : 'bad'}`}
                     title=${model.check.ok ? 'Both counting rules hold' : model.check.problems.join('\n')}>
                     ${model.check.ok ? '✓ Counts balance' : `⚠ ${model.check.problems[0]}`}
                 </span>
                 <span className="sc-spacer"></span>
+                ${view === '3d' && html`<button className="btn sc-home" title="Frame the whole refinery"
+                    onClick=${() => sceneRef.current?.fit()}>⌂</button>`}
                 <label className="sc-lens">Lens
                     <select className="btn" value=${filters.lens}
                         onChange=${(/** @type {any} */ e) => setLens(e.target.value)}>
@@ -108,77 +283,16 @@ export function SignalChainPanel() {
                 </label>
             </div>
 
-            <div className="sc-scroll">
-                ${zones.map((zone) => html`
-                    <table key=${zone} className="sc-table sc-zone">
-                        <colgroup>
-                            <col className="c-name" /><col className="c-kind" /><col className="c-num" /><col className="c-num" />
-                            <col /><col className="c-num" /><col className="c-num" />
-                        </colgroup>
-                        <thead>
-                            <tr><th colSpan="2">${ZONE_LABELS[zone]}</th><th>Held</th><th>Lit</th><th className="sc-bands">Lit by lens · ghost</th><th>In 7d</th><th>Out 7d</th></tr>
-                        </thead>
-                        <tbody>
-                            ${nodes.filter((n) => n.zone === zone).map((n) => {
-                                const level = model.levels[n.id] ?? { total: 0, lit: 0, bands: [] };
-                                const io = flowIn[n.id] ?? { in: 0, out: 0 };
-                                const action = n.action;
-                                const isCodex = n.holds === 'objects';
-                                return html`
-                                    <tr key=${n.id} className=${n.locked ? 'locked' : ''}>
-                                        <td className="sc-name">
-                                            ${action && !n.locked
-                                                ? html`<button className="sc-link" onClick=${() => runAction(action)}
-                                                    title=${`Open ${action.panel}${action.mode ? ` (${action.mode})` : ''}`}>${n.label}</button>`
-                                                : n.label}
-                                            ${n.locked && html`<span className="sc-lock" title="Not built yet">🔒</span>`}
-                                        </td>
-                                        <td className="sc-dim">${n.kind}${n.matter ? ` · ${n.matter}` : ''}</td>
-                                        ${isCodex
-                                            ? html`<td>${model.codex.total}</td><td colSpan="2" className="sc-dim">
-                                                ${Object.entries(model.codex.byType).map(([t, c]) => `${OBJECT_TYPES[/** @type {ObjectType} */ (t)].glyph} ${c}`).join('   ')}
-                                              </td>`
-                                            : n.holds
-                                                ? html`<td>${level.total}</td><td>${level.lit}</td><td><${Bands} level=${level} /></td>`
-                                                : html`<td className="sc-dim">—</td><td className="sc-dim">—</td><td></td>`}
-                                        <td>${io.in || ''}</td><td>${io.out || ''}</td>
-                                    </tr>
-                                `;
-                            })}
-                        </tbody>
-                    </table>
-                `)}
-
-                <table className="sc-table">
-                    <thead><tr><th>Pipe (7 days)</th><th>⟶</th><th>⟵</th></tr></thead>
-                    <tbody>
-                        ${busyPipes.map((p) => html`
-                            <tr key=${p.id}>
-                                <td>${p.a === OUTSIDE ? 'outside' : p.a} ${p.kind === 'conveyor' ? '⛓' : '—'} ${p.b}</td>
-                                <td>${routed.byPipe[p.id].forward || ''}</td>
-                                <td>${routed.byPipe[p.id].backward || ''}</td>
-                            </tr>
-                        `)}
-                        ${routed.unrouted.map((f) => html`
-                            <tr key=${`${f.from}>${f.to}`} className="bad"><td>no pipe: ${f.from} → ${f.to}</td><td>${f.count}</td><td></td></tr>
-                        `)}
-                    </tbody>
-                </table>
-
-                <table className="sc-table sc-moves">
-                    <thead><tr><th colSpan="3">Latest moves (${transitions.length} held)</th></tr></thead>
-                    <tbody>
-                        ${transitions.slice(-RECENT).reverse().map((t) => html`
-                            <tr key=${t.id}>
-                                <td className="sc-dim">${clock(t.at)}</td>
-                                <td>${t.from} → ${t.to}</td>
-                                <td className="sc-dim">${titleOf.get(t.row_id) ?? t.entity}</td>
-                            </tr>
-                        `)}
-                        ${!transitions.length && html`<tr><td colSpan="3" className="sc-dim">No moves in the last 24 hours</td></tr>`}
-                    </tbody>
-                </table>
-            </div>
+            ${view === 'table'
+                ? html`<${TwinTable} nodes=${nodes} pipes=${pipes} model=${model} routed=${routed} io=${io}
+                    transitions=${transitions} titleOf=${titleOf} />`
+                : html`
+                    <div className="sc-stage">
+                        <div className="twin-host" ref=${hostRef}></div>
+                        ${status === 'loading' && html`<div className="sc-overlay">Starting the refinery…</div>`}
+                        ${status === 'error' && html`<div className="sc-overlay">The 3D view failed to start (see the console). The Table view still works.</div>`}
+                    </div>
+                `}
         </div>
     `;
 }

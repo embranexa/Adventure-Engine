@@ -22,7 +22,8 @@ import { MAIN_ROUTE, PHASE_NODES, PHASE_STAGES } from '../lifecycle.js';
  */
 /**
  * What clicking a machine does: open a panel, maybe after switching mode or opening the
- * create dialog. @typedef {{ panel: PanelId, mode?: PoolMode, shades?: boolean, create?: boolean }} TwinAction
+ * create dialog. `label` (the panel's name) is filled in by the panel.
+ * @typedef {{ panel: PanelId, mode?: PoolMode, shades?: boolean, create?: boolean, label?: string }} TwinAction
  */
 /** @typedef {{ id: string, a: string, b: string, kind: 'pipe' | 'conveyor' }} TwinPipe */
 
