@@ -23,7 +23,7 @@
 
 import { loadScript, loadStylesheet } from './loadScript.js';
 import { stageOf } from '../lifecycle.js';
-import { deferredResize, isResizing } from './resizing.js';
+import { deferredResize, isResizing, viewOf } from './resizing.js';
 
 const VENDOR = '/frontend/vendor';
 
@@ -50,7 +50,8 @@ export class LevelMap {
         }
 
         // Own an inner host that fills the parent (inline style beats MapLibre's CSS)
-        if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+        this.view = viewOf(parent); // a popped-out Atlas lives in its own window
+        if (this.view.getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
         this.container = document.createElement('div');
         this.container.style.cssText = 'position:absolute;inset:0;background:#05070d';
         parent.appendChild(this.container);
@@ -105,7 +106,7 @@ export class LevelMap {
     }
 
     _watchSize() {
-        this._ro = new ResizeObserver(deferredResize(() => this.map?.resize()));
+        this._ro = new this.view.ResizeObserver(deferredResize(() => this.map?.resize(), this.view));
         this._ro.observe(this.container);
     }
 

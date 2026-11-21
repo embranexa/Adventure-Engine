@@ -19,7 +19,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { deferredResize, isResizing } from './resizing.js';
+import { deferredResize, isResizing, viewOf } from './resizing.js';
 
 const LAYER_X = 66;       // spacing between steps (left to right)
 const ROW_Z = 52;         // spacing between actions in the same step
@@ -61,11 +61,13 @@ export class AlembicScene {
         this.onActivate = onActivate;
         this.onHover = onHover;
 
+        // the window this scene is shown in (a popped-out panel lives in its own window)
+        this.view = viewOf(parent);
         this.container = el('div', 'alm-root');
         parent.appendChild(this.container);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        this.renderer.setPixelRatio(Math.min(this.view.devicePixelRatio || 1, 2));
         this.renderer.setClearColor(0x000000, 0); // the panel's glass shows through
         this.container.appendChild(this.renderer.domElement);
 
@@ -118,17 +120,17 @@ export class AlembicScene {
         this._v = new THREE.Vector3();
         this._bindEvents();
 
-        this._ro = new ResizeObserver(deferredResize(() => this._resize()));
+        this._ro = new this.view.ResizeObserver(deferredResize(() => this._resize(), this.view));
         this._ro.observe(this.container);
         this._resize();
 
-        this._last = performance.now();
+        this._last = this.view.performance.now();
         const loop = (t) => {
-            this._raf = requestAnimationFrame(loop);
+            this._raf = this.view.requestAnimationFrame(loop);
             if (isResizing()) { this._last = t; return; } // hold still while a splitter is dragged
             this._frame(t);
         };
-        this._raf = requestAnimationFrame(loop);
+        this._raf = this.view.requestAnimationFrame(loop);
     }
 
     /* ------------------------------------------------------------------ */
@@ -540,7 +542,7 @@ export class AlembicScene {
     }
 
     dispose() {
-        cancelAnimationFrame(this._raf);
+        this.view.cancelAnimationFrame(this._raf);
         this._ro?.disconnect();
         const canvas = this.renderer.domElement;
         canvas.removeEventListener('pointerdown', this._onDown);

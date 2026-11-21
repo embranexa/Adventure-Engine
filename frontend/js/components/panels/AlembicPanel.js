@@ -5,6 +5,7 @@ import {
     addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, toggleDone, toggleLink,
 } from '../../lib/roadmap.js';
 import { PromoteButton } from '../PromoteButton.js';
+import { focusedWindow } from '../../lib/windows.js';
 
 /**
  * Controls for the selected action: rename, complete/undo, link, add the next action, delete.
@@ -166,8 +167,9 @@ export function AlembicPanel() {
     useEffect(() => {
         if (!linkFrom) return;
         const onKey = (/** @type {KeyboardEvent} */ e) => { if (e.key === 'Escape') setLinkFrom(null); };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
+        const win = focusedWindow(); // the panel's window (it may be popped out)
+        win.addEventListener('keydown', onKey);
+        return () => win.removeEventListener('keydown', onKey);
     }, [linkFrom]);
 
     useEffect(() => { if (roadmapError) flash(roadmapError); }, [roadmapError]);

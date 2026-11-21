@@ -266,6 +266,8 @@ interface WorkspaceState {
     /** null when every panel has been closed. */
     tree: LayoutNode | null;
     draggingPanelId: PanelId | null;
+    /** Panels shown in their own window; they stay in `tree`, hidden from the main dock. */
+    poppedOut: PanelId[];
     /** Whether the dock layout is saved to the server. */
     layoutStatus: string;
     feedStatus: FeedStatus;
@@ -321,6 +323,8 @@ interface WorkspaceState {
     reopenPanel(panelId: PanelId): void;
     /** Bring a panel to the front: select its tab, or reopen it if it was closed. */
     showPanel(panelId: PanelId): void;
+    popOut(panelId: PanelId): void;
+    dockPopout(panelId: PanelId): void;
     resetWorkspace(): Promise<void>;
 
     /** From an `events` message. */

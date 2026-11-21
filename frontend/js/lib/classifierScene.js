@@ -19,7 +19,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ROLE_COLORS, galaxyRadius, layout } from './classifierGraph.js';
 import { magicCircleCanvases } from './magicCircle.js';
 import { stageOf } from '../lifecycle.js';
-import { deferredResize, isResizing } from './resizing.js';
+import { deferredResize, isResizing, viewOf } from './resizing.js';
 
 const EXPAND_BASE = 170;     // a galaxy breaks apart when the camera is closer than this (+ size)
 const CARD_DISTANCE = 120;   // adventures closer than this show their card
@@ -66,11 +66,13 @@ export class ClassifierScene {
         this.onStarClick = onStarClick;
         this.onStarContext = onStarContext;
 
+        // the window this scene is shown in (a popped-out panel lives in its own window)
+        this.view = viewOf(parent);
         this.container = el('div', 'cls-root');
         parent.appendChild(this.container);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        this.renderer.setPixelRatio(Math.min(this.view.devicePixelRatio || 1, 2));
         this.renderer.setClearColor(0x000000, 0); // transparent: the panel's glass shows through
         this.container.appendChild(this.renderer.domElement);
 
@@ -119,18 +121,18 @@ export class ClassifierScene {
         this._buildLinks();
         this._bindEvents();
 
-        this._ro = new ResizeObserver(deferredResize(() => this._resize()));
+        this._ro = new this.view.ResizeObserver(deferredResize(() => this._resize(), this.view));
         this._ro.observe(this.container);
         this._resize();
 
-        this._last = performance.now();
+        this._last = this.view.performance.now();
         const loop = (t) => {
-            this._raf = requestAnimationFrame(loop);
+            this._raf = this.view.requestAnimationFrame(loop);
             // Hold still while a splitter is dragged: the GPU time goes to the resize instead.
             if (isResizing()) { this._last = t; return; }
             this._frame(t);
         };
-        this._raf = requestAnimationFrame(loop);
+        this._raf = this.view.requestAnimationFrame(loop);
     }
 
     /* ------------------------------------------------------------------ */
@@ -594,7 +596,7 @@ export class ClassifierScene {
         const dir = this.camera.position.clone().sub(this.controls.target).normalize();
         if (!Number.isFinite(dir.x)) dir.set(0, 0.5, 1).normalize();
         this._fly = {
-            t0: performance.now(),
+            t0: this.view.performance.now(),
             fromPos: this.camera.position.clone(), toPos: target.clone().addScaledVector(dir, distance),
             fromTarget: this.controls.target.clone(), toTarget: target.clone(),
         };
@@ -791,7 +793,7 @@ export class ClassifierScene {
     /* ------------------------------------------------------------------ */
 
     dispose() {
-        cancelAnimationFrame(this._raf);
+        this.view.cancelAnimationFrame(this._raf);
         this._ro.disconnect();
         const canvas = this.renderer.domElement;
         canvas.removeEventListener('pointerdown', this._onDown);

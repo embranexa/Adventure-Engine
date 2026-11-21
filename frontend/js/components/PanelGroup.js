@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../store.js';
 import { pendingChanges } from '../filters.js';
 import { PanelContent } from './PanelContent.js';
 import { Corners, Icon, PanelTitle } from './PanelTitle.js';
+import { popOut } from './Popout.js';
 
 const STEEL = '#cfd3da';
 
@@ -34,11 +35,12 @@ function usePanelChrome(kind) {
 
 /**
  * A module housing: steel pipe frame with ornate corners, glass interior, and a
- * nameplate (title, status, close), plus a tab strip when several panels share the
- * housing. Drag the nameplate or a tab to re-dock.
- * @param {{ node: LeafNode }} props
+ * nameplate (title, status, pop out, close), plus a tab strip when several panels share
+ * the housing. Drag the nameplate or a tab to re-dock. In a pop-out window (`popout`) the
+ * housing holds one panel, doesn't take part in docking, and has a Dock button instead.
+ * @param {{ node: LeafNode, popout?: boolean }} props
  */
-function PanelGroupImpl({ node }) {
+function PanelGroupImpl({ node, popout = false }) {
     const panels = useWorkspaceStore((s) => s.panels);
     const mode = useWorkspaceStore((s) => s.mode);
     const draggingPanelId = useWorkspaceStore((s) => s.draggingPanelId);
@@ -46,6 +48,7 @@ function PanelGroupImpl({ node }) {
     const selectTab = useWorkspaceStore((s) => s.selectTab);
     const dockPanel = useWorkspaceStore((s) => s.dockPanel);
     const closePanel = useWorkspaceStore((s) => s.closePanel);
+    const dockPopout = useWorkspaceStore((s) => s.dockPopout);
 
     const [hoverZone, setHoverZone] = useState(/** @type {DropZone | null} */ (null));
     const groupRef = useRef(/** @type {HTMLDivElement | null} */ (null));
@@ -101,25 +104,29 @@ function PanelGroupImpl({ node }) {
             ref=${groupRef}
             className="module"
             style=${{ '--acc': acc }}
-            onDragOver=${handleDragOver}
-            onDragLeave=${() => setHoverZone(null)}
-            onDrop=${handleDrop}
+            onDragOver=${popout ? undefined : handleDragOver}
+            onDragLeave=${popout ? undefined : () => setHoverZone(null)}
+            onDrop=${popout ? undefined : handleDrop}
         >
             <${Corners} />
             <div className="glass">
                 <div className="bloom"></div>
                 <div
                     className="plate"
-                    draggable="true"
-                    title="Drag to re-dock"
-                    onDragStart=${(/** @type {DragEvent} */ e) => activeTab && startDrag(e, activeTab)}
-                    onDragEnd=${endDrag}
+                    draggable=${popout ? 'false' : 'true'}
+                    title=${popout ? undefined : 'Drag to re-dock'}
+                    onDragStart=${popout ? undefined : (/** @type {DragEvent} */ e) => activeTab && startDrag(e, activeTab)}
+                    onDragEnd=${popout ? undefined : endDrag}
                 >
                     ${meta
                         ? html`<${PanelTitle} meta=${meta} input=${input} />`
                         : html`<div className="ptitle"><span className="ptitle-name">${activeTab}</span></div>`}
                     <div className="plate-end">
                         ${light && html`<span className=${`light ${light.cls}`}><i></i>${light.label}</span>`}
+                        ${activeTab && (popout
+                            ? html`<button className="pclose" title="Back to the dock" aria-label="Back to the dock" onClick=${() => dockPopout(activeTab)}>⇲</button>`
+                            : html`<button className="pclose" title="Pop out into its own window" aria-label="Pop out into its own window"
+                                onClick=${() => popOut(activeTab, groupRef.current?.getBoundingClientRect())}>⧉</button>`)}
                         ${activeTab && html`
                             <button className="pclose" title="Close panel" aria-label="Close panel" onClick=${() => closePanel(activeTab)}>✕</button>
                         `}

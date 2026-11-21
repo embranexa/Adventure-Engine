@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../../store.js';
 import { OBJECT_TYPES, PHASE_STAGES } from '../../lifecycle.js';
 import { PALETTE, objectColor } from '../../lib/lens.js';
 import { Field } from './AdventureEditor.js';
+import { confirmHere } from '../../lib/windows.js';
 
 /**
  * An object's colour (the Nexus, the lens): a preset swatch, any colour, or Auto (the
@@ -86,7 +87,7 @@ function ObjectDetail({ obj, onBack }) {
 
     const remove = async () => {
         const note = linked.length ? ` It's linked to ${linked.length} ${linked.length === 1 ? 'adventure' : 'adventures'}; they stay, unlinked.` : '';
-        if (!window.confirm(`Delete ${t.label.toLowerCase()} “${obj.name}”?${note}`)) return;
+        if (!confirmHere(`Delete ${t.label.toLowerCase()} “${obj.name}”?${note}`)) return;
         const err = await deleteObject(obj.id);
         if (err) setError(err);
         else onBack();

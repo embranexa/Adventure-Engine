@@ -12,67 +12,161 @@ a loose guide only.
 
 ## 0. Status and how to resume (read this first)
 
-**Where we are (2026-11-20):** phases 0–4 are built.
-- Phases 0–2 are committed in `b7dd63e` ("Signal chain: harvesters, transitions log,
-  twin model").
-- Phase 3 (the 3D view) is committed (the commit "Signal chain: 3D refinery view", right after `b7dd63e`).
-- Leave the user's own untracked files out of commits: `resources/19hz.ipynb`,
-  `resources/adventure.db`, `resources/upgrades.md`.
-- Phase 4 (the light layer), the Refiner → **Refinery** rename, the Harvest cooldown,
-  the Net platform, object colours (Codex picker, Nexus stars) and the selection's magic
-  circle are committed ("Signal chain: light layer, base buttons, object colours").
-- **Next: phase 5 (codex cabinet and conveyor).** Its notes are in section 4.
+This section is written so a new session with **no memory** can pick the work up. Read
+all of section 0, then the phase you're about to build in section 4.
 
-**Working with the user:**
-- They decide the concept and the names. Raise new names and behaviours with them; don't
-  invent them silently.
-- They like a short plan or a set of questions before big steps, then building whole
-  phases at once.
-- Ask before committing. They have asked for commits explicitly each time so far.
+### 0.1 What this is
 
-**Environment:**
-- Python: the conda env `adventure-net`
-  (`~/miniconda3/envs/adventure-net/bin/python`). The default `python3` lacks the
-  app's dependencies.
-- Run the app: `python server.py` (port 8000, auto-reload). The real database is
-  `data/adventure.db`.
-- To test against a copy, set `ADVENTURE_DB_PATH=/path/copy.db`. Never write to the real
-  database in a test.
-- The workspace layout lives in server memory and resets to `DEFAULT_LAYOUT_TREE`
-  (`backend/services/workspace.py`) on restart. Change it on a test server with
-  `PUT /api/workspace/layout {"tree": ...}`.
+Adventure Engine (repo root: `~/Desktop/Adventure Engine`) is a FastAPI + SQLite backend
+(`backend/`, `server.py`) with a no-build React frontend (`frontend/`: ES modules, an
+import map in `index.html`, `html` tagged templates, a zustand store, Three.js scenes).
+It finds events (crawled by "harvesters") and turns them into **adventures** that move
+through phases. The theme is alchemical: every module is a machine, and every row is
+matter.
+
+The **Signal Chain** is a dock panel (`signal_chain`) showing that whole pipeline as a
+3D digital twin. This file is its plan. `ARCHITECTURE.md` (same folder) is the original
+spec, superseded wherever they disagree. `signal_chain.md` gives the chain order.
+
+### 0.2 Where we are (2026-11-21)
+
+Phases 0–4 are built and committed. Phase 5 (the codex conveyor) is **skipped** (the
+user decided 2026-11-21: unclear value). Phase 6 (the lens in other views; the tooltip
+removed) and phase 8 (pop-out windows) are **built, waiting for the user's feedback and
+a commit**. Phase 7 (machine detail) was **parked** by the user (2026-11-21: "we'll come
+back to this"); its plan and open questions are under phase 7.
+
+| Commit | What |
+|---|---|
+| `b7dd63e` | phases 0–2: names, harvesters, transitions log, twin model (tables) |
+| `cdfcea2` | phase 3: the 3D view |
+| `a32d99e` | phase 4 (the light layer) plus the user's follow-ups: base buttons, magic circle selection, Net platform, Refiner → Refinery, Harvest cooldown, object colours |
+
+Run `git log --oneline -5` and `git status` first. Later commits may exist that this
+file doesn't mention yet.
+
+**Leave the user's own files out of every commit:** `resources/19hz.ipynb`,
+`resources/upgrades.md`, `resources/adventure.db` (stage files by name or with
+`git add -u`; never `git add -A`).
+
+### 0.3 First steps in a new session
+
+1. Read this section and the next phase in section 4. Skim section 1 (concept).
+2. Read the files in the code map (0.7) for the area you'll touch. `twinScene.js` is
+   large (~1250 lines): read it in parts.
+3. Before building, give the user **a short plan plus the open questions** for the phase
+   (listed with the phase in section 4), and wait for answers.
+4. Build the whole phase, then run the checks (0.6) and take a screenshot.
+5. Update this file (status, the phase's "as built" notes, the code map), then **ask
+   before committing**.
+
+### 0.4 Working with the user
+
+- **They decide the concept and the names.** Raise new names and behaviours with them; don't
+  invent them silently. If you have to interpret an ambiguous answer, say how you read it.
+- They like a short plan or a few questions before a big step, then whole phases built
+  at once, then a summary of what changed and what you couldn't verify.
+- **Ask before committing.** They say "commit" explicitly each time.
+- **They love magic circles** (sacred geometry: concentric rings, polygrams, rune bands,
+  counter-rotating layers). Whenever a marker, highlight or flourish is needed, reach for
+  one and reuse `frontend/js/lib/magicCircle.js`.
+- They give short feedback lists after looking at the result: expect a follow-up round
+  after each phase.
+
+### 0.5 Names (decided; use exactly these)
+
+| Use | Never | Notes |
+|---|---|---|
+| **harvester** | crawler (in the UI) | the backend package `backend/crawlers/` keeps its name |
+| **centrifuge** | sensorium | events `new`; matter **prima materia** (never "omen" in the UI; the internal `kind: 'omen'` stays) |
+| **sump** | limbo | events `ignored` with no adventure; matter **shade** |
+| **hopper** | — | `queued`; ore |
+| **Refinery** | Refiner | the `classifying` machine **and** its panel (node card); node id `refinery`. Because of this, "refinery" never names the whole twin: the twin's 3D tab is "3D" |
+| **Nexus** | — | the lantern: filters and lens (panel `classifier`) |
+| **Treasury** | reliquary | `completed`; artifact |
+| — | evaluator | deleted from the concept |
+| **site** | venue (for objects) | Codex object types: pillar, site, contact; "type", not "kind" |
+| **base button** | base ring | the rune collar at each vessel's base |
+
+Some older comments call the whole app "the refinery" (the theme: `styles.css`,
+`lifecycle.js`, `triage.py`, `global.d.ts`). That's left as is.
+
+### 0.6 Environment and checks
+
+- Python: the conda env `adventure-net` (`~/miniconda3/envs/adventure-net/bin/python`).
+  The default `python3` lacks the app's dependencies (it's fine for small scripts).
+- The user runs the app as `python server.py` (port 8000, **auto-reload**). The real
+  database is `data/adventure.db`.
+  - **Caution:** because of auto-reload, editing backend code restarts the user's server.
+    `init_db` then runs at once on the real database (new columns from
+    `_add_missing_columns`, one-off data migrations in `backend/db/setup.py`). Keep
+    migrations idempotent and safe, and tell the user when one has run.
+- Test against a **copy**: `cp data/adventure.db <scratch>/copy.db` and set
+  `ADVENTURE_DB_PATH=<scratch>/copy.db`. Never write to the real database in a test.
+  Test server: `ADVENTURE_DB_PATH=… <env python> -m uvicorn server:app --port 8766`.
+- The workspace layout lives in server memory (it resets to `DEFAULT_LAYOUT_TREE` in
+  `backend/services/workspace.py` on restart). Set it on a test server with
+  `PUT /api/workspace/layout {"tree": …}`. Tree format: a leaf is
+  `{"id","type":"leaf","tabs":[…],"activeTab"}`; a split is
+  `{"id","type":"split","direction":"horizontal"|"vertical","ratio":<percent>,"first":…,"second":…}`.
+  Panel ids: `signal_chain`, `classifier` (Nexus), `node` (Refinery), `codex`, `map`,
+  `calendar`, `alembic`, `quests`, `scripter`.
 - Type check the frontend (no Node project; VS Code's bundled TypeScript works):
   `node ~/.vscode/extensions/sumneko.lua-3.19.2-linux-x64/client/node_modules/typescript/lib/tsc.js -p frontend/jsconfig.json`.
-  One error is expected and older than this work (MapPanel.js line 206).
-- Run the pure frontend modules in Node with `node --experimental-default-type=module`
-  (the frontend has no package.json).
-- Stop background servers by PID. `pkill -f <pattern>` also matches the shell running it
-  and kills that shell (exit 144).
+  **One error is expected** and older than this work (MapPanel.js line 206).
+- Run pure frontend modules in Node with `node --experimental-default-type=module`
+  (there's no package.json).
+- **Stopping background processes:** find the PID in one command
+  (`ps -eo pid,args | grep "port 876[6]"`), then `kill <pid>` in a separate command.
+  `pkill -f`, or a `ps | grep` in the *same* command line as the pattern, matches your own
+  shell and kills it (exit 144).
 
-**Checks:**
+**Checks** (run all after each phase):
 - `ADVENTURE_DB_PATH=<copy> <env python> scripts/check_transitions.py`: every move
-  end-to-end, the counting rules, log replay, and broadcasts.
+  end-to-end, the counting rules, log replay, broadcasts. Needs a fresh copy each run.
 - `node --experimental-default-type=module scripts/check_twin_model.mjs http://127.0.0.1:8000`:
-  the model on live data under every lens. Read-only.
-- `scripts/twin_screenshot.py`: headless screenshots that include WebGL. The docstring has
-  the steps. `EVAL="import('/frontend/js/store.js').then(m => …)"` runs JS in the page
-  after `EVAL_S` seconds (select a row, set the lens). Writes pass through to the app.
+  the model on live data under every lens. Read-only, so it's safe against the real server.
+- **Screenshots** (`scripts/twin_screenshot.py`; the docstring has the details):
+  1. A Firefox profile with WebGL forced on: `<scratch>/ffprof/user.js` with
+     `webgl.force-enabled`, `webgl.disabled=false`, `gfx.webrender.software`,
+     `layers.acceleration.force-enabled` (all true except `webgl.disabled`).
+  2. A test server on 8766 (above), and the layout you want.
+  3. `python3 scripts/twin_screenshot.py &` (proxy on 8799). Env: `W`, `H`, `DELAY`,
+     `CAPTURE_S`, and `EVAL` (JS run in the page after `EVAL_S` s), for example
+     `EVAL="import('/frontend/js/store.js').then(function(m){var s=m.useWorkspaceStore.getState();s.setMode('adventures');s.setLens('pillar');s.selectItem('<adventure id>','twin');})"`.
+     Writes (the app saving its state) pass through to the app server.
+  4. `firefox --headless --profile <scratch>/ffprof --no-remote --window-size=W,H --screenshot <scratch>/shot.png http://localhost:8799/__wrap`
+  5. Look at the PNG. The red box at the bottom lists canvas pixel counts and any JS
+     errors.
+  - Timed effects (the beam sweep, wire pulses, packets) are hard to catch. Say so when
+    you couldn't see them.
+  - There's no PIL in either Python. To look at one drawing up close (for example a
+    magic circle), serve a tiny HTML page from a scratch folder
+    (`python3 -m http.server`) and screenshot that.
 
-**Code map:**
+### 0.7 Code map
 
 | Area | Files |
 |---|---|
-| Harvest, feed, siphon, purge | `backend/services/sync.py` (harvest), `backend/services/triage.py`, `backend/routers/sources.py`, `backend/routers/events.py` |
-| Transitions log | `backend/services/transitions.py`, `backend/routers/transitions.py`, `Transition` plus `PHASE_NODES` / `*_NODE` in `backend/db/models.py` |
-| Names and colours | `frontend/js/lifecycle.js` (`REVIEW_STAGES`, `PHASE_STAGES`, `PHASE_NODES`) |
-| Twin, pure | `frontend/js/lib/twinTopology.js` (nodes, pipes, `route`), `frontend/js/lib/twinModel.js` (levels, lit, bands, `pipeFlows`, the check), `frontend/js/lib/lens.js` |
-| Twin, 3D | `frontend/js/lib/twinScene.js` (light: `_buildLantern`, `_buildWires`, `relight`, `setSelection`, `_frameBeam`, `_frameSpot`) |
-| Harvest freshness | `frontend/js/lib/harvest.js` (`HARVEST_FRESH_MS` = 1 h) |
-| Magic circles (shared) | `frontend/js/lib/magicCircle.js` (`magicCircleCanvases`: outer rune band + inner hexagram, white, to tint) |
-| Object colours | `objects.color` column; `objectColor(id)` in `lens.js` (chosen, else a default from the id); picker in `CodexPanel.js`; Nexus stars via `starColor` in `classifierGraph.js` |
-| Twin, panel | `frontend/js/components/panels/SignalChainPanel.js` (3D / Table views, `runAction`, `runCommand`, node colours) |
-| Store | `frontend/js/store.js`: `transitions`, `flows`, `loadTransitions`, `addTransitions`, `setLens`, `feedSource`, `siphonSource`, `purgeCentrifuge`; `filters.lens` in `DEFAULT_FILTERS` (`filters.js`) and `backend/schemas/state.py` |
-| Interim Discovery controls | `HarvesterBar` in `frontend/js/components/ModeSwitch.js` (can go once the twin is in use) |
+| Harvest, feed, siphon, purge | `backend/services/sync.py` (harvest; sets `last_sync_time`), `backend/services/triage.py`, `backend/routers/sources.py`, `backend/routers/events.py` |
+| Transitions log | `backend/services/transitions.py` (listeners, `record_many`, backfill, `REFINERY_NODE`), `backend/routers/transitions.py`, `Transition` plus `PHASE_NODES` / `*_NODE` in `backend/db/models.py` |
+| DB startup and migrations | `backend/db/setup.py` (`init_db`: create tables, add missing columns, the refiner → refinery rename, backfill) |
+| Virtual objects (Codex) | `backend/services/objects.py` (`_apply` validates fields incl. `color` `#rrggbb`), `backend/schemas/objects.py`, `object_to_dict` in `backend/db/queries.py`, `VirtualObject` in models.py |
+| Names and colours | `frontend/js/lifecycle.js` (`REVIEW_STAGES`, `PHASE_STAGES`, `PHASE_NODES`, `OBJECT_TYPES`) |
+| Filters | `frontend/js/filters.js` (`FACETS`, `passes`, `pendingChanges`, object names and chosen colours via `setObjectNames` / `chosenObjectColor`) |
+| Lens and colours | `frontend/js/lib/lens.js` (`LENSES`, `lensValues`, `lensColor`, `lensLabel`, `PALETTE`, `objectColor(id)` = chosen colour or a default from the id) |
+| Twin, pure | `frontend/js/lib/twinTopology.js` (nodes, pipes, `route`, `nodeStage` = the stage a base button toggles), `frontend/js/lib/twinModel.js` (levels, lit, bands, `eventNode`, `pipeFlows`, the counting check) |
+| Twin, 3D | `frontend/js/lib/twinScene.js`: `layout()` (hand-placed positions), `_buildStage` (slabs: Net, Core, Gallery), `_addMachine` (per kind; the base button collar; the codex cabinet and jars), `_buildLantern`, `_buildWires`, `_buildLight` (beam, magic circle), `update` (no hover tooltip: removed in phase 6), `relight`, `setSelection`, `play` / `_launch` (packets), `_frame*` |
+| Twin, panel | `frontend/js/components/panels/SignalChainPanel.js`: the React boundary. `runAction`, `runCommand`, `toggleRing`, `turnLens`, `relightCause`, and memos for `light`, `stageFilter`, `packetStyle`, `fresh`, `selection`; the Table view (`TwinTable`) |
+| Magic circles (shared) | `frontend/js/lib/magicCircle.js` (`magicCircleCanvases(size)` → `{ outer, inner }` white canvases to tint and counter-rotate) |
+| Pop-out windows | `frontend/js/components/Popout.js` (`popOut`, `mountPopout`, `PopoutShell`), `dockedTree` / `poppedOut` / `popOut` / `dockPopout` / `popoutHooks` in `store.js`, `frontend/js/lib/windows.js` (`focusedWindow`, `confirmHere`), `viewOf` in `lib/resizing.js`; the ⧉ / ⇲ buttons in `PanelGroup.js` |
+| Harvest cooldown | `frontend/js/lib/harvest.js` (`HARVEST_FRESH_MS` = 1 h, `freshMinutes`, `freshTitle`) |
+| Nexus | `frontend/js/components/panels/ClassifierPanel.js` (the Lens row = the layer: `lensLayers`), `frontend/js/lib/classifierGraph.js` (stars: `facetColor`; `ROLE_COLORS` = the role cue), `frontend/js/lib/classifierScene.js` (`_styleStar`: role sigil = magic circle) |
+| Calendar, Atlas lens colour | `itemLensColor` in `CalendarPanel.js` (`CalendarBlock`) and `MapPanel.js` (`tinted`) |
+| Codex | `frontend/js/components/panels/CodexPanel.js` (`ColorPicker`, tinted glyphs) |
+| Store | `frontend/js/store.js`: `transitions`, `flows`, `loadTransitions`, `addTransitions`, `setLens`, `cycleStage` (applies at once), `feedSource`, `siphonSource`, `purgeCentrifuge`, `setObjects`; `filters.lens` in `DEFAULT_FILTERS` (`filters.js`) and `backend/schemas/state.py`; types in `frontend/types/global.d.ts` |
+| Interim Discovery controls | `HarvesterBar` in `frontend/js/components/ModeSwitch.js` (same harvest cooldown; can go once the twin is in use) |
+| Styles | `frontend/styles.css` (twin: `.sc-*`, `.twin-*`; Codex picker: `.cx-colors`, `.cx-swatch`) |
 
 ---
 
@@ -141,9 +235,10 @@ The harvesters are a staging area that Discovery never sees. The inbox indicator
 | **atlas** | armillary sphere: sensor wired to the lantern | Atlas |
 | **calendar** | astrolabe: sensor wired to the lantern | Calendar |
 
-Clicking a **machine** opens or focuses its panel. Clicking a vessel's **base rune ring**
-toggles that stage in the filter (the twin's own filter control, the way dragging on the
-calendar sets a date range). Vessels that hold rows get a hover tooltip with counts and a
+Clicking a **machine** opens or focuses its panel. Pressing a vessel's **base button** (a
+rune collar round its plinth) cycles that stage in the applied filter, include → exclude →
+off, at once: it's the twin's own filter control, the way dragging on the calendar sets a
+date range. Vessels that hold rows get a hover tooltip with counts and a
 breakdown by the current lens.
 
 ### Counting rules (checked on every recount, in dev builds)
@@ -173,14 +268,18 @@ they appear in the first rule but not the second.
 - **Pass through**: the hood opens and the beam sweeps the twin once, relighting it.
 - **Date range / ring changes** (these apply immediately in the app): a pulse runs along
   the copper wire from the calendar or atlas into the lantern, then the relight happens.
-- **Selection**: a narrow spotlight follows the selected row's packet or vessel.
+- **Selection**: a magic circle at the base of the machine holding the selected row, in
+  that row's lens colour.
+- **Other views follow the lens** (phase 6): Nexus stars are always in their value's lens
+  colour, whatever the filter; Calendar blocks and Atlas pins take their row's lens colour
+  (under Matter that's the stage colour, as before).
 
 ### Codex conveyor
 
 The codex is a cabinet of glass jars (⟁ pillars, ⌖ sites, ☉ contacts) that fill with the
 object count. A **chain conveyor**, visually unlike the liquid pipes, runs into the refinery.
-Linking an object to an adventure sends a small token in that type's colour along it.
-Unlinking sends one back, dimmed.
+Linking an object to an adventure sends a small token along it (colour: to decide in
+phase 5, probably the object's own colour). Unlinking sends one back, dimmed.
 
 ---
 
@@ -269,10 +368,10 @@ Three.js scene.
 | File | Role |
 |---|---|
 | `js/lib/twinTopology.js` | pure: node list (id, zone, kind, position, panel, locked), edges, phase/review → node |
-| `js/lib/twinModel.js` | pure: `(events, adventures, objects, filters, lens) → { nodes: {total, lit, bands}, check }`; dev check of the counting rules |
-| `js/lib/lens.js` | pure: `lensColor(facet, value)`. Stage → lifecycle colours; type and source → fixed colours; other facets → a fixed palette by value; unknown → grey |
-| `js/lib/twinScene.js` | Three.js: machines, liquid, pipes, packets (`InstancedMesh`), picking, labels and tooltip. As built: `update({ nodes, pipes, levels, codex, flows, colors, sources, io, centrifugeBySource })`, `play(transitions, { replay })`, `fit()`, `dispose()`; callbacks `onActivate(nodeId)`, `onCommand(cmd, nodeId)` |
-| `js/components/panels/SignalChainPanel.js` | React boundary: subscribes to the store, routes clicks to `showPanel` / `setMode` / filter toggles, tooltips |
+| `js/lib/twinModel.js` | pure: `twinModel({ rawEvents, adventures, objects, filters, lens, now }) → { levels: {id: {total, lit, bands}}, codex: {total, byType}, check }`; the counting rules |
+| `js/lib/lens.js` | pure: `lensColor(lens, value)`. Stage → lifecycle colours; type and source → fixed colours; object facets → `objectColor`; other facets → a fixed palette by value; unknown → grey |
+| `js/lib/twinScene.js` | Three.js: machines, liquid, pipes, packets (`InstancedMesh`), the lantern, wires, beam, magic circle, picking, labels and tooltip. API: `update({ nodes, pipes, levels, codex, flows, colors, sources, io, centrifugeBySource, stageFilter, light, packetStyle, fresh })`, `relight({ from })` (call before `update`), `setSelection(nodeId, color)`, `play(transitions, { replay })`, `fit()`, `dispose()`. Callbacks: `onActivate(nodeId)`, `onCommand(cmd, nodeId)`, `onRing(nodeId)` (base button), `onLens(step)` |
+| `js/components/panels/SignalChainPanel.js` | React boundary: subscribes to the store, computes what the scene shows, routes callbacks to `showPanel` / `setMode` / `cycleStage` / `setLens` / harvester commands |
 | store additions | `transitions` feed slice, `flows`, `lens` (saved with the filters, applied **immediately**: no draft) |
 | `backend/services/workspace.py` | panel `signal_chain`, kind `twin`, name "Signal Chain", icon gear, flow `["flux", "relic"]` |
 
@@ -361,64 +460,153 @@ Each phase ends with something you can look at.
   - Not checked in a screenshot (timing): the beam sweep and wire pulse. Look at these
     live.
 - Also done then: Refiner → **Refinery** (the node id too; `init_db` renames logged
-  `refiner` moves), the 3D view tab is now "3D", and a harvester that harvested within
-  the hour has a greyed (still clickable) Harvest button.
+  `refiner` moves), the 3D view tab is now "3D", objects got a `color` column, and the
+  Nexus model recomputes when objects load (it used to keep "Deleted object" labels).
+- How the user's answers were read: "lens and layers are the same" → one Lens row (the
+  Nexus can no longer show several facets as stars at once; active filters still show).
+  "Grey out harvest" → disabled, with no hover and no click.
 
-Original notes:
-- Lit/ghost liquid, lens bands, packet colours, the lantern with hood, status lamp, beam
-  sweep, copper wires plus pulses from the atlas and calendar, selection spotlight, base-ring
-  stage toggle.
-- A lens control in the Nexus (clicking a facet header sets the lens), plus a small lens
-  wheel on the twin.
-- Starting points in the code:
-  - **Liquid:** `SignalChainPanel` already computes `model.levels[id].bands` (lit, by lens)
-    and `total - lit` (ghosts). `twinScene.update` currently draws a single segment,
-    `[{ color, count: total }]`. Pass the bands plus a final `{ color, count: total - lit, ghost: true }`.
-    `_setSegments` already handles `ghost`, drawn translucent and dim.
-  - **Packet colours by lens:** look up the row by `t.row_id` (an event in
-    `rawEvents`, an adventure in `adventures`), then `lensValues(item, lens)` and
-    `lensColor`. Dim packets whose row fails the applied filter (`passes` in filters.js;
-    `kind: 'omen'` for events). Pass a `colorOf(transition)` function or a map into
-    `scene.play`.
-  - **Hood and status lamp:** draft pending = `pendingChanges(draftFilters, filters) > 0`
-    (filters.js). Beam sweep when `filters` changes because of Pass through.
-  - **Wire pulses:** when `filters.date_range` (calendar) or `filters.ring` (atlas) changes.
-  - **Spotlight:** the node of `selectedItemId`. For an event use `eventNode` in
-    twinModel.js; for an adventure use `PHASE_NODES[phase]`.
-  - **Nexus lens control:** the Nexus already has a "Layers" row of facet buttons
-    (`cls-layers` in `ClassifierPanel.js`), which toggles which facets show as stars. The
-    lens control should sit next to it or reuse it. **Ask the user which.**
-  - **Decide with the user:** does the base-ring stage toggle edit the Nexus *draft*
-    (`cycleFacet('phase' | 'review', value)`, pending until Pass through) or apply at once?
-    The twin follows the *applied* filter, so a draft edit would only show after Pass
-    through.
-
-### Phase 5: codex cabinet and conveyor
+### Phase 5: codex cabinet and conveyor ⏭ skipped
+- Skipped by the user (2026-11-21): "idek what's going on with the conveyor belt". What
+  exists from phase 3 stays (cabinet, jars, the brown conveyor pipe, brass link packets).
+  Don't build the rest unless the user brings it back. The notes below are kept in case
+  they do.
 - Jars per type, chain conveyor, link/unlink tokens.
-- Already there from phase 3: the cabinet with three jars (pillar/site/contact) filled by
-  count, the codex→refinery pipe (`kind: 'conveyor'`, drawn as a brown pipe), and link
-  packets (brass, slower). Still to do: a real chain look, link tokens (probably in the
-  object's own colour, `objectColor`, now that objects have colours: confirm with the
-  user), and dimmed tokens on unlink.
+- Already there:
+  - The cabinet: `_addMachine`, `node.kind === 'cabinet'` in twinScene.js. Three jars
+    (`rec.jars`, order pillar / site / contact) filled by count in `update()`
+    (`rec.jarTargets`) and eased in `_frame`. They're all brass now.
+  - The conveyor: the pipe `codex~refinery` with `kind: 'conveyor'` (`twinPipes` in
+    twinTopology.js), drawn in `_rebuild` as a brown pipe (`conveyor` flag on the pipe
+    record).
+  - Link packets: transitions with `entity: 'link'` (`row_id` = object id, `ref_id` =
+    adventure id; `codex → refinery` = link, `refinery → codex` = unlink). `_launch`
+    draws them brass, smaller (1.4) and slower (0.6×).
+  - Object colours exist: `objectColor(id)` in lens.js. The panel can pass a style for
+    link transitions through `packetStyle` (it returns `null` for links today), or the
+    scene can take an object-colour map.
+- To do: a chain look for the conveyor (links or a moving belt instead of a tube); link
+  tokens in their object's colour; unlink tokens dimmed; jars per type in a colour (or
+  banded by their objects' colours); maybe the cabinet opening or a jar flaring when a
+  token arrives.
+- **Ask the user first:** (1) token colour: the object's own colour, or one colour per
+  type? (2) Should the jars show the objects' colours (bands per object) or one colour
+  per type? (3) What should the chain look like (links, a belt, glyph tiles)? Is a magic
+  circle on the cabinet welcome (likely yes; see 0.4)?
 
-### Phase 6: lens in other views
-- Calendar blocks, Atlas pins and Nexus stars coloured by the lens.
+### Phase 6: lens in other views, plus the tooltip fix ✅ (built, not committed)
+- From the user's notes (`resources/upgrades.md`, "[signal chain]"): "cities, sources, etc
+  need coloring on nexus too" and "hover panels cover base ring hitbox".
+- **Nexus stars in their lens colour.** Today only object stars have a colour
+  (`starColor` in `classifierGraph.js`: object colour unless excluded; other facets are
+  grey when off, white when included, dark when excluded). Give every facet value its
+  `lensColor(facet, value)` (lens.js already has fixed colours for source and type and a
+  palette for the rest; the stage facets `phase` / `review` use the lifecycle colours).
+  Keep the include/exclude state readable some other way than colour (the ＋/－ label
+  prefix, the ring and ping already differ per role in `_styleStar` in
+  classifierScene.js).
+- **Calendar blocks and Atlas pins** coloured by the current lens (`filters.lens`), using
+  `lensValues(item, lens)[0]` and `lensColor`. Today they use matter (stage) colours. Find
+  where: the calendar panel and the map panel or scene under `frontend/js/components/panels/`
+  and `frontend/js/lib/`.
+- **Tooltip fix:** the twin's hover tooltip (`.twin-tip`, placed in `_placeLabels` in
+  twinScene.js at the label position + 8px, below the label) hangs over the vessel and
+  hides its base button. It has `pointer-events: none`, so it doesn't block clicks, but
+  it covers the target. Move it beside the machine (for example to the right of the label,
+  flipping left near the panel's edge).
+- **Ask the user first:** (1) Should included and excluded stars keep a colour cue (for
+  example a white or red halo ring, like the base buttons) now that the star itself is in
+  its lens colour? (2) Should the Calendar and Atlas follow the lens always, or only when
+  it isn't Matter? (3) Where should the tooltip go: right of the machine, or fixed in a
+  corner?
+- Checks: type check, `check_twin_model.mjs`, and screenshots of the Nexus, Calendar and
+  Atlas under the Source and City lenses (use `EVAL` to `setLens`).
+- **User's answers (2026-11-21):** (1) stars are always coloured correctly (lens colour);
+  include / exclude needs a separate mechanism. (2) Calendar and Atlas always follow the
+  lens (Matter = the stage colours anyway). (3) Remove the hover tooltip altogether.
+- **As built:**
+  - `lens.js`: `facetColor(facet, value)` (any facet; `phase` / `review` → stage colours)
+    and `itemLensColor(item, lens)` (one row's colour; `item.color` under Matter).
+  - Nexus stars (`classifierGraph.js`): facet stars use `facetColor`; date and ring stars
+    have fixed identity colours (`DATE_COLOR` gold-tan, `RING_COLOR` cyan); the seal stays
+    gold / grey. `ROLE_COLORS` now means the role cue: include white, exclude red
+    `#e0524a` (same as the twin's base buttons), seal gold.
+  - **Role cue** (`classifierScene.js`, interpreted by Claude): a small **magic circle**
+    (`magicCircle.js`, 256 px, two counter-rotating layers, flat under the star, scale 46)
+    in the role colour, plus the ping ring in the role colour. Off stars have none. The
+    label keeps ＋ / － and its frame; the excluded label's dashed border is now red.
+  - Calendar (`CalendarPanel.js`): blocks take `itemLensColor`; the block's subtitle shows
+    the lens value (e.g. the city) instead of the matter name when the lens isn't Matter.
+  - Atlas (`MapPanel.js`): `updateNodes` gets the items with `color` replaced by the lens
+    colour (memoised on items, lens and objects).
+  - Twin tooltip removed (`twinScene.js` `_renderTooltip`, `.twin-tip*` styles). The
+    scene's `io` data is now only used by the Table view.
+  - Not verified: Atlas pins up close (the screenshots were too zoomed out to see pin
+    colours), and the excluded sigil is faint at the default zoom.
 
-### Phase 7: machine detail and polish
+### Phase 7: machine detail and polish (after phase 6)
+- The user's "[signal chain] better aesthetics" note.
 - Proper machines (centrifuge rotor cage, alembic condenser coils, crucible induction glow,
   lantern optics, armillary, astrolabe). Bottleneck highlight: a vessel glows when its
   level is high relative to what flows out of it.
 
-### Phase 8: pop-out windows (a general dock feature)
-- Any panel can detach into a separate browser window: `window.open` plus a React portal
-  into the child document, sharing the same store. Copy stylesheets across. Scenes use the
-  child window's `requestAnimationFrame`, `devicePixelRatio` and `ResizeObserver`.
-  Closing the child window puts the panel back in the dock.
-- Check for `window.` / `document.` assumptions in scenes and panels first.
+### Phase 8: pop-out windows (a general dock feature) ✅ (built, not committed)
+- Any panel can detach into a separate browser window sharing the same store. Closing the
+  window puts the panel back in the dock.
+- **User's answers (2026-11-21):** on reload, popped-out panels go back into the dock (no
+  "reopen windows" prompt); no drag-out (the ⧉ button only); one panel per window; the
+  window shows the full housing.
+- **As built:**
+  - The panel **stays in the saved tree**; `poppedOut` (store, not saved) hides it from
+    the main dock through `dockedTree(tree, popped)` (app.js), which collapses a group
+    left empty. So reloading, or closing the window, puts it back exactly where it was.
+  - `Popout.js`: `popOut(panelId, rect)` runs in the ⧉ click (browsers allow
+    `window.open` only in a click), opens a `popup` window at the panel's size and place,
+    then `mountPopout` writes a standards-mode skeleton (`doc.write` with a doctype; a
+    blank window is in quirks mode otherwise), a `<base>` for the app's origin, copies of
+    the main head's stylesheets (later ones too, via a MutationObserver: the map's CSS
+    loads on demand), and renders `PopoutShell` (a `PanelGroup` with `popout`) in its
+    **own React root**. Not a portal: the vendored react-dom bundle doesn't export
+    `createPortal`; a second root reading the same zustand store works the same.
+  - It renders only **after the stylesheets load** (max 3 s): the Atlas sized itself to an
+    unstyled, zero-height box otherwise.
+  - Closing the window (`pagehide`) → `dockPopout`. ⇲ (Dock), ✕ (close panel) and Reset
+    layout remove it from `poppedOut`; a store subscription then closes the window. The
+    main page's `pagehide` closes every window. `showPanel` on a popped-out panel focuses
+    its window (`popoutHooks.focus`).
+  - Scenes (`twinScene`, `classifierScene`, `alembicScene`, `levelMap`) take
+    `this.view = viewOf(parent)` and use its `requestAnimationFrame`,
+    `cancelAnimationFrame`, `devicePixelRatio`, `ResizeObserver`, `performance.now` and
+    `getComputedStyle`, so a popped-out scene animates while the main tab is hidden.
+    `deferredResize(fn, view)`.
+  - `windows.js`: `confirmHere` (Purge, delete object, type change) and `focusedWindow`
+    (Calendar drag's pointerup, Alembic's Esc) act in the window the user is working in.
+  - **Testing:** headless Firefox can't screenshot a second window, so the test mounts
+    into an **iframe** (same cross-document situation: own document, frames, clock). The
+    iframe must be mounted on its `load` (an iframe without `src` loads about:blank
+    asynchronously and wipes it). Patch the iframe's `requestAnimationFrame` to a timer,
+    like the screenshot hook does. Its own canvas copy covers HTML on top of WebGL, so
+    check HUD elements in a second shot without the copy.
+  - Seen working (iframe): Twin, Nexus and Atlas popped out with their housings; the main
+    dock collapsing the emptied group; ⇲ putting the Atlas back in its old group.
+  - **Not verified:** a real `window.open` window (size, position, pop-up blocker,
+    `doc.write` into it) in the user's browser; OrbitControls / MapLibre dragging inside a
+    real window (MapLibre listens on its own `window` for some drags).
 
 ---
 
 ## 5. Open points (small; decide along the way)
+- **Not yet seen live:** the beam sweep and the wire pulse (phase 4). Ask the user
+  whether they look right, or catch them in a screenshot by changing the lens through
+  `EVAL` just before the capture.
+- The user keeps a wider wishlist in `resources/upgrades.md` (their file: read it, never
+  commit it). Outside the twin: Nexus bugs (un-collapsing doesn't reveal cards, the cover
+  image doesn't always show, slow updates from the Refinery, the portal, rotating cards),
+  Refinery fields (address input, rewards, event time rules), an Atlas with stray lines and
+  auto-home, a Calendar month view, no full caps in titles, panel hover ornaments, Codex
+  cover images and new object types, and new modules. Its "rename the Nexus to
+  centrifuge?" clashes with the Centrifuge machine (Net, events `new`): raise this if it
+  comes up. Codex colour is done.
 - Should Feed and Purge act only on **lit** rows (those passing the applied filter)? That
   would let you feed just one city's ra events, for example. Default: everything.
 - There's no sump → centrifuge path (reviving a shade sends it to the hopper). Add a
@@ -429,4 +617,9 @@ Original notes:
 - Panel name: "Signal Chain" for now. Its title question is "all"; the Refinery's is "why" and
   the Nexus's "which" (chosen by Claude, not yet confirmed by the user).
 - Harvesters, forge and gallery positions are hand-placed in `layout()` in twinScene.js;
-  they were tuned against screenshots at 1500×900.
+  they were tuned against screenshots at 1500×900. The Net platform slab (`_buildStage`)
+  is sized to them: move it if they move.
+- The Nexus's Lens row allows one facet as stars. If the user misses showing several at
+  once, add multi-select back for stars only.
+- Object colours on Calendar blocks and Atlas pins: done in phase 6 (any object lens uses
+  the object's Codex colour).

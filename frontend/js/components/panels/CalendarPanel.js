@@ -5,6 +5,7 @@ import { addDays, hourOf, layoutWeek, sameDay, startOfWeek } from './calendarLay
 import { dayKey, parseDay } from '../../filters.js';
 import { stageOf } from '../../lifecycle.js';
 import { itemLensColor, lensLabel, lensValues } from '../../lib/lens.js';
+import { focusedWindow } from '../../lib/windows.js';
 
 const FIRST_HOUR = 6;   // visible range: 06:00 ...
 const LAST_HOUR = 24;   // ... to midnight
@@ -137,8 +138,9 @@ export function CalendarPanel() {
             setDrag(null);
             if (d) commitRange(d.anchor, d.current);
         };
-        window.addEventListener('pointerup', onUp, { once: true });
-        return () => window.removeEventListener('pointerup', onUp);
+        const win = focusedWindow(); // the drag's window (the panel may be popped out)
+        win.addEventListener('pointerup', onUp, { once: true });
+        return () => win.removeEventListener('pointerup', onUp);
     }, [drag !== null, dateRange]);
 
     /** @param {PointerEvent} e @param {Date} day */

@@ -10,19 +10,31 @@ export function isResizing() {
 }
 
 /**
+ * The window a node is shown in: the main window, or a popped-out panel's own window.
+ * Scenes take their animation frames, pixel ratio and resize observer from it, so a
+ * popped-out scene keeps animating while the main window is hidden.
+ * @param {Node | null | undefined} node
+ * @returns {Window & typeof globalThis}
+ */
+export function viewOf(node) {
+    return /** @type {any} */ (node?.ownerDocument?.defaultView ?? window);
+}
+
+/**
  * Wrap a resize handler for a ResizeObserver: runs at most once per frame normally,
  * and only after the size has settled for SETTLE_MS while a splitter is being dragged.
  * @param {() => void} fn
+ * @param {Window} [view]  the window whose animation frames to use
  * @returns {() => void}
  */
-export function deferredResize(fn) {
+export function deferredResize(fn, view = window) {
     let raf = 0;
     /** @type {ReturnType<typeof setTimeout> | undefined} */
     let timer;
     return () => {
-        cancelAnimationFrame(raf);
+        view.cancelAnimationFrame(raf);
         clearTimeout(timer);
         if (isResizing()) timer = setTimeout(fn, SETTLE_MS);
-        else raf = requestAnimationFrame(fn);
+        else raf = view.requestAnimationFrame(fn);
     };
 }

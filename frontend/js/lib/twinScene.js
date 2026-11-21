@@ -37,7 +37,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { magicCircleCanvases } from './magicCircle.js';
-import { deferredResize, isResizing } from './resizing.js';
+import { deferredResize, isResizing, viewOf } from './resizing.js';
 import { CENTRIFUGE, CODEX, FORGE, MAIN_CHAIN, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from './twinTopology.js';
 
 const NET_Y = 8;          // the foundry floor's platform
@@ -140,11 +140,13 @@ export class TwinScene {
         this.onRing = onRing;
         this.onLens = onLens;
 
+        // the window this scene is shown in (a popped-out panel lives in its own window)
+        this.view = viewOf(parent);
         this.container = el('div', 'twin-root');
         parent.appendChild(this.container);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        this.renderer.setPixelRatio(Math.min(this.view.devicePixelRatio || 1, 2));
         this.renderer.setClearColor(0x000000, 0); // the panel's glass shows through
         this.container.appendChild(this.renderer.domElement);
 
@@ -217,17 +219,17 @@ export class TwinScene {
         this._c = new THREE.Color();
         this._bindEvents();
 
-        this._ro = new ResizeObserver(deferredResize(() => this._resize()));
+        this._ro = new this.view.ResizeObserver(deferredResize(() => this._resize(), this.view));
         this._ro.observe(this.container);
         this._resize();
 
-        this._last = performance.now();
+        this._last = this.view.performance.now();
         const loop = (t) => {
-            this._raf = requestAnimationFrame(loop);
+            this._raf = this.view.requestAnimationFrame(loop);
             if (isResizing()) { this._last = t; return; } // hold still while a splitter is dragged
             this._frame(t);
         };
-        this._raf = requestAnimationFrame(loop);
+        this._raf = this.view.requestAnimationFrame(loop);
     }
 
     /* ------------------------------------------------------------------ */
@@ -1185,7 +1187,7 @@ export class TwinScene {
     }
 
     dispose() {
-        cancelAnimationFrame(this._raf);
+        this.view.cancelAnimationFrame(this._raf);
         this._ro?.disconnect();
         const canvas = this.renderer.domElement;
         canvas.removeEventListener('pointerdown', this._onDown);

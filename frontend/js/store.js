@@ -106,6 +106,29 @@ export function collectMountedPanels(node, out = new Set()) {
     return out;
 }
 
+/**
+ * The tree the main dock shows: popped-out panels left out, and any group they leave
+ * empty collapsed into its sibling. Untouched subtrees keep their identity (DockNode is
+ * memoized). The saved tree keeps popped-out panels in place, so on reload, or when a
+ * window closes, they're back where they were.
+ * @param {LayoutNode | null} node @param {ReadonlySet<PanelId>} popped @returns {LayoutNode | null}
+ */
+export function dockedTree(node, popped) {
+    if (!node || popped.size === 0) return node;
+    if (node.type === 'leaf') {
+        const tabs = node.tabs.filter((t) => !popped.has(t));
+        if (tabs.length === node.tabs.length) return node;
+        if (tabs.length === 0) return null;
+        return { ...node, tabs, activeTab: tabs.includes(node.activeTab) ? node.activeTab : tabs[0] };
+    }
+    const first = dockedTree(node.first, popped);
+    const second = dockedTree(node.second, popped);
+    if (first === node.first && second === node.second) return node;
+    if (!first) return second;
+    if (!second) return first;
+    return { ...node, first, second };
+}
+
 /** @param {LayoutNode | null} node @returns {string | null} */
 function findFirstLeafId(node) {
     if (!node) return null;
@@ -119,6 +142,9 @@ function findLeafWithPanel(node, panelId) {
     if (node.type === 'leaf') return node.tabs.includes(panelId) ? node.id : null;
     return findLeafWithPanel(node.first, panelId) || findLeafWithPanel(node.second, panelId);
 }
+
+/** Set by components/Popout.js (the store can't import it: it imports the store). */
+export const popoutHooks = { focus: (/** @type {PanelId} */ _panelId) => {} };
 
 const PERSIST_DEBOUNCE_MS = 300;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -349,6 +375,7 @@ const workspaceStore = (set, get) => ({
     panels: {},
     tree: null,
     draggingPanelId: null,
+    poppedOut: [],
     layoutStatus: 'AWAITING LINK',
 
     // UI-level state subscriptions
@@ -817,6 +844,14 @@ const workspaceStore = (set, get) => ({
 
     setDraggingPanel: (panelId) => set({ draggingPanelId: panelId }),
 
+    // --- pop-out windows (components/Popout.js opens and closes the windows) ---
+    popOut: (panelId) => {
+        if (!get().poppedOut.includes(panelId)) set({ poppedOut: [...get().poppedOut, panelId] });
+    },
+    dockPopout: (panelId) => {
+        if (get().poppedOut.includes(panelId)) set({ poppedOut: get().poppedOut.filter((id) => id !== panelId) });
+    },
+
     resizeSplit: (splitId, ratio) => {
         const { tree } = get();
         if (!tree) return;
@@ -849,6 +884,7 @@ const workspaceStore = (set, get) => ({
     },
 
     closePanel: (panelId) => {
+        get().dockPopout(panelId); // closing a popped-out panel closes its window
         const nextTree = removePanelFromTree(clone(get().tree), panelId);
         get().persistLayout(nextTree);
     },
@@ -865,6 +901,7 @@ const workspaceStore = (set, get) => ({
     },
 
     showPanel: (panelId) => {
+        if (get().poppedOut.includes(panelId)) { popoutHooks.focus(panelId); return; }
         const leafId = findLeafWithPanel(get().tree, panelId);
         if (leafId) get().selectTab(leafId, panelId);
         else get().reopenPanel(panelId);
@@ -875,7 +912,7 @@ const workspaceStore = (set, get) => ({
         try {
             const res = await fetch('/api/workspace/reset', { method: 'POST' });
             const data = await res.json();
-            set({ panels: data.panels, tree: data.tree, layoutStatus: 'RUNES RESTORED' });
+            set({ panels: data.panels, tree: data.tree, poppedOut: [], layoutStatus: 'RUNES RESTORED' });
         } catch (_) {}
     },
 });

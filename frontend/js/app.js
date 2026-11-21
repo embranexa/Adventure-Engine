@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { html } from './html.js';
-import { useWorkspaceStore, collectMountedPanels } from './store.js';
+import { useWorkspaceStore, collectMountedPanels, dockedTree } from './store.js';
 import { DockNode } from './components/DockNode.js';
 import { ModeSwitch } from './components/ModeSwitch.js';
 import { MatterGauge } from './components/MatterGauge.js';
@@ -29,6 +29,9 @@ function App() {
     const reopenPanel = useWorkspaceStore((s) => s.reopenPanel);
     const createAdventure = useWorkspaceStore((s) => s.createAdventure);
     const showPanel = useWorkspaceStore((s) => s.showPanel);
+    const poppedOut = useWorkspaceStore((s) => s.poppedOut);
+    // the main dock leaves out panels shown in their own window
+    const docked = useMemo(() => dockedTree(tree, new Set(poppedOut)), [tree, poppedOut]);
 
     useEffect(() => {
         initWorkspace();
@@ -87,9 +90,9 @@ function App() {
             <${MatterGauge} />
 
             <main className="dock-root">
-                ${tree
-                    ? html`<${DockNode} node=${tree} />`
-                    : html`<div className="empty-dock">No panels open · use Open panel or Reset layout</div>`}
+                ${docked
+                    ? html`<${DockNode} node=${docked} />`
+                    : html`<div className="empty-dock">${tree ? 'Every panel is in its own window' : 'No panels open · use Open panel or Reset layout'}</div>`}
             </main>
         </div>
     `;

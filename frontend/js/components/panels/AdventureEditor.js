@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { ADVENTURE_TYPES } from '../../lifecycle.js';
+import { confirmHere } from '../../lib/windows.js';
 
 /** ISO time -> value for <input type="datetime-local"> (local time). @param {string | null} iso */
 function toLocalInput(iso) {
@@ -113,7 +114,7 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
     const setType = (type) => {
         if (type === adventure.type) return;
         const losesWhenWhere = isEvent && (own.start || own.venue || own.address || own.city || own.lat != null);
-        if (losesWhenWhere && !window.confirm(`A ${type} has no when or where: its time and place will be cleared. Continue?`)) return;
+        if (losesWhenWhere && !confirmHere(`A ${type} has no when or where: its time and place will be cleared. Continue?`)) return;
         save({ type });
     };
 
