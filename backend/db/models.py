@@ -1,28 +1,32 @@
 """Database tables.
 
-    event_sources  one row per crawler (luma, ...) with its sync status
-    events         raw crawled events ("omens"), unique per (source, api_id), each with a review state
+    event_sources  one row per harvester (luma, ...) with its sync status
+    events         raw harvested events, unique per (source, api_id), each with a review state
     adventures     the events you kept and hand-made ones, each with a lifecycle phase
                    and an optional action roadmap
     objects        virtual objects (pillars, sites, contacts) that adventures link to (the Codex)
     adventure_objects  links between adventures and objects
     app_state      small JSON settings that must survive restarts (filters)
+    transitions    log of every move between nodes of the signal chain (the twin's packets)
 
-Stage names (Sensorium, Hopper, Assay, ...) are only for display: see
-resources/classifier.md. The database stores the plain values below.
+Stage names (Harvester, Centrifuge, Hopper, ...) are only for display: see
+resources/classifier.md. The database stores the plain values below. Node ids (for the
+transitions log) are in PHASE_NODES and the *_NODE constants.
 """
 
 import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, Float, ForeignKey, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, UTCDateTime, utcnow
 
-# Raw event review states: new (omen, Sensorium) | passed (became an adventure) | ignored (shade, Limbo)
-REVIEW_STATES = ("new", "passed", "ignored")
+# Raw event review states:
+#   harvested (flux, in its Harvester) | new (prima materia, in the Centrifuge: Discovery shows these)
+#   passed (became an adventure)       | ignored (shade, in the Sump)
+REVIEW_STATES = ("harvested", "new", "passed", "ignored")
 
 # Adventure phases, in lifecycle order (display names in frontend/js/lifecycle.js)
 PHASES = (
@@ -35,6 +39,28 @@ PHASES = (
     "killed",          # Necropolis  / vestige
     "decommissioned",  # Archive     / relic
 )
+# Signal chain nodes (the twin): where each phase sits, and the other node ids. Same map in
+# frontend/js/lifecycle.js. Harvesters are "harvester:<source name>".
+PHASE_NODES = {
+    "queued": "hopper",
+    "classifying": "refiner",
+    "decomposing": "alembic",
+    "constructing": "crucible",
+    "consuming": "arena",
+    "completed": "treasury",
+    "killed": "necropolis",
+    "decommissioned": "archive",
+}
+OUTSIDE_NODE = "outside"        # where harvested events come from
+CENTRIFUGE_NODE = "centrifuge"  # events "new"
+SUMP_NODE = "sump"              # events "ignored" that have no adventure
+FORGE_NODE = "forge"            # hand-made adventures enter here
+CODEX_NODE = "codex"            # objects; links travel codex <-> refiner
+
+
+def harvester_node(source_name: str) -> str:
+    return f"harvester:{source_name}"
+
 # Adventure types. Only events have a when/where; items and songs are exempt from everything
 # that uses one (calendar, map, date/proximity filters, the missed-adventure sweeper).
 ADVENTURE_TYPES = ("event", "item", "song")
@@ -79,7 +105,8 @@ class Event(Base):
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # source-specific extras
     first_seen: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
-    review: Mapped[str] = mapped_column(String(10), default="new", server_default="new")
+    # server_default only fills rows that existed before the column did; harvests insert "harvested"
+    review: Mapped[str] = mapped_column(String(10), default="harvested", server_default="new")
     reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
@@ -161,6 +188,26 @@ class AdventureObject(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class Transition(Base):
+    """One move of a packet between signal chain nodes (see backend/services/transitions.py).
+
+    entity: "event" (row_id = event id), "adventure" (row_id = adventure id) or
+    "link" (row_id = object id, ref_id = adventure id). synthetic: backfilled once from
+    rows that existed before the log did; never replayed as packets.
+    """
+
+    __tablename__ = "transitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+    entity: Mapped[str] = mapped_column(String(10))
+    row_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    ref_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    from_node: Mapped[str] = mapped_column(String(120))
+    to_node: Mapped[str] = mapped_column(String(120))
+    synthetic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+
+
 class AppState(Base):
     """Key/value store for small JSON settings (see backend/routers/state.py for the keys)."""
 
@@ -171,7 +218,7 @@ class AppState(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
 
-# Columns a crawler fills in; everything else is managed by the app.
+# Columns a crawler (a harvester's scraper) fills in; everything else is managed by the app.
 EVENT_FIELDS = (
     "api_id", "title", "start_time", "end_time", "timezone", "url", "venue", "address",
     "city", "lat", "lon", "location_approximate", "cover_url", "details",

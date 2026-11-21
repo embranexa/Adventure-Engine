@@ -32,7 +32,8 @@
     --danger: #ff6b6b;
 
     /* matter (cold -> warm along the lifecycle) */
-    --m-omen: #4b5a86;
+    --m-flux: #3a4a5e;
+    --m-prima: #4b5a86;
     --m-ore: #3d7bf0;
     --m-essence: #1fc2c9;
     --m-distillate: #e9c43b;
@@ -160,7 +161,21 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .mode-btn.active b { text-shadow: 0 0 8px rgba(255, 255, 255, 0.4); }
 .mode-btn small { font: 500 10px var(--font-mono); letter-spacing: 0; text-transform: none; color: var(--text-dim); }
 .inbox { font: 600 12px var(--font-mono); letter-spacing: 0; color: var(--text-dim); }
-.inbox.has-omens { color: #a9b6dc; text-shadow: 0 0 8px rgba(110, 130, 200, 0.7); }
+.inbox.has-prima { color: #a9b6dc; text-shadow: 0 0 8px rgba(110, 130, 200, 0.7); }
+/* Discovery: harvesters and the centrifuge (until the Signal Chain twin) */
+.harvesters { display: flex; gap: 6px; align-items: center; }
+.hv {
+    display: flex; align-items: center; gap: 5px; padding: 3px 4px 3px 10px; border-radius: 999px;
+    box-shadow: inset 0 0 0 1px var(--steel-2); background: rgba(10, 11, 13, 0.7);
+}
+.hv-name { font: 600 11px var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+.hv-count { font: 600 12px var(--font-mono); color: var(--m-flux); color: color-mix(in srgb, var(--m-flux) 40%, #fff); min-width: 1.5ch; }
+.hv.centrifuge .hv-count { color: color-mix(in srgb, var(--m-prima) 45%, #fff); }
+.hv.failed .hv-name { color: #e57373; }
+.hv.syncing .hv-count { animation: hv-fill 1.2s ease-in-out infinite; }
+@keyframes hv-fill { 50% { opacity: 0.4; } }
+.hv-btn { padding: 3px 9px; font-size: 10px; border-radius: 999px; }
+.hv-btn:disabled { opacity: 0.35; cursor: default; }
 .shade-toggle {
     display: flex; align-items: center; gap: 6px; cursor: pointer;
     font: 600 12px var(--font-display); letter-spacing: 0.14em; color: var(--text-muted); text-transform: uppercase;
@@ -1016,3 +1031,34 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 @media (prefers-reduced-motion: reduce) {
     .leviathan, .leviathan-bob, .leviathan-body, .lume, .arrow, .breathe, .light i, .promote, .promote-shine::after { animation: none !important; }
 }
+
+/* Signal Chain (phase 2: the model as tables, before the 3D twin) */
+.signal-chain { gap: 8px; }
+.signal-chain, .signal-chain * { user-select: text; }
+.sc-head { display: flex; align-items: center; gap: 10px; }
+.sc-spacer { flex: 1; }
+.sc-check { font: 600 12px var(--font-mono); }
+.sc-check.ok { color: #7fd8a4; }
+.sc-check.bad { color: #f0a35b; }
+.sc-lens { display: flex; align-items: center; gap: 6px; font: 600 11px var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+.sc-lens .btn { padding: 3px 12px; font-size: 11px; }
+.sc-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 4px; }
+.sc-table { width: 100%; border-collapse: collapse; font: 12px var(--font-mono); color: var(--text); }
+.sc-table th { text-align: left; font: 600 10px var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); padding: 4px 6px; border-bottom: 1px solid var(--steel-2); }
+.sc-table td { padding: 3px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); white-space: nowrap; }
+.sc-table tr.locked td { opacity: 0.45; }
+.sc-table tr.bad td { color: #f0a35b; }
+.sc-zone { table-layout: fixed; }
+.sc-zone col.c-name { width: 17%; }
+.sc-zone col.c-kind { width: 22%; }
+.sc-zone col.c-num { width: 7%; }
+.sc-zone td { overflow: hidden; text-overflow: ellipsis; }
+.sc-name { color: var(--text-bright); }
+.sc-dim { color: var(--text-dim); }
+.sc-lock { margin-left: 4px; font-size: 10px; }
+.sc-link { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.sc-link:hover { color: #fff; }
+.sc-bar { display: flex; height: 10px; min-width: 120px; border-radius: 3px; overflow: hidden; background: rgba(255, 255, 255, 0.04); }
+.sc-bar i { display: block; min-width: 2px; }
+.sc-bar i.ghost { background: repeating-linear-gradient(45deg, rgba(255,255,255,0.08) 0 3px, transparent 3px 6px); }
+.sc-moves td:nth-child(3) { white-space: normal; }

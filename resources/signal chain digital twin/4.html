@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steampunk Alchemical Signal Matrix</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Share+Tech+Mono&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #080605;
+            font-family: 'Share Tech Mono', monospace;
+            color: #d4af37;
+            user-select: none;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        /* Top-Left Header HUD */
+        #hud-header {
+            position: absolute;
+            top: 14px;
+            left: 18px;
+            pointer-events: none;
+            border-left: 4px solid #c88a32;
+            padding: 8px 14px;
+            background: linear-gradient(90deg, rgba(30, 20, 12, 0.92) 0%, rgba(12, 8, 5, 0) 100%);
+            z-index: 20;
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            margin: 0;
+            font-size: 1.35rem;
+            letter-spacing: 2px;
+            color: #f3c677;
+            text-shadow: 0 2px 10px rgba(200, 138, 50, 0.5);
+        }
+
+        .subtitle {
+            color: #b5a084;
+            font-size: 0.73rem;
+            letter-spacing: 1.1px;
+            margin-top: 3px;
+        }
+
+        /* Top-Right Interactive Control Deck */
+        #hud-controls {
+            position: absolute;
+            top: 14px;
+            right: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            align-items: flex-end;
+            z-index: 30;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 7px;
+            align-items: center;
+        }
+
+        .brass-btn {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.74rem;
+            color: #fce8c3;
+            background: linear-gradient(180deg, #3a2816 0%, #1e140b 100%);
+            border: 1px solid #c88a32;
+            padding: 6px 11px;
+            border-radius: 3px;
+            cursor: pointer;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.8), inset 0 0 6px rgba(243, 198, 119, 0.2);
+            transition: all 0.16s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .brass-btn:hover {
+            background: linear-gradient(180deg, #52381e 0%, #2b1d10 100%);
+            border-color: #ffd778;
+            color: #fff;
+            box-shadow: 0 0 12px rgba(212, 175, 55, 0.5);
+        }
+
+        .brass-btn.active-lens {
+            background: linear-gradient(180deg, #5e421e 0%, #2e1d0b 100%);
+            border-color: #00ffcc;
+            color: #00ffcc;
+            box-shadow: 0 0 12px rgba(0, 255, 204, 0.35);
+        }
+
+        #legend-box {
+            background: rgba(16, 11, 8, 0.92);
+            border: 1px solid #6e4e23;
+            padding: 6px 10px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            color: #cbb89d;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .swatch {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            margin-right: 4px;
+        }
+
+        /* Bottom Bar */
+        #bottom-bar {
+            position: absolute;
+            bottom: 14px;
+            left: 18px;
+            pointer-events: none;
+            font-size: 0.74rem;
+            color: #b5a288;
+            background: rgba(16, 11, 8, 0.9);
+            border: 1px solid #7c5826;
+            padding: 6px 12px;
+            border-radius: 3px;
+            z-index: 20;
+        }
+
+        #bottom-bar span {
+            color: #f3c677;
+            font-weight: bold;
+        }
+
+        /* 3D Projected Node Labels */
+        .node-label {
+            position: absolute;
+            pointer-events: none;
+            font-size: 0.72rem;
+            color: #fce8c3;
+            background: rgba(18, 13, 9, 0.92);
+            border: 1px solid #b8860b;
+            padding: 3px 7px;
+            border-radius: 3px;
+            white-space: nowrap;
+            transform: translate(-50%, -100%);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.85);
+            z-index: 10;
+            text-align: center;
+        }
+
+        .node-label.processor-tag {
+            border-color: #e69532;
+        }
+
+        .node-label.dynamo-tag {
+            border-color: #00d8ff;
+            background: rgba(12, 20, 26, 0.92);
+        }
+
+        .node-label .type-badge {
+            font-size: 0.58rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            display: block;
+            color: #9e8a70;
+            margin-bottom: 1px;
+        }
+
+        .node-label .pkt-count {
+            color: #f3c677;
+            font-weight: bold;
+            margin-left: 4px;
+        }
+
+        /* 3D Action Buttons (Sync / Panel / Locked) */
+        .node-btn {
+            pointer-events: auto;
+            margin-top: 3px;
+            display: inline-block;
+            padding: 2px 6px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.63rem;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.14s;
+        }
+
+        .node-btn.sync-btn {
+            color: #00ffcc;
+            background: rgba(10, 28, 26, 0.92);
+            border: 1px solid #00ffcc;
+        }
+        .node-btn.sync-btn:hover {
+            background: #00ffcc;
+            color: #000;
+        }
+
+        .node-btn.panel-btn {
+            color: #f3c677;
+            background: rgba(38, 26, 12, 0.92);
+            border: 1px solid #c88a32;
+        }
+        .node-btn.panel-btn:hover {
+            background: #f3c677;
+            color: #000;
+        }
+
+        .node-btn.locked-btn {
+            color: #ff5555;
+            background: rgba(35, 12, 12, 0.92);
+            border: 1px solid #aa3333;
+            cursor: not-allowed;
+        }
+
+        /* Flow Pipe Labels */
+        .flow-label {
+            position: absolute;
+            pointer-events: none;
+            font-size: 0.65rem;
+            color: #d8c3a5;
+            background: rgba(10, 8, 7, 0.85);
+            border: 1px dashed rgba(200, 138, 50, 0.5);
+            padding: 1px 5px;
+            border-radius: 8px;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+        }
+
+        /* Placeholder Module Panel Drawer/Modal */
+        #module-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            background: rgba(20, 14, 10, 0.97);
+            border: 2px solid #d4af37;
+            box-shadow: 0 0 40px rgba(0,0,0,0.95), inset 0 0 18px rgba(212, 175, 55, 0.2);
+            padding: 18px 24px;
+            border-radius: 4px;
+            min-width: 340px;
+            z-index: 200;
+        }
+
+        #module-modal h2 {
+            font-family: 'Cinzel', serif;
+            margin: 0 0 4px 0;
+            color: #f3c677;
+            font-size: 1.15rem;
+        }
+
+        #module-modal .modal-sub {
+            font-size: 0.75rem;
+            color: #00ffcc;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+
+        .modal-placeholder-box {
+            border: 1px dashed #7c5826;
+            background: rgba(10, 7, 5, 0.8);
+            padding: 14px;
+            font-size: 0.78rem;
+            color: #cbb89d;
+            line-height: 1.5;
+            margin-bottom: 14px;
+        }
+
+        /* Hover Tooltip */
+        #tooltip {
+            position: absolute;
+            display: none;
+            pointer-events: none;
+            background: rgba(22, 16, 11, 0.96);
+            border: 1px solid #d4af37;
+            box-shadow: 0 0 22px rgba(0,0,0,0.95);
+            padding: 10px 14px;
+            border-radius: 4px;
+            min-width: 235px;
+            z-index: 100;
+            transform: translate(15px, -50%);
+        }
+
+        #tooltip h3 {
+            font-family: 'Cinzel', serif;
+            margin: 0 0 5px 0;
+            font-size: 0.9rem;
+            color: #f3c677;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+            padding-bottom: 4px;
+        }
+
+        .tt-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.74rem;
+            margin: 3px 0;
+            color: #cbb89d;
+        }
+
+        .tt-val {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .layer-bar {
+            display: flex;
+            align-items: center;
+            font-size: 0.72rem;
+            margin-top: 3px;
+            color: #e8dccb;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="hud-header">
+        <h1>Alchemical Civilization &amp; Signal Matrix</h1>
+        <div class="subtitle">VESSELS (STORAGE) &bull; PROCESSORS (HYBRID VATS) &bull; DYNAMOS (STATELESS ENGINES)</div>
+    </div>
+
+    <div id="hud-controls">
+        <div class="control-row">
+            <button class="brass-btn" onclick="syncAllCrawlers()">&#x27F3; SYNC CRAWLER PORTFOLIO</button>
+            <button class="brass-btn" onclick="triggerForgePulse()">&#x26A1; PULSE [FORGE] (+40)</button>
+            <button class="brass-btn" onclick="resetSimulation()">&#x2715; DRAIN ALL</button>
+        </div>
+        <div class="control-row">
+            <button class="brass-btn active-lens" id="btn-lens-matter" onclick="setLensMode('matter')">&#x25C9; LENS: MATTER STATE</button>
+            <button class="brass-btn" id="btn-lens-source" onclick="setLensMode('source')">&#x2261; LENS: SOURCE PROVENANCE</button>
+        </div>
+        <div id="legend-box">
+            <span><strong>PORTFOLIO:</strong></span>
+            <span><i class="swatch" style="background:#0088ff"></i>[19hz]</span>
+            <span><i class="swatch" style="background:#00d68f"></i>[luma]</span>
+            <span><i class="swatch" style="background:#ffaa00"></i>[ra]</span>
+            <span><i class="swatch" style="background:#ff2a6d"></i>[forge]</span>
+            <span><i class="swatch" style="background:#555555"></i>[eventbrite: LOCKED]</span>
+        </div>
+    </div>
+
+    <div id="bottom-bar">
+        <span>[PROCESSORS &amp; DYNAMOS]</span> Click <strong>[&#x2699; PANEL]</strong> to open Module Console &nbsp;|&nbsp;
+        <span>[SUBTERRANEAN BUS]</span> Feeds <strong>[nexus] &rarr; [atlas] / [calendar]</strong> &nbsp;|&nbsp;
+        <span>[ENTROPY MARKET]</span> Recycles Reward &rarr; Crucible/Arena Cost
+    </div>
+
+    <!-- Placeholder Module Panel Modal -->
+    <div id="module-modal">
+        <h2 id="modal-title">[MODULE]</h2>
+        <div class="modal-sub" id="modal-type">CLASS // ROLE</div>
+        <div class="modal-placeholder-box" id="modal-desc">
+            Module configuration and telemetry panel placeholder.
+        </div>
+        <div style="text-align: right;">
+            <button class="brass-btn" onclick="closeModuleModal()">CLOSE PANEL [ESC]</button>
+        </div>
+    </div>
+
+    <div id="tooltip">
+        <h3 id="tt-name">[node]</h3>
+        <div class="tt-row"><span>MODULE CLASS:</span> <span class="tt-val" id="tt-class">Vessel</span></div>
+        <div class="tt-row"><span>FUNCTION:</span> <span class="tt-val" id="tt-role">Role</span></div>
+        <div class="tt-row"><span>MATTER OUTPUT:</span> <span class="tt-val" id="tt-matter">Matter</span></div>
+        <div class="tt-row"><span>STORED / FLUX:</span> <span class="tt-val" id="tt-pkts">0</span></div>
+        <div id="tt-breakdown"></div>
+    </div>
+
+    <div id="labels-layer"></div>
+    <div id="canvas-container"></div>
+
+    <script>
+        // =========================================================================
+        // 1. UPDATED TOPOLOGY: VESSELS, PROCESSORS & STATELESS DYNAMOS
+        // =========================================================================
+        const MACRO_CAP = 1200; // 1x Floor Scale (Crawlers, Centrifuge, Sump)
+        const MICRO_CAP = 160;  // 10x Precision Bench Scale (Refiner -> Archive)
+        const BENCH_Y   = 2.6;
+
+        const SOURCE_COLORS = {
+            s_19hz:  { name: "[19hz]",  color: 0x0088ff, hex: "#0088ff" },
+            s_luma:  { name: "[luma]",  color: 0x00d68f, hex: "#00d68f" },
+            s_ra:    { name: "[ra]",    color: 0xffaa00, hex: "#ffaa00" },
+            s_forge: { name: "[forge]", color: 0xff2a6d, hex: "#ff2a6d" }
+        };
+
+        const harvestState = { s_19hz: 0, s_luma: 0, s_ra: 0, s_forge: 0 };
+        const HARVEST_YIELD = { s_19hz: 520, s_luma: 340, s_ra: 240, s_forge: 40 };
+
+        let currentLens = 'matter';
+
+        // Node Definitions with explicit `modType`: 'vessel' | 'processor' | 'dynamo'
+        const nodesConfig = [
+            // --- A1: CRAWLER PORTFOLIO (4 Processors at X = -42) ---
+            {
+                id: "19hz", code: "A1.1", label: "[19hz]", modType: "processor", subStyle: "crawler",
+                x: -42, y: 0, z: -13.5, radius: 1.75, h: 5.2, maxCap: MACRO_CAP,
+                matterName: "(prima materia)", matterColor: 0x0066ff, role: "Electronic Event Crawler",
+                sourceKey: "s_19hz", syncable: true
+            },
+            {
+                id: "luma", code: "A1.2", label: "[luma]", modType: "processor", subStyle: "crawler",
+                x: -42, y: 0, z: -4.5, radius: 1.75, h: 5.2, maxCap: MACRO_CAP,
+                matterName: "(prima materia)", matterColor: 0x0088ff, role: "Community Tech Crawler",
+                sourceKey: "s_luma", syncable: true
+            },
+            {
+                id: "ra", code: "A1.3", label: "[ra]", modType: "processor", subStyle: "crawler",
+                x: -42, y: 0, z: 4.5, radius: 1.75, h: 5.2, maxCap: MACRO_CAP,
+                matterName: "(prima materia)", matterColor: 0x00aaff, role: "Resident Advisor Crawler",
+                sourceKey: "s_ra", syncable: true
+            },
+            {
+                id: "eventbrite", code: "A1.4", label: "[eventbrite]", modType: "processor", subStyle: "crawler",
+                x: -42, y: 0, z: 13.5, radius: 1.75, h: 5.2, maxCap: MACRO_CAP,
+                matterName: "(unlinked)", matterColor: 0x444444, role: "Unlinked Scraper API",
+                locked: true
+            },
+
+            // --- A2: CENTRIFUGE (Macro Consolidator & Filter Processor at X = -23) ---
+            {
+                id: "centrifuge", code: "A2", label: "[centrifuge]", modType: "processor", subStyle: "centrifuge",
+                x: -23, y: 0, z: -1.5, radius: 2.85, h: 6.0, maxCap: MACRO_CAP,
+                matterName: "(slag / ore / matter)", matterColor: 0x00d8ff,
+                role: "High-Speed Separation Centrifuge (90% Slag / 10% Ore)"
+            },
+
+            // --- A3: SUMP (Macro Waste Vessel at X = -23, Z = -15.5) ---
+            {
+                id: "sump", code: "A3", label: "[sump]", modType: "vessel",
+                x: -23, y: 0, z: -15.5, radius: 2.75, h: 5.6, maxCap: MACRO_CAP,
+                matterName: "(slag)", matterColor: 0x5a626a, role: "Rejected Slag Reservoir", isWaste: true
+            },
+
+            // --- A8: FORGE (Stateless Dynamo streaming into Refiner) ---
+            {
+                id: "forge", code: "A8", label: "[forge]", modType: "dynamo", subStyle: "forge",
+                x: -7, y: 0, z: 12.5, radius: 1.9, h: 4.4, maxCap: MICRO_CAP,
+                matterName: "(essence)", matterColor: 0xff2a6d, role: "Stateless Bessemer Event Forge"
+            },
+
+            // --- ELEVATED 10x CORE CHAIN (Y = BENCH_Y = 2.6m) ---
+            // A7: REFINER (Processor)
+            {
+                id: "refiner", code: "A7", label: "[refiner]", modType: "processor", subStyle: "refiner",
+                x: -7, y: BENCH_Y, z: 2.2, radius: 1.55, h: 5.0, maxCap: MICRO_CAP,
+                matterName: "(essence)", matterColor: 0x20d69b, role: "Reciprocating Ore Refiner"
+            },
+            // A9: ALEMBIC (Processor)
+            {
+                id: "alembic", code: "A9", label: "[alembic]", modType: "processor", subStyle: "alembic",
+                x: 3, y: BENCH_Y, z: -3.2, radius: 1.50, h: 5.0, maxCap: MICRO_CAP,
+                matterName: "(distillate)", matterColor: 0xffaa00, role: "Copper-Coil Condenser Still"
+            },
+            // A10: CRUCIBLE (Processor)
+            {
+                id: "crucible", code: "A10", label: "[crucible]", modType: "processor", subStyle: "crucible",
+                x: 13, y: BENCH_Y, z: 2.2, radius: 1.55, h: 5.0, maxCap: MICRO_CAP,
+                matterName: "(alloy / dross)", matterColor: 0xff4500, role: "Induction Thermal Crucible"
+            },
+            // A11: NECROPOLIS (Waste Vessel)
+            {
+                id: "necropolis", code: "A11", label: "[necropolis]", modType: "vessel",
+                x: 13, y: BENCH_Y, z: -12.5, radius: 1.35, h: 4.6, maxCap: MICRO_CAP,
+                matterName: "(dross)", matterColor: 0x574c3f, role: "Calcined Dross Ossuary", isWaste: true
+            },
+            // A12: EVALUATOR / QUALITY GATE (Vessel)
+            {
+                id: "evaluator", code: "A12", label: "[evaluator]", modType: "vessel",
+                x: 23, y: BENCH_Y, z: -3.2, radius: 1.48, h: 5.0, maxCap: MICRO_CAP,
+                matterName: "(animus)", matterColor: 0xe61975, role: "Quality Gate Vessel"
+            },
+            // A13: ARENA (Vessel)
+            {
+                id: "arena", code: "A13", label: "[arena]", modType: "vessel",
+                x: 33, y: BENCH_Y, z: 2.2, radius: 1.48, h: 5.0, maxCap: MICRO_CAP,
+                matterName: "(artifact)", matterColor: 0xc41cff, role: "Competitive Ranking Vessel"
+            },
+            // A14: RELIQUARY (Vessel)
+            {
+                id: "reliquary", code: "A14", label: "[reliquary]", modType: "vessel",
+                x: 43, y: BENCH_Y, z: -3.2, radius: 1.48, h: 5.0, maxCap: MICRO_CAP,
+                matterName: "(relic / reward)", matterColor: 0x8c00ff, role: "Curated Artifact Reliquary"
+            },
+            // A15: ARCHIVE (Terminal Vessel)
+            {
+                id: "archive", code: "A15", label: "[archive]", modType: "vessel",
+                x: 53, y: BENCH_Y, z: 2.2, radius: 1.50, h: 5.0, maxCap: MICRO_CAP,
+                matterName: "(relic)", matterColor: 0x5900ff, role: "Immortal Relic Archive"
+            },
+
+            // --- A16: ENTROPY MARKET (Stateless Dynamo on Raised Front Hearth) ---
+            {
+                id: "entropy_market", code: "A16", label: "[entropy market]", modType: "dynamo", subStyle: "market",
+                x: 28, y: BENCH_Y, z: 12.5, radius: 2.1, h: 4.8, maxCap: MICRO_CAP,
+                matterName: "(reward -> cost)", matterColor: 0xffd700,
+                role: "Civilization Trade Engine (Rewards -> Crucible & Arena Cost)"
+            },
+
+            // --- GLOBAL MATTER INFRASTRUCTURE GALLERY (Back Elevated Deck: Z = -20, Y = 5.0) ---
+            // Connected via Subterranean Universal Matter Bus running under the entire chain!
+            {
+                id: "nexus", code: "A17", label: "[nexus]", modType: "dynamo", subStyle: "nexus",
+                x: 5, y: 5.0, z: -20.0, radius: 2.1, h: 4.8, maxCap: MACRO_CAP,
+                matterName: "(universal matter)", matterColor: 0x00ffcc,
+                role: "Universal Matter Router & Telemetry Hub"
+            },
+            {
+                id: "atlas", code: "A5", label: "[atlas]", modType: "dynamo", subStyle: "atlas",
+                x: -7, y: 5.0, z: -20.0, radius: 1.85, h: 4.5, maxCap: MACRO_CAP,
+                matterName: "(spatial matter)", matterColor: 0x00b4ff,
+                role: "Geospatial Armillary Sphere"
+            },
+            {
+                id: "calendar", code: "A18", label: "[calendar]", modType: "dynamo", subStyle: "calendar",
+                x: 17, y: 5.0, z: -20.0, radius: 1.85, h: 4.5, maxCap: MACRO_CAP,
+                matterName: "(temporal matter)", matterColor: 0xffae00,
+                role: "Horological Astrolabe & Chronometer"
+            }
+        ];
+
+        // Complete Pipe Connections matching A1 -> A18 topology + circular feedback
+        const flowsConfig = [
+            // A1[crawler portfolio] --> A2[centrifuge] | prima materia
+            { from: "19hz",       to: "centrifuge", label: "(prima materia)", matterColor: 0x0066ff, srcKey: "s_19hz" },
+            { from: "luma",       to: "centrifuge", label: "(prima materia)", matterColor: 0x00b4ff, srcKey: "s_luma" },
+            { from: "ra",         to: "centrifuge", label: "(prima materia)", matterColor: 0x00ffcc, srcKey: "s_ra" },
+            { from: "eventbrite", to: "centrifuge", label: "(unlinked)",      matterColor: 0x444444, locked: true },
+
+            // A2 --> A3[sump] | slag
+            { from: "centrifuge", to: "sump",       label: "(slag)",          matterColor: 0x6c757d, isWaste: true },
+
+            // A2 --> A7[refiner] | ore (Steps up onto 10x Bench)
+            { from: "centrifuge", to: "refiner",    label: "(ore)",           matterColor: 0x20d69b },
+
+            // A2 --> A17[nexus] | matter (Rises from Universal Matter Bus)
+            { from: "centrifuge", to: "nexus",      label: "(matter)",        matterColor: 0x00ffcc, highArch: 3.5 },
+
+            // A17 --> A5[atlas] & A18[calendar] | matter
+            { from: "nexus",      to: "atlas",      label: "(matter)",        matterColor: 0x00b4ff },
+            { from: "nexus",      to: "calendar",   label: "(matter)",        matterColor: 0xffae00 },
+
+            // A8[forge] --> A7[refiner] | essence
+            { from: "forge",      to: "refiner",    label: "(essence)",       matterColor: 0xff2a6d },
+
+            // A7[refiner] --> A9[alembic] | essence
+            { from: "refiner",    to: "alembic",    label: "(essence)",       matterColor: 0x80e64d },
+
+            // A9[alembic] --> A10[crucible] | distillate
+            { from: "alembic",    to: "crucible",   label: "(distillate)",    matterColor: 0xff7b00 },
+
+            // A10[crucible] --> A11[necropolis] | dross
+            { from: "crucible",   to: "necropolis", label: "(dross)",         matterColor: 0x6b5e4c, isWaste: true },
+
+            // A10[crucible] --> A12[evaluator] | alloy
+            { from: "crucible",   to: "evaluator",  label: "(alloy)",         matterColor: 0xf2293a },
+
+            // A12[evaluator] --> A13[arena] | animus
+            { from: "evaluator",  to: "arena",      label: "(animus)",        matterColor: 0xd61ab5 },
+
+            // A13[arena] --> A14[reliquary] | artifact
+            { from: "arena",      to: "reliquary",  label: "(artifact)",      matterColor: 0xa80eff },
+
+            // A14[reliquary] --> A15[archive] | relic
+            { from: "reliquary",  to: "archive",    label: "(relic)",         matterColor: 0x6e00ff },
+
+            // A14[reliquary] --> A16[entropy market] | reward
+            { from: "reliquary",  to: "entropy_market", label: "(reward)",    matterColor: 0xffd700, highArch: 2.2 },
+
+            // Circular Feedback: A16[entropy market] --> A10[crucible] & A13[arena] | cost (Overhead Golden Arches)
+            { from: "entropy_market", to: "crucible", label: "(cost)",        matterColor: 0xffae00, highArch: 5.5, isFeedback: true },
+            { from: "entropy_market", to: "arena",    label: "(cost)",        matterColor: 0xffae00, highArch: 4.5, isFeedback: true }
+        ];
+
+        // =========================================================================
+        // 2. THREE.JS SCENE, LIGHTING & UNIVERSAL MATTER BUS ARCHITECTURE
+        // =========================================================================
+        const container = document.getElementById('canvas-container');
+        const labelsLayer = document.getElementById('labels-layer');
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x080605);
+        scene.fog = new THREE.FogExp2(0x080605, 0.0052);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 600);
+        camera.position.set(4, 38, 72);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.target.set(5, 3, -2);
+        controls.maxPolarAngle = Math.PI / 2 - 0.02;
+        controls.minDistance = 14;
+        controls.maxDistance = 155;
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0x4a3b2c, 1.55));
+        const dirLight = new THREE.DirectionalLight(0xffe4c4, 1.3);
+        dirLight.position.set(15, 65, 35);
+        scene.add(dirLight);
+
+        const blueLight = new THREE.PointLight(0x00aaff, 1.6, 65);
+        blueLight.position.set(-30, 12, 0);
+        scene.add(blueLight);
+
+        const goldLight = new THREE.PointLight(0xffaa22, 1.8, 65);
+        goldLight.position.set(20, 14, 8);
+        scene.add(goldLight);
+
+        const nexusLight = new THREE.PointLight(0x00ffcc, 1.8, 55);
+        nexusLight.position.set(5, 12, -20);
+        scene.add(nexusLight);
+
+        // Floor & Grid
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(170, 100),
+            new THREE.MeshStandardMaterial({ color: 0x110d0a, roughness: 0.88, metalness: 0.2 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        const grid = new THREE.GridHelper(150, 75, 0x5c4020, 0x201710);
+        grid.position.y = 0.02;
+        scene.add(grid);
+
+        // Shared Materials
+        const brassMat = new THREE.MeshStandardMaterial({ color: 0xc88a32, metalness: 0.86, roughness: 0.26 });
+        const goldMat  = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.90, roughness: 0.18 });
+        const copperMat = new THREE.MeshStandardMaterial({ color: 0xd96b38, metalness: 0.88, roughness: 0.22 });
+        const darkIronMat = new THREE.MeshStandardMaterial({ color: 0x241f1c, metalness: 0.75, roughness: 0.48 });
+        const glassMat = new THREE.MeshPhysicalMaterial({
+            color: 0xffffff, transparent: true, opacity: 0.20,
+            roughness: 0.08, metalness: 0.05, side: THREE.DoubleSide, depthWrite: false
+        });
+
+        // 1. Elevated 10x Precision Core Bench (X = -12 to +58, Z = -15 to +16)
+        const benchMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(70, BENCH_Y, 31),
+            new THREE.MeshStandardMaterial({ color: 0x1a130e, roughness: 0.75, metalness: 0.35 })
+        );
+        benchMesh.position.set(23, BENCH_Y / 2, 0.5);
+        scene.add(benchMesh);
+
+        const benchEdges = new THREE.LineSegments(
+            new THREE.EdgesGeometry(new THREE.BoxGeometry(70.1, BENCH_Y + 0.04, 31.1)),
+            new THREE.LineBasicMaterial({ color: 0xc88a32 })
+        );
+        benchEdges.position.copy(benchMesh.position);
+        scene.add(benchEdges);
+
+        // 2. Elevated Back Infrastructure Gallery for [nexus], [atlas], [calendar] (Z = -20, Y = 5.0)
+        const galleryMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(34, 5.0, 8),
+            new THREE.MeshStandardMaterial({ color: 0x161210, roughness: 0.7, metalness: 0.45 })
+        );
+        galleryMesh.position.set(5, 2.5, -20);
+        scene.add(galleryMesh);
+
+        const galleryEdges = new THREE.LineSegments(
+            new THREE.EdgesGeometry(new THREE.BoxGeometry(34.1, 5.04, 8.1)),
+            new THREE.LineBasicMaterial({ color: 0x00d8ff })
+        );
+        galleryEdges.position.copy(galleryMesh.position);
+        scene.add(galleryEdges);
+
+        // 3. Universal Subterranean Matter Bus Bar (Visually links the entire chain to [nexus] without pipe clutter!)
+        const busSpine = new THREE.Mesh(
+            new THREE.BoxGeometry(96, 0.18, 0.65),
+            new THREE.MeshBasicMaterial({ color: 0x00d8ff, transparent: true, opacity: 0.35 })
+        );
+        busSpine.position.set(5, BENCH_Y + 0.05, -7.2);
+        scene.add(busSpine);
+
+        const busRiser = new THREE.Mesh(
+            new THREE.BoxGeometry(0.65, 0.18, 13),
+            new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.45 })
+        );
+        busRiser.position.set(5, BENCH_Y + 0.05, -13.5);
+        scene.add(busRiser);
+
+        function createGlowTex() {
+            const c = document.createElement('canvas');
+            c.width = 64; c.height = 64;
+            const ctx = c.getContext('2d');
+            const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 28);
+            g.addColorStop(0, 'rgba(255,255,255,1)');
+            g.addColorStop(0.4, 'rgba(255,255,255,0.5)');
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, 64, 64);
+            return new THREE.CanvasTexture(c);
+        }
+        const particleTex = createGlowTex();
+
+        // =========================================================================
+        // 3. BUILD 3D MODULES BY TAXONOMY: VESSELS, PROCESSORS & DYNAMOS
+        // =========================================================================
+        const nodeMap = {};
+        const interactableMeshes = [];
+        const BASE_H = 0.45;
+
+        nodesConfig.forEach((n) => {
+            const group = new THREE.Group();
+            group.position.set(n.x, n.y, n.z);
+            const R = n.radius;
+            const H = n.h;
+
+            // Permanent Matter-State Glowing Base Rune Ring
+            const matterRing = new THREE.Mesh(
+                new THREE.TorusGeometry(R * 1.22, 0.08, 10, 32),
+                new THREE.MeshBasicMaterial({ color: n.matterColor })
+            );
+            matterRing.rotation.x = Math.PI / 2;
+            matterRing.position.y = 0.08;
+            group.add(matterRing);
+
+            const dynamicGroup = new THREE.Group(); // Holds liquid layers for Vessels & Processors
+            group.add(dynamicGroup);
+
+            const animParts = {};
+
+            if (n.modType === "vessel" || n.modType === "processor") {
+                // ===============================================================
+                // SHARED GLASS CONTAINMENT CHAMBER (Used by Vessels & Processors)
+                // ===============================================================
+                const plinth = new THREE.Mesh(
+                    new THREE.CylinderGeometry(R * 1.15, R * 1.22, BASE_H, 24),
+                    darkIronMat
+                );
+                plinth.position.y = BASE_H / 2;
+                group.add(plinth);
+
+                const ringGeo = new THREE.TorusGeometry(R * 1.05, 0.11, 10, 28);
+                const botRing = new THREE.Mesh(ringGeo, brassMat);
+                botRing.rotation.x = Math.PI / 2;
+                botRing.position.y = BASE_H;
+                group.add(botRing);
+
+                const glassCyl = new THREE.Mesh(
+                    new THREE.CylinderGeometry(R, R, H, 28, 1, true),
+                    glassMat
+                );
+                glassCyl.position.y = BASE_H + H / 2;
+                group.add(glassCyl);
+
+                const numRods = R > 2.2 ? 6 : 4;
+                const rodGeo = new THREE.CylinderGeometry(0.055, 0.055, H + 0.2, 8);
+                for (let i = 0; i < numRods; i++) {
+                    const a = (i * Math.PI * 2) / numRods + Math.PI / numRods;
+                    const rod = new THREE.Mesh(rodGeo, n.locked ? darkIronMat : brassMat);
+                    rod.position.set(Math.cos(a) * R * 1.06, BASE_H + H / 2, Math.sin(a) * R * 1.06);
+                    group.add(rod);
+                }
+
+                const topY = BASE_H + H;
+                const topRing = new THREE.Mesh(ringGeo, n.locked ? darkIronMat : brassMat);
+                topRing.rotation.x = Math.PI / 2;
+                topRing.position.y = topY;
+                group.add(topRing);
+
+                const dome = new THREE.Mesh(
+                    new THREE.SphereGeometry(R * 1.01, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2.2),
+                    glassMat
+                );
+                dome.position.y = topY;
+                group.add(dome);
+
+                glassCyl.userData = n;
+                interactableMeshes.push(glassCyl);
+
+                // ===============================================================
+                // BESPOKE ACTIVE MACHINERY OVERLAYS FOR PROCESSORS
+                // ===============================================================
+                if (n.modType === "processor") {
+                    if (n.subStyle === "crawler") {
+                        // Crawler Harvester Gearhead on top
+                        const gear = new THREE.Mesh(
+                            new THREE.CylinderGeometry(0.65, 0.65, 0.35, 8),
+                            n.locked ? darkIronMat : copperMat
+                        );
+                        gear.position.y = topY + R * 0.9;
+                        group.add(gear);
+                        animParts.crawlerGear = gear;
+
+                        if (n.locked) {
+                            const band = new THREE.Mesh(new THREE.TorusGeometry(R * 1.08, 0.14, 10, 24), darkIronMat);
+                            band.rotation.x = Math.PI / 2;
+                            band.position.y = BASE_H + H * 0.5;
+                            group.add(band);
+                        }
+                    } else if (n.subStyle === "centrifuge") {
+                        // Spinning External Planetary Rotor Cage around Centrifuge Vat
+                        const rotorCage = new THREE.Group();
+                        rotorCage.position.y = BASE_H + H / 2;
+                        for (let i = 0; i < 3; i++) {
+                            const arm = new THREE.Mesh(new THREE.BoxGeometry(0.22, H * 0.85, 0.22), copperMat);
+                            const a = (i * Math.PI * 2) / 3;
+                            arm.position.set(Math.cos(a) * R * 1.22, 0, Math.sin(a) * R * 1.22);
+                            rotorCage.add(arm);
+                        }
+                        const midBelt = new THREE.Mesh(new THREE.TorusGeometry(R * 1.22, 0.12, 10, 32), brassMat);
+                        midBelt.rotation.x = Math.PI / 2;
+                        rotorCage.add(midBelt);
+                        group.add(rotorCage);
+                        animParts.rotorCage = rotorCage;
+
+                    } else if (n.subStyle === "refiner") {
+                        // Reciprocating Vertical Agitator Shaft & Impeller Ring
+                        const agitator = new THREE.Group();
+                        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, H * 0.9, 10), brassMat);
+                        shaft.position.y = BASE_H + H * 0.55;
+                        agitator.add(shaft);
+                        const impeller = new THREE.Mesh(new THREE.TorusGeometry(R * 0.65, 0.10, 8, 20), copperMat);
+                        impeller.rotation.x = Math.PI / 2;
+                        impeller.position.y = BASE_H + H * 0.4;
+                        agitator.add(impeller);
+                        group.add(agitator);
+                        animParts.agitator = agitator;
+
+                    } else if (n.subStyle === "alembic") {
+                        // Helical Copper Condenser Rings & Distiller Swan-Neck Cap
+                        for (let i = 1; i <= 3; i++) {
+                            const coil = new THREE.Mesh(new THREE.TorusGeometry(R * 1.12, 0.08, 10, 28), copperMat);
+                            coil.rotation.x = Math.PI / 2;
+                            coil.rotation.y = i * 0.2;
+                            coil.position.y = BASE_H + (H * 0.22 * i);
+                            group.add(coil);
+                        }
+                        const condenser = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), copperMat);
+                        condenser.position.y = topY + R * 0.95;
+                        group.add(condenser);
+                        animParts.condenser = condenser;
+
+                    } else if (n.subStyle === "crucible") {
+                        // Glowing Thermal Induction Furnace Collar at base of Crucible
+                        const heater = new THREE.Mesh(
+                            new THREE.TorusGeometry(R * 1.16, 0.18, 12, 28),
+                            new THREE.MeshStandardMaterial({
+                                color: 0xff3300, emissive: 0xff2200, emissiveIntensity: 0.8, roughness: 0.3
+                            })
+                        );
+                        heater.rotation.x = Math.PI / 2;
+                        heater.position.y = BASE_H + 0.6;
+                        group.add(heater);
+                        animParts.heater = heater;
+                    }
+                } else {
+                    // Standard Passive Vessel Top Finial Valve
+                    const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.35, 0.5, 12), brassMat);
+                    valve.position.y = topY + R * 0.92;
+                    group.add(valve);
+                }
+
+            } else if (n.modType === "dynamo") {
+                // ===============================================================
+                // BESPOKE STATELESS DYNAMOS (Pure Machinery — Zero Stored Liquid)
+                // ===============================================================
+                const ped = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.1, R * 1.25, 0.9, 16), darkIronMat);
+                ped.position.y = 0.45;
+                group.add(ped);
+                ped.userData = n;
+                interactableMeshes.push(ped);
+
+                if (n.subStyle === "forge") {
+                    // [forge]: Reciprocating Forge Hammer + Copper Coils + Plasma Core
+                    const coil = new THREE.Mesh(new THREE.TorusGeometry(R * 0.8, 0.2, 12, 28), copperMat);
+                    coil.rotation.x = Math.PI / 2;
+                    coil.position.y = 1.4;
+                    group.add(coil);
+
+                    const core = new THREE.Mesh(
+                        new THREE.OctahedronGeometry(1.0, 1),
+                        new THREE.MeshBasicMaterial({ color: 0xff2a6d, wireframe: false })
+                    );
+                    core.position.y = 2.6;
+                    core.userData = n;
+                    interactableMeshes.push(core);
+                    group.add(core);
+
+                    const hammer = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 0.9, 12), brassMat);
+                    hammer.position.y = 4.1;
+                    group.add(hammer);
+
+                    animParts.forgeCore = core;
+                    animParts.forgeHammer = hammer;
+
+                } else if (n.subStyle === "market") {
+                    // [entropy market]: Twin-Pan Golden Balance Beam & Flywheel
+                    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.4, 3.6, 12), brassMat);
+                    pillar.position.y = 2.2;
+                    pillar.userData = n;
+                    interactableMeshes.push(pillar);
+                    group.add(pillar);
+
+                    const beamGroup = new THREE.Group();
+                    beamGroup.position.y = 3.8;
+                    const beam = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 0.22), goldMat);
+                    beamGroup.add(beam);
+
+                    const panGeo = new THREE.CylinderGeometry(0.65, 0.4, 0.25, 16);
+                    const leftPan = new THREE.Mesh(panGeo, goldMat);
+                    leftPan.position.set(-1.5, -0.8, 0);
+                    beamGroup.add(leftPan);
+
+                    const rightPan = new THREE.Mesh(panGeo, goldMat);
+                    rightPan.position.set(1.5, -0.8, 0);
+                    beamGroup.add(rightPan);
+
+                    group.add(beamGroup);
+                    animParts.marketBeam = beamGroup;
+
+                } else if (n.subStyle === "nexus") {
+                    // [nexus]: 3-Axis Gyroscopic Aether Switchboard
+                    const ring1 = new THREE.Mesh(new THREE.TorusGeometry(1.65, 0.10, 12, 32), brassMat);
+                    ring1.position.y = 2.8;
+                    group.add(ring1);
+
+                    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(1.30, 0.09, 12, 32), copperMat);
+                    ring2.position.y = 2.8;
+                    group.add(ring2);
+
+                    const core = new THREE.Mesh(
+                        new THREE.IcosahedronGeometry(0.75, 1),
+                        new THREE.MeshBasicMaterial({ color: 0x00ffcc, wireframe: true })
+                    );
+                    core.position.y = 2.8;
+                    core.userData = n;
+                    interactableMeshes.push(core);
+                    group.add(core);
+
+                    animParts.nexusR1 = ring1;
+                    animParts.nexusR2 = ring2;
+                    animParts.nexusCore = core;
+
+                } else if (n.subStyle === "atlas") {
+                    // [atlas]: Rotating Geospatial Armillary Globe
+                    const globeGroup = new THREE.Group();
+                    globeGroup.position.y = 2.7;
+                    globeGroup.rotation.z = 0.35; // Axial tilt
+
+                    const meridian1 = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.08, 10, 28), brassMat);
+                    globeGroup.add(meridian1);
+                    const meridian2 = meridian1.clone();
+                    meridian2.rotation.y = Math.PI / 2;
+                    globeGroup.add(meridian2);
+
+                    const earth = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.85, 16, 12),
+                        new THREE.MeshStandardMaterial({ color: 0x0088ff, wireframe: true, emissive: 0x0044aa })
+                    );
+                    earth.userData = n;
+                    interactableMeshes.push(earth);
+                    globeGroup.add(earth);
+
+                    group.add(globeGroup);
+                    animParts.atlasGlobe = globeGroup;
+
+                } else if (n.subStyle === "calendar") {
+                    // [calendar]: Concentric Counter-Rotating Horological Astrolabe Dials
+                    const dial1 = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.12, 8, 12), goldMat);
+                    dial1.position.y = 2.7;
+                    dial1.userData = n;
+                    interactableMeshes.push(dial1);
+                    group.add(dial1);
+
+                    const dial2 = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.10, 8, 8), copperMat);
+                    dial2.position.y = 2.7;
+                    group.add(dial2);
+
+                    const hand = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 0.08), brassMat);
+                    hand.position.y = 2.7;
+                    group.add(hand);
+
+                    animParts.calDial1 = dial1;
+                    animParts.calDial2 = dial2;
+                    animParts.calHand = hand;
+                }
+            }
+
+            scene.add(group);
+
+            // ===================================================================
+            // CREATE 3D PROJECTED LABEL & MODULE ACTION BUTTONS
+            // ===================================================================
+            const labelEl = document.createElement('div');
+            labelEl.className = `node-label ${n.modType}-tag`;
+
+            let actionBtnHtml = '';
+            if (n.syncable) {
+                actionBtnHtml = `<br><button class="node-btn sync-btn" onclick="syncCrawler('${n.sourceKey}')">&#x27F3; SYNC</button>`;
+            } else if (n.locked) {
+                actionBtnHtml = `<br><span class="node-btn locked-btn">&#x1F512; UNLINKED</span>`;
+            } else if (n.modType === "processor" || n.modType === "dynamo") {
+                actionBtnHtml = `<br><button class="node-btn panel-btn" onclick="openModuleModal('${n.id}')">&#x2699; PANEL</button>`;
+            }
+
+            const typeTitle = n.modType.toUpperCase();
+            labelEl.innerHTML = `
+                <span class="type-badge">${n.code} &bull; ${typeTitle}</span>
+                <span>${n.label}</span><span class="pkt-count" id="pkt-${n.id}">0</span>
+                ${actionBtnHtml}
+            `;
+            labelsLayer.appendChild(labelEl);
+
+            nodeMap[n.id] = {
+                config: n,
+                group: group,
+                dynamicGroup: dynamicGroup,
+                labelEl: labelEl,
+                labelY: n.y + H + R + 1.0,
+                animParts: animParts,
+                currentTotal: 0,
+                composition: { s_19hz: 0, s_luma: 0, s_ra: 0, s_forge: 0 }
+            };
+        });
+
+        // =========================================================================
+        // 4. BUILD PIPES & OVERHEAD FEEDBACK ARCHES
+        // =========================================================================
+        const pipeObjects = [];
+        const flowLabelList = [];
+
+        function getPipeRadius(pkts, isMicro) {
+            if (pkts <= 0) return 0.09;
+            const k = isMicro ? 0.024 : 0.0125;
+            return Math.max(0.10, Math.min(0.44, k * Math.sqrt(pkts)));
+        }
+
+        flowsConfig.forEach((f) => {
+            const src = nodeMap[f.from].config;
+            const tgt = nodeMap[f.to].config;
+
+            const startY = src.y + 1.5;
+            const endY   = tgt.y + 1.5;
+
+            const dir = new THREE.Vector3(tgt.x - src.x, 0, tgt.z - src.z).normalize();
+            const startPt = new THREE.Vector3(src.x + dir.x * src.radius * 0.9, startY, src.z + dir.z * src.radius * 0.9);
+            const endPt   = new THREE.Vector3(tgt.x - dir.x * tgt.radius * 0.9, endY,   tgt.z - dir.z * tgt.radius * 0.9);
+
+            const archLift = f.highArch || 0.35;
+            const dx = (endPt.x - startPt.x) * 0.42;
+            const dz = (endPt.z - startPt.z) * 0.42;
+            const p1 = new THREE.Vector3(startPt.x + dx, Math.max(startPt.y, endPt.y) + archLift, startPt.z + dz * 0.25);
+            const p2 = new THREE.Vector3(endPt.x - dx,   Math.max(startPt.y, endPt.y) + archLift, endPt.z - dz * 0.25);
+
+            const curve = new THREE.CubicBezierCurve3(startPt, p1, p2, endPt);
+            const pipeHolder = new THREE.Group();
+            scene.add(pipeHolder);
+
+            const sprites = [];
+            for (let i = 0; i < 4; i++) {
+                const spMat = new THREE.SpriteMaterial({
+                    map: particleTex,
+                    color: f.matterColor,
+                    transparent: true,
+                    opacity: 0,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const sp = new THREE.Sprite(spMat);
+                sp.scale.set(0.7, 0.7, 1);
+                scene.add(sp);
+                sprites.push({ sprite: sp, t: i / 4 });
+            }
+
+            const midPt = curve.getPointAt(0.5);
+            const flEl = document.createElement('div');
+            flEl.className = 'flow-label';
+            flEl.style.borderColor = '#' + f.matterColor.toString(16).padStart(6, '0');
+            flEl.textContent = f.label;
+            labelsLayer.appendChild(flEl);
+
+            flowLabelList.push({ el: flEl, pos: new THREE.Vector3(midPt.x, midPt.y + 0.55, midPt.z) });
+
+            pipeObjects.push({
+                config: f,
+                curve: curve,
+                pipeHolder: pipeHolder,
+                sprites: sprites,
+                flowPkts: 0
+            });
+        });
+
+        // =========================================================================
+        // 5. SIGNAL CHAIN MASS-BALANCE & DUAL-LENS LIQUID BUILDER
+        // =========================================================================
+        function recomputeChain() {
+            const s19 = harvestState.s_19hz;
+            const sLu = harvestState.s_luma;
+            const sRa = harvestState.s_ra;
+            const sFo = harvestState.s_forge;
+
+            // A1: Crawler Portfolio
+            setNodeComp("19hz",       { s_19hz: s19, s_luma: 0,   s_ra: 0,   s_forge: 0 });
+            setNodeComp("luma",       { s_19hz: 0,   s_luma: sLu, s_ra: 0,   s_forge: 0 });
+            setNodeComp("ra",         { s_19hz: 0,   s_luma: 0,   s_ra: sRa, s_forge: 0 });
+            setNodeComp("eventbrite", { s_19hz: 0,   s_luma: 0,   s_ra: 0,   s_forge: 0 });
+
+            // A2: Centrifuge consolidates all crawlers
+            const centComp = { s_19hz: s19, s_luma: sLu, s_ra: sRa, s_forge: 0 };
+            setNodeComp("centrifuge", centComp);
+
+            // A3: Sump receives 90% Slag
+            setNodeComp("sump", scaleComp(centComp, 0.90));
+
+            // A17, A5, A18: Universal Matter Infrastructure (Stateless Dynamos)
+            const passedOre = scaleComp(centComp, 0.10);
+            setNodeComp("nexus",    passedOre);
+            setNodeComp("atlas",    passedOre);
+            setNodeComp("calendar", passedOre);
+
+            // A8: Stateless Forge
+            setNodeComp("forge", { s_19hz: 0, s_luma: 0, s_ra: 0, s_forge: sFo });
+
+            // A7: Refiner merges 10% Centrifuge Ore + 100% Forge Essence
+            const refComp = {
+                s_19hz:  passedOre.s_19hz,
+                s_luma:  passedOre.s_luma,
+                s_ra:    passedOre.s_ra,
+                s_forge: sFo
+            };
+            setNodeComp("refiner", refComp);
+
+            // A9: Alembic
+            const alemComp = scaleComp(refComp, 0.94);
+            setNodeComp("alembic", alemComp);
+
+            // A10: Crucible (Boosted slightly by Entropy Market feedback when active!)
+            const crucComp = scaleComp(alemComp, 0.95);
+            setNodeComp("crucible", crucComp);
+
+            // A11: Necropolis (22% Dross) & A12: Evaluator (78% Alloy)
+            setNodeComp("necropolis", scaleComp(crucComp, 0.22));
+            const evalComp = scaleComp(crucComp, 0.78);
+            setNodeComp("evaluator", evalComp);
+
+            // A13: Arena
+            const arenaComp = scaleComp(evalComp, 0.92);
+            setNodeComp("arena", arenaComp);
+
+            // A14: Reliquary
+            const reliComp = scaleComp(arenaComp, 0.90);
+            setNodeComp("reliquary", reliComp);
+
+            // A15: Archive & A16: Entropy Market
+            setNodeComp("archive", scaleComp(reliComp, 0.85));
+            setNodeComp("entropy_market", scaleComp(reliComp, 0.35));
+
+            Object.keys(nodeMap).forEach(id => rebuildVesselLiquid(nodeMap[id]));
+            rebuildPipes();
+        }
+
+        function scaleComp(c, f) {
+            return {
+                s_19hz:  Math.round(c.s_19hz * f),
+                s_luma:  Math.round(c.s_luma * f),
+                s_ra:    Math.round(c.s_ra * f),
+                s_forge: Math.round(c.s_forge * f)
+            };
+        }
+
+        function setNodeComp(id, comp) {
+            const node = nodeMap[id];
+            node.composition = comp;
+            node.currentTotal = comp.s_19hz + comp.s_luma + comp.s_ra + comp.s_forge;
+
+            const span = document.getElementById(`pkt-${id}`);
+            if (span) {
+                span.textContent = node.config.modType === "dynamo"
+                    ? `⚡${node.currentTotal}`
+                    : `${node.currentTotal}`;
+            }
+        }
+
+        function rebuildVesselLiquid(node) {
+            const cfg = node.config;
+            if (cfg.modType === "dynamo") return; // Stateless Dynamos never store liquid
+
+            while (node.dynamicGroup.children.length > 0) {
+                node.dynamicGroup.remove(node.dynamicGroup.children[0]);
+            }
+            if (node.currentTotal <= 0) return;
+
+            const R = cfg.radius * 0.91;
+            const maxH = cfg.h * 0.88;
+
+            if (currentLens === 'matter') {
+                const ratio = Math.min(1.0, node.currentTotal / cfg.maxCap);
+                const liqH = Math.max(0.18, maxH * ratio);
+
+                const mat = new THREE.MeshStandardMaterial({
+                    color: cfg.matterColor,
+                    emissive: cfg.matterColor,
+                    emissiveIntensity: cfg.isWaste ? 0.25 : 0.65,
+                    roughness: 0.2,
+                    transparent: true,
+                    opacity: cfg.isWaste ? 0.78 : 0.88
+                });
+                const mesh = new THREE.Mesh(new THREE.CylinderGeometry(R, R, liqH, 24), mat);
+                mesh.position.y = BASE_H + liqH / 2 + 0.04;
+                node.dynamicGroup.add(mesh);
+            } else {
+                let curY = BASE_H + 0.04;
+                ["s_19hz", "s_luma", "s_ra", "s_forge"].forEach(k => {
+                    const pkts = node.composition[k];
+                    if (pkts <= 0) return;
+                    const layerH = Math.max(0.12, (pkts / cfg.maxCap) * maxH);
+                    const sCol = SOURCE_COLORS[k].color;
+
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: sCol, emissive: sCol, emissiveIntensity: 0.68,
+                        roughness: 0.18, transparent: true, opacity: 0.92
+                    });
+                    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(R, R, layerH, 24), mat);
+                    mesh.position.y = curY + layerH / 2;
+                    node.dynamicGroup.add(mesh);
+                    curY += layerH;
+                });
+            }
+        }
+
+        function rebuildPipes() {
+            pipeObjects.forEach(p => {
+                while (p.pipeHolder.children.length > 0) {
+                    p.pipeHolder.remove(p.pipeHolder.children[0]);
+                }
+
+                const f = p.config;
+                const srcNode = nodeMap[f.from];
+                const tgtNode = nodeMap[f.to];
+
+                let pkts = 0;
+                if (!f.locked) {
+                    pkts = (f.isWaste || f.to === "refiner" && f.from === "centrifuge")
+                        ? tgtNode.currentTotal
+                        : srcNode.currentTotal;
+                }
+                p.flowPkts = pkts;
+
+                const isMicro = srcNode.config.maxCap === MICRO_CAP && tgtNode.config.maxCap === MICRO_CAP;
+                const rOuter = getPipeRadius(pkts, isMicro);
+
+                const outerTube = new THREE.Mesh(
+                    new THREE.TubeGeometry(p.curve, 24, rOuter, 10, false),
+                    glassMat
+                );
+                p.pipeHolder.add(outerTube);
+
+                if (pkts > 0) {
+                    const col = (currentLens === 'source' && f.srcKey)
+                        ? SOURCE_COLORS[f.srcKey].color
+                        : f.matterColor;
+
+                    const innerTube = new THREE.Mesh(
+                        new THREE.TubeGeometry(p.curve, 24, rOuter * 0.55, 8, false),
+                        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.6 })
+                    );
+                    p.pipeHolder.add(innerTube);
+
+                    p.sprites.forEach(sp => {
+                        sp.sprite.material.color.setHex(col);
+                        sp.sprite.material.opacity = 0.88;
+                        sp.sprite.scale.set(rOuter * 3.4, rOuter * 3.4, 1);
+                    });
+                } else {
+                    p.sprites.forEach(sp => { sp.sprite.material.opacity = 0; });
+                }
+            });
+        }
+
+        // =========================================================================
+        // 6. UI CONTROLLERS & PLACEHOLDER MODULE PANEL MODAL
+        // =========================================================================
+        window.syncCrawler = function(key) {
+            harvestState[key] = HARVEST_YIELD[key];
+            recomputeChain();
+        };
+
+        window.syncAllCrawlers = function() {
+            harvestState.s_19hz = HARVEST_YIELD.s_19hz;
+            harvestState.s_luma = HARVEST_YIELD.s_luma;
+            harvestState.s_ra   = HARVEST_YIELD.s_ra;
+            recomputeChain();
+        };
+
+        window.triggerForgePulse = function() {
+            harvestState.s_forge = Math.min(80, harvestState.s_forge + HARVEST_YIELD.s_forge);
+            recomputeChain();
+        };
+
+        window.resetSimulation = function() {
+            harvestState.s_19hz = 0; harvestState.s_luma = 0;
+            harvestState.s_ra   = 0; harvestState.s_forge = 0;
+            recomputeChain();
+        };
+
+        window.setLensMode = function(mode) {
+            currentLens = mode;
+            document.getElementById('btn-lens-matter').classList.toggle('active-lens', mode === 'matter');
+            document.getElementById('btn-lens-source').classList.toggle('active-lens', mode === 'source');
+            recomputeChain();
+        };
+
+        window.openModuleModal = function(nodeId) {
+            const n = nodeMap[nodeId];
+            if (!n) return;
+            document.getElementById('modal-title').textContent = `${n.config.code} // ${n.config.label.toUpperCase()}`;
+            document.getElementById('modal-type').textContent = `${n.config.modType.toUpperCase()} MODULE — ${n.config.role.toUpperCase()}`;
+            document.getElementById('modal-desc').innerHTML = `
+                <strong>Matter Throughput:</strong> ${n.config.matterName}<br>
+                <strong>Active Packet Load:</strong> ${n.currentTotal} pkts<br><br>
+                <em>[ Dedicated ${n.config.label} Control &amp; Telemetry Panel UI Placeholder — Ready for backend route binding ]</em>
+            `;
+            document.getElementById('module-modal').style.display = 'block';
+        };
+
+        window.closeModuleModal = function() {
+            document.getElementById('module-modal').style.display = 'none';
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModuleModal();
+        });
+
+        recomputeChain();
+
+        // =========================================================================
+        // 7. HOVER TELEMETRY & SUBTLE BESPOKE MACHINE ANIMATIONS
+        // =========================================================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const tooltip = document.getElementById('tooltip');
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects(interactableMeshes);
+
+            if (hits.length > 0) {
+                const cfg = hits[0].object.userData;
+                const node = nodeMap[cfg.id];
+                document.body.style.cursor = 'pointer';
+                tooltip.style.display = 'block';
+                tooltip.style.left = `${e.clientX}px`;
+                tooltip.style.top = `${e.clientY}px`;
+
+                document.getElementById('tt-name').textContent = `${cfg.code} ${cfg.label}`;
+                document.getElementById('tt-name').style.color = '#' + cfg.matterColor.toString(16).padStart(6, '0');
+                document.getElementById('tt-class').textContent = cfg.modType.toUpperCase();
+                document.getElementById('tt-role').textContent = cfg.role;
+                document.getElementById('tt-matter').textContent = cfg.matterName;
+                document.getElementById('tt-pkts').textContent = cfg.modType === "dynamo"
+                    ? `${node.currentTotal} flux (Stateless)`
+                    : `${node.currentTotal} pkts`;
+
+                let bHtml = `<div style="margin-top:5px; border-top:1px solid rgba(212,175,55,0.3); padding-top:4px; font-size:0.7rem; color:#f3c677;">PROVENANCE SHARE:</div>`;
+                ["s_forge", "s_ra", "s_luma", "s_19hz"].forEach(k => {
+                    const sc = SOURCE_COLORS[k];
+                    bHtml += `<div class="layer-bar"><span class="swatch" style="background:${sc.hex}"></span>${sc.name}: <strong style="margin-left:auto; color:#fff;">${node.composition[k]}</strong></div>`;
+                });
+                document.getElementById('tt-breakdown').innerHTML = bHtml;
+            } else {
+                document.body.style.cursor = 'default';
+                tooltip.style.display = 'none';
+            }
+        });
+
+        const clock = new THREE.Clock();
+
+        function projectToScreen(vec3, domEl) {
+            const p = vec3.clone().project(camera);
+            if (p.z > 1) {
+                domEl.style.display = 'none';
+            } else {
+                domEl.style.display = 'block';
+                domEl.style.left = `${(p.x * 0.5 + 0.5) * window.innerWidth}px`;
+                domEl.style.top  = `${(-(p.y * 0.5) + 0.5) * window.innerHeight}px`;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsed = clock.getElapsedTime();
+            controls.update();
+
+            // Subtle, Functional Animations for Processors & Dynamos
+            Object.values(nodeMap).forEach(n => {
+                const ap = n.animParts;
+                const active = n.currentTotal > 0 ? 1.0 : 0.2;
+
+                if (ap.crawlerGear && n.currentTotal > 0) {
+                    ap.crawlerGear.rotation.y += 0.025;
+                }
+                if (ap.rotorCage) {
+                    ap.rotorCage.rotation.y += 0.022 * active;
+                }
+                if (ap.agitator) {
+                    ap.agitator.position.y = Math.sin(elapsed * 3.0) * 0.25 * active;
+                    ap.agitator.rotation.y += 0.015 * active;
+                }
+                if (ap.condenser) {
+                    const s = 1.0 + Math.sin(elapsed * 2.5) * 0.06 * active;
+                    ap.condenser.scale.set(s, s, s);
+                }
+                if (ap.heater) {
+                    ap.heater.material.emissiveIntensity = 0.5 + Math.sin(elapsed * 4.0) * 0.35;
+                }
+                if (ap.forgeCore) {
+                    const p = 0.9 + Math.sin(elapsed * 5.0) * 0.12;
+                    ap.forgeCore.scale.set(p, p, p);
+                    ap.forgeHammer.position.y = 4.0 + Math.abs(Math.sin(elapsed * 3.2)) * 0.45;
+                }
+                if (ap.marketBeam) {
+                    ap.marketBeam.rotation.z = Math.sin(elapsed * 1.8) * 0.14;
+                }
+                if (ap.nexusR1) {
+                    ap.nexusR1.rotation.y += 0.012;
+                    ap.nexusR2.rotation.x += 0.015;
+                    ap.nexusCore.rotation.y -= 0.01;
+                }
+                if (ap.atlasGlobe) {
+                    ap.atlasGlobe.rotation.y += 0.01;
+                }
+                if (ap.calDial1) {
+                    ap.calDial1.rotation.z += 0.006;
+                    ap.calDial2.rotation.z -= 0.012;
+                    ap.calHand.rotation.z  += 0.025;
+                }
+
+                projectToScreen(new THREE.Vector3(n.config.x, n.labelY, n.config.z), n.labelEl);
+            });
+
+            // Pipe Flow Particles
+            pipeObjects.forEach(p => {
+                if (p.flowPkts <= 0) return;
+                p.sprites.forEach(sp => {
+                    sp.t += 0.0028;
+                    if (sp.t > 1) sp.t -= 1;
+                    sp.sprite.position.copy(p.curve.getPointAt(sp.t));
+                });
+            });
+
+            flowLabelList.forEach(fl => projectToScreen(fl.pos, fl.el));
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

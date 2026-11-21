@@ -25,10 +25,10 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin';
 
 /** Icon names drawn by components/PanelTitle.js. */
-type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex';
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear';
 
 /** A panel's definition (backend/services/workspace.py). Its title reads:
  *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
@@ -69,8 +69,11 @@ interface EventRecord {
 
 // --- the refinery (stored values; display names in js/lifecycle.js) ---
 
-/** Raw event review: new (omen, Sensorium) | passed (became an adventure) | ignored (shade, Limbo). */
-type ReviewState = 'new' | 'passed' | 'ignored';
+/**
+ * Raw event review: harvested (flux, in its Harvester) | new (prima materia, in the Centrifuge)
+ * | passed (became an adventure) | ignored (shade, in the Sump).
+ */
+type ReviewState = 'harvested' | 'new' | 'passed' | 'ignored';
 
 /** Adventure phase: Hopper, Assay, Alembic, Crucible, Arena, Treasury, Necropolis, Archive. */
 type Phase =
@@ -140,7 +143,7 @@ interface Roadmap {
     done: string[];
 }
 
-/** Something in the current pool: an omen (Discovery mode) or an adventure. */
+/** Something in the current pool: a raw event (kind 'omen', Discovery mode) or an adventure. */
 type PoolRecord =
     | (EventRecord & { kind: 'omen'; event_id?: undefined; phase?: undefined })
     | (AdventureRecord & { kind: 'adventure' });
@@ -148,7 +151,7 @@ type PoolRecord =
 /** A pool record in the store, plus a stable display color. */
 type PoolItem = PoolRecord & { color: string };
 
-/** adventures = normal use; discovery = reviewing raw events (the Augur). */
+/** adventures = normal use; discovery = reviewing raw events in the Centrifuge. */
 type PoolMode = 'adventures' | 'discovery';
 
 // --- filters (logic in js/filters.js; persisted via /api/state/filters) ---
@@ -174,6 +177,30 @@ interface FilterState {
     /** Hermetic Seal: hide past / Treasury / Necropolis / Archive (Adventures mode). */
     seal: boolean;
     units: 'mi' | 'km';
+    /** What colors the matter (applies at once, never pending). See js/lib/lens.js. */
+    lens: LensKey;
+}
+
+/** "stage" (Matter) or a facet that can color rows. */
+type LensKey = 'stage' | 'source' | 'city' | 'registration' | 'type' | 'pillar' | 'site' | 'contact';
+
+/** One move between signal chain nodes (backend/services/transitions.py). */
+interface TransitionRecord {
+    id: number;
+    at: string;
+    /** event (row_id = event id) | adventure (row_id = adventure id) | link (row_id = object id, ref_id = adventure id) */
+    entity: 'event' | 'adventure' | 'link';
+    row_id: string;
+    ref_id: string | null;
+    from: string;
+    to: string;
+}
+
+/** Packets along one edge over the flows window (GET /api/transitions/flows). */
+interface FlowRecord {
+    from: string;
+    to: string;
+    count: number;
 }
 
 /** pillar | site | contact (js/lifecycle.js OBJECT_TYPES); only sites have a location. */
@@ -217,6 +244,7 @@ interface FeedMessages {
     adventures: { type: 'adventures'; adventures: AdventureRecord[] };
     objects: { type: 'objects'; objects: VObject[] };
     source_status: { type: 'source_status'; source: SourceStatus };
+    transitions: { type: 'transitions'; transitions: TransitionRecord[] };
 }
 
 type FeedMessage = FeedMessages[keyof FeedMessages];
@@ -267,6 +295,16 @@ interface WorkspaceState {
     objects: VObject[];
     /** The object open in the Codex (separate from the adventure selection). */
     selectedObjectId: string | null;
+    /** Recent observed moves, oldest first (at most 500): the twin's packets. */
+    transitions: TransitionRecord[];
+    /** Packets per edge over the last 7 days: the twin's pipe widths. */
+    flows: FlowRecord[];
+    /** Fetch moves since the last one held (or the last 24 h), and the flows. */
+    loadTransitions(): Promise<void>;
+    /** Add moves (from the feed or a fetch); refreshes the flows shortly after, unless told not to. */
+    addTransitions(records: TransitionRecord[], options?: { refreshFlows?: boolean }): void;
+    /** Pick what colors the matter. Applies at once (to the draft too) and is saved. */
+    setLens(lens: LensKey): void;
 
     initWorkspace(): Promise<void>;
     persistLayout(nextTree: LayoutNode | null): void;
@@ -343,6 +381,12 @@ interface WorkspaceState {
     linkObject(adventureId: string, objectId: string): Promise<string | null>;
     unlinkObject(adventureId: string, objectId: string): Promise<string | null>;
     setSourceStatus(source: SourceStatus): void;
-    /** Ask the server to crawl a source; progress arrives as source_status messages. */
+    /** Harvest: crawl the source; new events fill its Harvester (progress: source_status messages). */
     syncSource(name: string): Promise<void>;
+    /** Harvester -> Centrifuge: the source's harvested events show in Discovery. */
+    feedSource(name: string): Promise<void>;
+    /** Centrifuge -> Harvester: the source's events leave Discovery. */
+    siphonSource(name: string): Promise<void>;
+    /** Centrifuge -> Sump: every event still in the Centrifuge is ignored. */
+    purgeCentrifuge(): Promise<void>;
 }

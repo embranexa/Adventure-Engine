@@ -1,9 +1,9 @@
-// Pure helpers for pool items: omens (raw events) and adventures. No React, no store.
+// Pure helpers for pool items: raw events (kind 'omen') and adventures. No React, no store.
 
 import { stageColor } from './lifecycle.js';
 
 /**
- * Turn a list of pool records (omens or adventures) into store state. Items whose
+ * Turn a list of pool records (raw events or adventures) into store state. Items whose
  * data didn't change keep the same object, so memoized components showing them skip
  * re-rendering. The color is the item's stage (matter) color, the same in every view.
  * @param {PoolRecord[]} incoming

@@ -13,6 +13,7 @@ from backend.crawlers import CRAWLERS
 from backend.db.base import engine
 from backend.db.setup import init_db
 from backend.routers import api_router
+from backend.services import transitions  # noqa: F401 - registers the transition recorder
 from backend.services.triage import run_sweeper
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     [%(name)s] %(message)s")

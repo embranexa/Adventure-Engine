@@ -1,10 +1,11 @@
 """WebSocket hub: tracks connected browsers and pushes typed messages to them.
 
 Every message is a JSON object with a "type" field:
-    events         {"events": [...]}  all raw events (omens), on connect and after changes
+    events         {"events": [...]}  all raw events (every review state), on connect and after changes
     adventures     {"adventures": [...]}  all adventures (flattened), on connect and after changes
     objects        {"objects": [...]}  all virtual objects (the Codex), on connect and after changes
-    source_status  {"source": {...}}  a crawler's status changed
+    source_status  {"source": {...}}  a source's harvest status changed
+    transitions    {"transitions": [...]}  moves just committed (services/transitions.py)
 """
 
 import asyncio

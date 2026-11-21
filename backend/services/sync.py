@@ -1,8 +1,10 @@
-"""Runs crawlers in the background and writes their results to the database.
+"""Harvest: runs a source's crawler in the background and stores what it finds.
 
-Flow for one sync:
+Flow for one harvest (a "sync" in the API):
     status -> syncing (broadcast)
     crawler.fetch_events()  -> validate each event -> upsert into `events`
+        events never seen before go into the source's Harvester ("harvested");
+        ones already known are refreshed and keep their review state
     status -> idle | failed (broadcast), then broadcast the full event list
 """
 
@@ -18,10 +20,11 @@ from sqlalchemy.dialects.sqlite import insert
 
 from backend.crawlers import CRAWLERS
 from backend.db.base import SessionLocal, utcnow
-from backend.db.models import EVENT_FIELDS, Event, EventSource
+from backend.db.models import EVENT_FIELDS, OUTSIDE_NODE, Event, EventSource, harvester_node
 from backend.db.queries import get_source
 from backend.schemas.events import EventIn
 from backend.services.hub import hub
+from backend.services.transitions import record_many
 from backend.services.triage import broadcast_pools, sweep_missed
 
 log = logging.getLogger(__name__)
@@ -68,13 +71,16 @@ def _validate(raw_events: list[dict[str, Any]], name: str) -> list[EventIn]:
     return list(valid.values())
 
 
-async def _upsert(name: str, events: list[EventIn]) -> int:
-    """Insert new events and refresh existing ones (prices, guest counts change)."""
+async def _upsert(name: str, events: list[EventIn]) -> tuple[int, int]:
+    """Insert new events (into the Harvester) and refresh existing ones (prices, guest
+    counts change). Returns (stored, new)."""
     if not events:
-        return 0
+        return 0, 0
     now = utcnow()
     async with SessionLocal() as session:
         source_id = await session.scalar(select(EventSource.id).where(EventSource.name == name))
+        known = set((await session.scalars(select(Event.api_id).where(
+            Event.source_id == source_id, Event.api_id.in_([ev.api_id for ev in events])))).all())
         rows = [
             {
                 **ev.model_dump(mode="python", include=set(EVENT_FIELDS)),
@@ -83,18 +89,22 @@ async def _upsert(name: str, events: list[EventIn]) -> int:
                 "source_id": source_id,
                 "first_seen": now,
                 "updated_at": now,
+                "review": "harvested",  # new rows only: the conflict update below leaves it
             }
             for ev in events
         ]
         stmt = insert(Event).values(rows)
         stmt = stmt.on_conflict_do_update(
             index_elements=["source_id", "api_id"],
-            # keep id and first_seen; refresh everything the crawler provides
+            # keep id, first_seen and review; refresh everything the crawler provides
             set_={f: stmt.excluded[f] for f in (*EVENT_FIELDS, "updated_at")},
         )
         await session.execute(stmt)
+        # the generated ids of new rows are their real ids (known rows kept their old ones)
+        fresh = [r["id"] for r in rows if r["api_id"] not in known]
+        record_many(session, "event", fresh, OUTSIDE_NODE, harvester_node(name))
         await session.commit()
-    return len(rows)
+    return len(rows), len(fresh)
 
 
 async def sync_source(name: str) -> None:
@@ -105,13 +115,13 @@ async def sync_source(name: str) -> None:
         try:
             async with httpx.AsyncClient(timeout=20, headers={"User-Agent": USER_AGENT}) as client:
                 raw_events = await crawler.fetch_events(client)
-            count = await _upsert(name, _validate(raw_events, name))
+            count, fresh = await _upsert(name, _validate(raw_events, name))
         except Exception as e:  # noqa: BLE001 - any crawler failure becomes a 'failed' status
             log.exception("[%s] sync failed", name)
             await _set_status(name, status="failed", last_error=f"{type(e).__name__}: {e}")
             return
 
-        log.info("[%s] sync done: %d events stored (%d fetched)", name, count, len(raw_events))
+        log.info("[%s] harvest done: %d new, %d stored (%d fetched)", name, fresh, count, len(raw_events))
         await _set_status(name, status="idle", last_sync_time=utcnow(), last_error=None)
         # event times may have changed: check for missed adventures, then send both pools
         # (adventures read their event's fields, so they change too)

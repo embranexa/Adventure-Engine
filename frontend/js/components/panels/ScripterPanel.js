@@ -31,7 +31,7 @@ export function ScripterPanel() {
         return html`
             <div className="panel-body scripter">
                 <div className="nc-empty">
-                    ${item ? 'Omens have no roadmap' : 'Nothing selected'}
+                    ${item ? 'Raw events have no roadmap' : 'Nothing selected'}
                     <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to script its actions'}</small>
                 </div>
             </div>

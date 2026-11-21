@@ -11,6 +11,8 @@ Rules:
       own where fields (crawled events keep their source's where; see queries.py)
 
 Every change is broadcast: `objects`, and `adventures` when links or names changed.
+Links and unlinks are logged as transitions (codex <-> refiner); links removed with a
+delete statement are recorded here, since the automatic recorder only sees ORM objects.
 """
 
 import uuid
@@ -21,10 +23,11 @@ from sqlalchemy import delete, select
 
 from backend.db.base import SessionLocal
 from backend.db.models import (
-    GEO_OBJECT_TYPES, OBJECT_TYPES, WHEN_WHERE_TYPES, AdventureObject, VirtualObject,
+    CODEX_NODE, GEO_OBJECT_TYPES, OBJECT_TYPES, PHASE_NODES, WHEN_WHERE_TYPES, AdventureObject, VirtualObject,
 )
 from backend.db.queries import list_adventures, list_objects, object_to_dict
 from backend.services.hub import hub
+from backend.services.transitions import record
 from backend.services.triage import NotFound, _get_adventure
 
 LIMITS = {"name": 200, "description": 20_000, "address": 500, "city": 200}
@@ -95,6 +98,16 @@ def _apply(obj: VirtualObject, changes: dict[str, Any]) -> None:
         obj.details = details
 
 
+async def _delete_links(session, *where) -> None:
+    """Delete the links matching `where`, recording each as an unlink (refiner -> codex)."""
+    links = (await session.execute(
+        select(AdventureObject.adventure_id, AdventureObject.object_id).where(*where))).all()
+    for adventure_id, object_id in links:
+        record(session, "link", object_id, PHASE_NODES["classifying"], CODEX_NODE, ref_id=adventure_id)
+    if links:
+        await session.execute(delete(AdventureObject).where(*where))
+
+
 async def _get_object(session, object_id: uuid.UUID) -> VirtualObject:
     obj = await session.get(VirtualObject, object_id)
     if not obj:
@@ -134,7 +147,7 @@ async def update_object(object_id: uuid.UUID, changes: dict[str, Any]) -> dict[s
 async def delete_object(object_id: uuid.UUID) -> None:
     async with SessionLocal() as session:
         obj = await _get_object(session, object_id)
-        await session.execute(delete(AdventureObject).where(AdventureObject.object_id == object_id))
+        await _delete_links(session, AdventureObject.object_id == object_id)
         await session.delete(obj)
         await session.commit()
     await _broadcast(adventures_too=True)
@@ -147,8 +160,8 @@ async def link(adventure_id: uuid.UUID, object_id: uuid.UUID) -> None:
         if obj.type == "site" and adventure.type in WHEN_WHERE_TYPES:
             # an event happens at one site: replace any other
             others = select(VirtualObject.id).where(VirtualObject.type == "site", VirtualObject.id != obj.id)
-            await session.execute(delete(AdventureObject).where(
-                AdventureObject.adventure_id == adventure_id, AdventureObject.object_id.in_(others)))
+            await _delete_links(session, AdventureObject.adventure_id == adventure_id,
+                                AdventureObject.object_id.in_(others))
             if adventure.event_id is None:  # hand-made: the site is its where now
                 for field in ("venue", "address", "city", "lat", "lon"):
                     setattr(adventure, field, None)
@@ -162,8 +175,8 @@ async def link(adventure_id: uuid.UUID, object_id: uuid.UUID) -> None:
 async def unlink(adventure_id: uuid.UUID, object_id: uuid.UUID) -> None:
     async with SessionLocal() as session:
         await _get_adventure(session, adventure_id)
-        await session.execute(delete(AdventureObject).where(
-            AdventureObject.adventure_id == adventure_id, AdventureObject.object_id == object_id))
+        await _delete_links(session, AdventureObject.adventure_id == adventure_id,
+                            AdventureObject.object_id == object_id)
         await session.commit()
     await _broadcast(adventures_too=True)
 

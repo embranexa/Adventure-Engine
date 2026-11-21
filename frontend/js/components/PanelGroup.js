@@ -93,8 +93,8 @@ function PanelGroupImpl({ node }) {
         if (panelId) dockPanel(panelId, node.id, zone);
     };
 
-    // In Discovery the generic input word becomes "omen"
-    const input = meta && meta.flow[0] === 'matter' && mode === 'discovery' ? 'omen' : undefined;
+    // In Discovery the generic input word becomes "prima materia"
+    const input = meta && meta.flow[0] === 'matter' && mode === 'discovery' ? 'prima materia' : undefined;
 
     return html`
         <div

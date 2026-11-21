@@ -22,11 +22,11 @@ stages are vessels or places.
 
 | Stage | Module | Matter | Stored value | Moves here |
 |---|---|---|---|---|
-| crawling | **Sensorium** | **omen** | raw: `new` | when a crawler syncs it |
-| discovery review | **Augur** | judges omens | — | (Discovery mode) |
-| rejected | **Limbo** | **shade** | raw: `ignored` | ignore in Discovery |
+| harvested | **Harvester** (one per source) | **flux** | raw: `harvested` | Harvest (a sync); only events never harvested before |
+| in review | **Centrifuge** | **prima materia** | raw: `new` | Feed from a harvester (Siphon sends them back) |
+| rejected | **Sump** | **shade** | raw: `ignored` | ignore in Discovery, or Purge the Centrifuge |
 | passed, waiting | **Hopper** | **ore** | `queued` | pass in Discovery |
-| classification | **Nexus** | **essence** | `classifying` | by hand |
+| classification | **Refiner** | **essence** | `classifying` | by hand |
 | decomposition | **Alembic** | **distillate** | `decomposing` | by hand |
 | construction | **Crucible** | **alloy** | `constructing` | by hand |
 | consumption | **Arena** | **animus** | `consuming` | by hand |
@@ -38,26 +38,29 @@ stages are vessels or places.
   names can change later without touching stored data.
 - **Arena** is the one stage that isn't a machine: it's real life, where the refined
   adventure leaves the factory.
-- Read as a journey: omen (Sensorium) → judged by the Augur → ore (Hopper) → essence
-  (Nexus) → distillate (Alembic) → alloy (Crucible) → animus (Arena) → artifact
-  (Treasury) → relic (Archive). Side paths: shade (Limbo), vestige (Necropolis).
-- The future analyzer (the **Spectrometer**) can chart the count of adventures per stage.
-- Module ↔ panel: Sensorium = crawler and sync, Augur = Discovery mode and inbox,
-  Nexus = classifier, Alembic = action roadmap, Crucible = quest log, Arena = real life.
-- Matter colors run cold to warm along the lifecycle: omen slate, ore blue, essence cyan,
+- Read as a journey: flux (Harvester) → prima materia (Centrifuge, judged in Discovery)
+  → ore (Hopper) → essence (Refiner) → distillate (Alembic) → alloy (Crucible) → animus
+  (Arena) → artifact (Treasury) → relic (Archive). Side paths: shade (Sump), vestige
+  (Necropolis).
+- The **Signal Chain** twin draws every stage as a machine and every move as a packet:
+  see `resources/signal chain digital twin/BUILD_PLAN.md`.
+- Module ↔ panel: Harvesters and Centrifuge = Discovery's harvester bar (later the twin),
+  Centrifuge = Discovery mode, Refiner = node card (classification), Nexus = filters and
+  lens, Alembic = action roadmap, Crucible = quest log, Arena = real life.
+- Matter colors run cold to warm along the lifecycle: flux steel, prima materia slate, ore blue, essence cyan,
   distillate amber, alloy orange, animus red, artifact violet; side paths are desaturated
   (shade grey, vestige ash, relic bronze). Every view colors items by stage
   (`frontend/js/lifecycle.js`, `frontend/styles.css`).
 
 ## 3. Core objects
 
-### Raw events (omens)
+### Raw events (flux, prima materia)
 Everything the crawlers pull in (Luma, Resident Advisor, ...), stored separately from
-adventures, with a review state: `new` (omen in the Sensorium), `passed` (became an
-adventure) or `ignored` (shade in Limbo).
+adventures, with a review state: `harvested` (flux in its Harvester), `new` (prima materia
+in the Centrifuge), `passed` (became an adventure) or `ignored` (shade in the Sump).
 
 - Re-syncing never resets a review: events are matched by (source, source id).
-- Most raw events are expected to end up in Limbo.
+- Most raw events are expected to end up in the Sump.
 
 ### Adventures
 A separate table: events that passed through, plus adventures created by hand.
@@ -89,14 +92,19 @@ lifecycle phase. More explicit status fields come later.
 ## 4. State changes
 
 ```
-raw event:  new ──pass──▶ passed ◀──revive── ignored
-             │              │                   ▲
-             │              └───────kill────────┤
-             └─────────────ignore───────────────┘
+raw event:  harvested ──feed──▶ new ──pass──▶ passed ◀──revive── ignored
+                ▲               │ │              │                   ▲
+                └────siphon─────┘ │              └───────kill────────┤
+                                  └──────────ignore / purge──────────┘
 ```
 
-- **Pass** (omen → ore): creates the linked adventure in the Hopper.
-- **Ignore** (omen → shade): the raw event goes to Limbo.
+- **Harvest** (→ flux): a sync; events never harvested before land in their source's
+  Harvester. Known events are refreshed and keep their state.
+- **Feed** / **Siphon** (flux ⇄ prima materia): move a source's events into the
+  Centrifuge (shown in Discovery) or back out.
+- **Purge** (prima materia → shade): everything left in the Centrifuge goes to the Sump.
+- **Pass** (prima materia → ore): creates the linked adventure in the Hopper.
+- **Ignore** (prima materia → shade): the raw event goes to the Sump.
 - **Kill** (any adventure → vestige): the adventure moves to the Necropolis and its raw
   event becomes ignored. Nothing is deleted: its fields (stats, links) and the phase it
   was in are kept. Kill works from any stage.
@@ -104,7 +112,7 @@ raw event:  new ──pass──▶ passed ◀──revive── ignored
   the Necropolis, that adventure is restored to its previous phase with all its data;
   otherwise a new adventure is created in the Hopper, the same as a first pass.
 - **Missed events**: an adventure whose event ends before it reaches the Arena (still in
-  the Hopper, Nexus, Alembic or Crucible) moves to the Necropolis automatically.
+  the Hopper, Refiner, Alembic or Crucible) moves to the Necropolis automatically.
 - **Decommission** (artifact → relic): by hand, for completed adventures old enough to
   be irrelevant.
 - Pass, ignore, kill and revive will also work **in bulk on a filtered set** (later).
@@ -113,12 +121,12 @@ raw event:  new ──pass──▶ passed ◀──revive── ignored
 
 - One global switch flips between **two separate pools**:
   - **Adventures** (normal use): only adventures. Raw events are never in this pool.
-  - **Discovery** (the Augur): only raw events. Shows omens (`new`) by default, with a
+  - **Discovery** (the Centrifuge): only raw events. Shows prima materia (`new`) by default, with a
     toggle to also show shades (`ignored`) so they can be revived.
 - Filters work the same way in both modes, applied to that mode's pool.
 - In Discovery, the node card gets **Pass** / **Ignore** / **Revive** buttons; in
   Adventures, it gets **Kill**.
-- An **inbox indicator** shows the number of omens from recent syncs and the time of the
+- An **inbox indicator** shows the number of events in the Centrifuge and the time of the
   last sync.
 
 ## 6. Filters

@@ -11,11 +11,11 @@ from typing import Any
 PANELS_METADATA = {
     "node": {
         "id": "node", "kind": "node", "icon": "eye",
-        "name": "Refiner", "question": "what", "flow": ["matter", "details"],
+        "name": "Refiner", "question": "why", "flow": ["ore", "essence"],
     },
     "classifier": {
         "id": "classifier", "kind": "classifier", "icon": "flask",
-        "name": "Nexus", "question": "why", "flow": ["ore", "essence"],
+        "name": "Nexus", "question": "which", "flow": ["matter", "light"],
     },
     "map": {
         "id": "map", "kind": "map", "icon": "compass",
@@ -41,6 +41,10 @@ PANELS_METADATA = {
         "id": "quests", "kind": "quests", "icon": "scroll",
         "name": "Crucible", "question": "now", "flow": ["alloy", "animus"],
     },
+    "signal_chain": {
+        "id": "signal_chain", "kind": "twin", "icon": "gear",
+        "name": "Signal Chain", "question": "all", "flow": ["flux", "relic"],
+    },
 }
 
 DEFAULT_LAYOUT_TREE: dict[str, Any] = {
@@ -54,7 +58,7 @@ DEFAULT_LAYOUT_TREE: dict[str, Any] = {
         "type": "split",
         "direction": "horizontal",
         "ratio": 50,
-        "first": {"id": "leaf-classifier", "type": "leaf", "tabs": ["classifier", "alembic"], "activeTab": "alembic"},
+        "first": {"id": "leaf-classifier", "type": "leaf", "tabs": ["classifier", "alembic", "signal_chain"], "activeTab": "alembic"},
         "second": {
             "id": "split-map-calendar",
             "type": "split",

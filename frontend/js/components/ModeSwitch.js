@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 
@@ -13,15 +13,81 @@ function ago(iso, now) {
 }
 
 /**
- * Adventures / Discovery switch, the inbox (omens waiting for review + last sync),
- * and, in Discovery, the toggle for showing shades (ignored events) to revive.
+ * Per-source counts of raw events by review state.
+ * @param {EventRecord[]} events @returns {Record<string, Partial<Record<ReviewState, number>>>}
+ */
+function countBySource(events) {
+    /** @type {Record<string, Partial<Record<ReviewState, number>>>} */
+    const out = {};
+    for (const e of events) {
+        const row = (out[e.source] ??= {});
+        row[e.review] = (row[e.review] ?? 0) + 1;
+    }
+    return out;
+}
+
+/**
+ * Discovery's controls for the net (until the Signal Chain twin has them in 3D): each
+ * source's Harvester (harvest, feed into the Centrifuge, siphon back) and the
+ * Centrifuge's purge into the Sump.
+ */
+function HarvesterBar() {
+    const sources = useWorkspaceStore((s) => s.sources);
+    const rawEvents = useWorkspaceStore((s) => s.rawEvents);
+    const syncSource = useWorkspaceStore((s) => s.syncSource);
+    const feedSource = useWorkspaceStore((s) => s.feedSource);
+    const siphonSource = useWorkspaceStore((s) => s.siphonSource);
+    const purgeCentrifuge = useWorkspaceStore((s) => s.purgeCentrifuge);
+
+    const counts = useMemo(() => countBySource(rawEvents), [rawEvents]);
+    const spinning = rawEvents.reduce((n, e) => n + (e.review === 'new' ? 1 : 0), 0);
+
+    const purge = () => {
+        if (spinning && window.confirm(`Purge ${spinning} event${spinning === 1 ? '' : 's'} from the Centrifuge into the Sump? (Each can be revived.)`)) {
+            purgeCentrifuge();
+        }
+    };
+
+    return html`
+        <div className="harvesters" role="group" aria-label="Harvesters">
+            ${Object.values(sources).map((src) => {
+                const flux = counts[src.name]?.harvested ?? 0;
+                const fed = counts[src.name]?.new ?? 0;
+                const syncing = src.status === 'syncing';
+                return html`
+                    <div key=${src.name} className=${`hv ${src.status}`}
+                        title=${src.status === 'failed' ? `Last harvest failed: ${src.last_error ?? ''}` : `${flux} flux waiting · ${fed} in the Centrifuge`}>
+                        <span className="hv-name">${src.name}</span>
+                        <b className="hv-count">${flux}</b>
+                        <button className="btn hv-btn" disabled=${syncing} onClick=${() => syncSource(src.name)}
+                            title="Crawl the source: events not harvested before fill this harvester">${syncing ? 'Harvesting…' : 'Harvest'}</button>
+                        <button className="btn hv-btn" disabled=${!flux} onClick=${() => feedSource(src.name)}
+                            title="Pour this harvester's events into the Centrifuge, to review them">Feed ⟶</button>
+                        <button className="btn hv-btn" disabled=${!fed} onClick=${() => siphonSource(src.name)}
+                            title="Draw this source's events back out of the Centrifuge">⟵ Siphon</button>
+                    </div>
+                `;
+            })}
+            <div className="hv centrifuge" title="Events being reviewed in Discovery">
+                <span className="hv-name">Centrifuge</span>
+                <b className="hv-count">${spinning}</b>
+                <button className="btn hv-btn" disabled=${!spinning} onClick=${purge}
+                    title="Send everything left in the Centrifuge to the Sump">Purge</button>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Adventures / Discovery switch, the inbox (prima materia in the Centrifuge + last
+ * harvest), and, in Discovery, the harvesters and the toggle for showing shades.
  */
 export function ModeSwitch() {
     const mode = useWorkspaceStore((s) => s.mode);
     const setMode = useWorkspaceStore((s) => s.setMode);
     const showShades = useWorkspaceStore((s) => s.showShades);
     const toggleShades = useWorkspaceStore((s) => s.toggleShades);
-    const omenCount = useWorkspaceStore((s) => s.rawEvents.reduce((n, e) => n + (e.review === 'new' ? 1 : 0), 0));
+    const spinning = useWorkspaceStore((s) => s.rawEvents.reduce((n, e) => n + (e.review === 'new' ? 1 : 0), 0));
     const adventureCount = useWorkspaceStore((s) => s.adventures.length);
     const lastSync = useWorkspaceStore((s) => Object.values(s.sources)
         .map((src) => src.last_sync_time)
@@ -46,14 +112,15 @@ export function ModeSwitch() {
             <button
                 className=${`mode-btn discovery ${mode === 'discovery' ? 'active' : ''}`}
                 onClick=${() => setMode('discovery')}
-                title=${`Review new omens (last sync ${ago(lastSync, now)})`}
+                title=${`Review the prima materia in the Centrifuge (last harvest ${ago(lastSync, now)})`}
             >
                 Discovery
-                <span className=${`inbox ${omenCount ? 'has-omens' : ''}`}>${omenCount} omen${omenCount === 1 ? '' : 's'}</span>
-                <small>synced ${ago(lastSync, now)}</small>
+                <span className=${`inbox ${spinning ? 'has-prima' : ''}`}>${spinning} in centrifuge</span>
+                <small>harvested ${ago(lastSync, now)}</small>
             </button>
         </div>
         ${mode === 'discovery' && html`
+            <${HarvesterBar} />
             <label className="shade-toggle" title="Also show ignored events (shades) so they can be revived">
                 <input type="checkbox" checked=${showShades} onChange=${toggleShades} />
                 Show shades

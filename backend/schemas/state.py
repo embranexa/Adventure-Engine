@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, model_validator
 
 FilterMode = Literal["include", "exclude"]
 FacetKey = Literal["source", "city", "registration", "type", "phase", "review", "pillar", "site", "contact"]
+# what colors the matter: "stage" (Matter) or a facet (frontend/js/lib/lens.js)
+LensKey = Literal["stage", "source", "city", "registration", "type", "pillar", "site", "contact"]
 
 
 class DateRange(BaseModel):
@@ -42,4 +44,5 @@ class FilterState(BaseModel):
     ring: Ring | None = None
     seal: bool = True  # Hermetic Seal (Adventures mode)
     units: Literal["mi", "km"] = "mi"
+    lens: LensKey = "stage"  # applies at once (never pending): it changes colors, not the subset
 

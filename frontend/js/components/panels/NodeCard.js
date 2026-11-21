@@ -153,7 +153,8 @@ function ItemActions({ item }) {
     let controls;
     if (item.kind === 'omen') {
         controls = item.review === 'ignored'
-            ? html`<button className="btn nc-act" onClick=${() => reviveEvent(item.id)}>↺ Revive → Omen</button>`
+            ? html`<button className="btn nc-act" onClick=${() => reviveEvent(item.id)}
+                title="Becomes an adventure again: back where it was killed, else ore">↺ Revive</button>`
             : html`
                 <button className="btn nc-act pass" onClick=${() => passEvent(item.id)} title="Becomes an adventure: ore">✦ Pass → Ore</button>
                 <button className="btn nc-act" onClick=${() => ignoreEvent(item.id)} title="Rejected, a shade; can be revived later">✕ Ignore → Shade</button>
@@ -248,7 +249,7 @@ export function NodeCard() {
                 : html`
                     <div className="nc-empty">Nothing selected
                         <small>${mode === 'discovery'
-                            ? 'Select an omen to review it, or make an adventure from scratch'
+                            ? 'Select an event to review it, or make an adventure from scratch'
                             : 'Select an adventure in the Nexus, Atlas or Calendar, or make one from scratch'}</small>
                         <${NewAdventureButtons} />
                         ${actionError && html`<div className="nc-error">${actionError}</div>`}

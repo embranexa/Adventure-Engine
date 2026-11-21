@@ -194,7 +194,7 @@ export function AlembicPanel() {
 
             ${status === 'ready' && !adventure && html`
                 <div className="nc-empty alm-overlay-empty">
-                    ${item ? 'Omens have no roadmap' : 'Nothing selected'}
+                    ${item ? 'Raw events have no roadmap' : 'Nothing selected'}
                     <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to break it into actions'}</small>
                 </div>
             `}

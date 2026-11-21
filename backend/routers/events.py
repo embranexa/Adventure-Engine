@@ -1,4 +1,4 @@
-"""Raw crawled events ("omens") and their review: pass, ignore, revive."""
+"""Raw harvested events and their review: pass, ignore, revive, and purging the centrifuge."""
 
 import uuid
 
@@ -24,7 +24,7 @@ async def get_events(session: AsyncSession = Depends(get_session)):
 async def clear_events(session: AsyncSession = Depends(get_session)):
     """Delete raw events that have no adventure (those keep their event data).
 
-    Mainly for development: the next sync brings them back as new omens.
+    Mainly for development: the next harvest brings them back into their harvesters.
     """
     linked = select(Adventure.event_id).where(Adventure.event_id.is_not(None))
     result = await session.execute(delete(Event).where(Event.id.not_in(linked)))
@@ -33,16 +33,22 @@ async def clear_events(session: AsyncSession = Depends(get_session)):
     return {"deleted": result.rowcount}
 
 
+@router.post("/purge")
+async def purge_centrifuge():
+    """Centrifuge -> Sump: every event still in the centrifuge (new) becomes ignored."""
+    return {"moved": await triage.purge_centrifuge()}
+
+
 @router.post("/{event_id}/pass")
 async def pass_event(event_id: uuid.UUID):
-    """Omen -> ore: creates an adventure in the Hopper."""
+    """Prima materia -> ore: creates an adventure in the Hopper."""
     with triage_errors():
         return {"adventure_id": await triage.pass_event(event_id)}
 
 
 @router.post("/{event_id}/ignore")
 async def ignore_event(event_id: uuid.UUID):
-    """Omen -> shade (Limbo)."""
+    """Prima materia -> shade (Sump)."""
     with triage_errors():
         await triage.ignore_event(event_id)
     return {"status": "ignored"}

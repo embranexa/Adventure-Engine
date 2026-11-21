@@ -11,7 +11,7 @@
 import { ADVENTURE_TYPES, OBJECT_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
 
 /** @type {FilterState} */
-export const DEFAULT_FILTERS = { facets: {}, date_range: null, ring: null, seal: true, units: 'mi' };
+export const DEFAULT_FILTERS = { facets: {}, date_range: null, ring: null, seal: true, units: 'mi', lens: 'stage' };
 
 /** Value used for items that have no value for a facet (e.g. no city). */
 export const UNKNOWN = '∅';
@@ -224,7 +224,7 @@ export function formatDistance(km, units) {
  * @param {FilterState} draft @param {FilterState} applied
  */
 export function pendingChanges(draft, applied) {
-    let n = draft.seal === applied.seal ? 0 : 1;
+    let n = draft.seal === applied.seal ? 0 : 1; // the lens and ranges apply at once: never pending
     const keys = new Set([...Object.keys(draft.facets), ...Object.keys(applied.facets)]);
     for (const k of keys) {
         const a = draft.facets[/** @type {FacetKey} */ (k)] ?? {}, b = applied.facets[/** @type {FacetKey} */ (k)] ?? {};

@@ -137,6 +137,25 @@ function startFeed(get) {
     feed.on('adventures', (msg) => get().setAdventures(msg.adventures));
     feed.on('objects', (msg) => get().setObjects(msg.objects));
     feed.on('source_status', (msg) => get().setSourceStatus(msg.source));
+    feed.on('transitions', (msg) => get().addTransitions(msg.transitions));
+}
+
+/** How many recent transitions the store keeps (the twin replays these). */
+const MAX_TRANSITIONS = 500;
+const FLOWS_REFRESH_MS = 1500;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let flowsTimer;
+
+/** Fetch JSON, or null on any failure (logged). @param {string} url */
+async function getJson(url) {
+    try {
+        const res = await fetch(url);
+        if (res.ok) return await res.json();
+        console.error(`[${url}]`, res.status, await res.text());
+    } catch (err) {
+        console.error(`[${url}] request failed`, err);
+    }
+    return null;
 }
 
 // --- the pool: what every view shows, depending on the mode ---
@@ -352,6 +371,8 @@ const workspaceStore = (set, get) => ({
     visibleItems: [],
     objects: [],
     selectedObjectId: null,
+    transitions: [],
+    flows: [],
 
     initWorkspace: async () => {
         try {
@@ -378,7 +399,41 @@ const workspaceStore = (set, get) => ({
         // items become past (and fall behind the Hermetic Seal) as time passes
         setInterval(() => set((state) => withVisible(state, {})), 60_000);
         startFeed(get);
-        feed.start((feedStatus) => set({ feedStatus }));
+        feed.start((feedStatus) => {
+            // (re)connected: catch up on moves made while the socket was down
+            if (feedStatus.state === 'online' && get().feedStatus.state !== 'online') get().loadTransitions();
+            set({ feedStatus });
+        });
+    },
+
+    // --- the transitions log (the Signal Chain's packets and pipe flows) ---
+
+    loadTransitions: async () => {
+        const last = get().transitions.at(-1)?.id;
+        const [recent, flows] = await Promise.all([
+            getJson(last == null ? '/api/transitions' : `/api/transitions?since_id=${last}`),
+            getJson('/api/transitions/flows'),
+        ]);
+        if (recent) get().addTransitions(recent, { refreshFlows: false });
+        if (flows) set({ flows });
+    },
+
+    addTransitions: (records, { refreshFlows = true } = {}) => {
+        if (!records.length) return;
+        set((state) => {
+            const known = new Set(state.transitions.map((t) => t.id));
+            const fresh = records.filter((t) => !known.has(t.id));
+            if (!fresh.length) return {};
+            const transitions = [...state.transitions, ...fresh].sort((a, b) => a.id - b.id).slice(-MAX_TRANSITIONS);
+            return { transitions };
+        });
+        if (refreshFlows) {
+            clearTimeout(flowsTimer);
+            flowsTimer = setTimeout(async () => {
+                const flows = await getJson('/api/transitions/flows');
+                if (flows) set({ flows });
+            }, FLOWS_REFRESH_MS);
+        }
     },
 
     // --- events & sources ---
@@ -443,6 +498,14 @@ const workspaceStore = (set, get) => ({
     discardDraft: () => {
         set((state) => ({ draftFilters: { ...state.filters } }));
         saveDraft(get);
+    },
+
+    setLens: (lens) => {
+        set((state) => (state.filters.lens === lens ? {} : {
+            filters: { ...state.filters, lens },
+            draftFilters: { ...state.draftFilters, lens },
+        }));
+        saveApplied(get); saveDraft(get);
     },
 
     setDateRange: (range) => {
@@ -694,6 +757,18 @@ const workspaceStore = (set, get) => ({
         } catch (err) {
             console.error(`[sync:${name}] request failed`, err);
         }
+    },
+
+    feedSource: async (name) => {
+        await callAction(set, `/api/sources/${encodeURIComponent(name)}/feed`);
+    },
+
+    siphonSource: async (name) => {
+        await callAction(set, `/api/sources/${encodeURIComponent(name)}/siphon`);
+    },
+
+    purgeCentrifuge: async () => {
+        await callAction(set, '/api/events/purge');
     },
 
     // Updates the tree immediately; the server PUT is debounced so rapid

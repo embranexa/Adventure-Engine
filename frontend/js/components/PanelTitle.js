@@ -10,6 +10,7 @@ const ICON_PATHS = {
     alembic: html`<circle cx="5.8" cy="10" r="4.2"></circle><path d="M8.4 6.7L14.6 3.6v3.2"></path><path d="M2 10.6h7.6"></path>`,
     quill: html`<path d="M13.8 2.2C9.6 2.6 5.8 5.8 4.6 11.4l-.9 2.4"></path><path d="M13.8 2.2c-.4 4.4-3.6 7.4-8.4 8.6"></path><path d="M7.4 8.6l2.4.2"></path>`,
     codex: html`<path d="M3 2.5h7.5a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2z"></path><path d="M3 11.5a2 2 0 0 1 2-2h7.5"></path><path d="M7.8 4.6l1 1.9-1 1.9-1-1.9z"></path>`,
+    gear: html`<circle cx="8" cy="8" r="2.3"></circle><path d="M8 1.6v2M8 12.4v2M1.6 8h2M12.4 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4"></path><circle cx="8" cy="8" r="4.4"></circle>`,
     scroll: html`<path d="M4.5 2.5h8a1.6 1.6 0 0 1 0 3.2H11v7.6a1.6 1.6 0 0 1-1.6 1.6H3.2a1.6 1.6 0 0 1 0-3.2h1.3z"></path><path d="M6.6 7.2h2.8M6.6 9.8h2.8"></path>`,
 };
 
@@ -63,7 +64,7 @@ export function Corners() {
 /**
  * Two-line panel title: [icon] NAME / QUESTION · INPUT ⟶ OUTPUT.
  * Input/output words that name a matter take its color.
- * @param {{ meta: PanelMeta, input?: string }} props  `input` overrides the meta (e.g. "omen" in Discovery)
+ * @param {{ meta: PanelMeta, input?: string }} props  `input` overrides the meta (e.g. "prima materia" in Discovery)
  */
 export function PanelTitle({ meta, input }) {
     const [inWord, outWord] = [input ?? meta.flow[0], meta.flow[1]];

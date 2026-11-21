@@ -5,7 +5,8 @@ import { MAIN_ROUTE, PHASE_STAGES, REVIEW_STAGES } from '../lifecycle.js';
 
 /**
  * The analytics strip under the top bar: one vial per stage, filled by how many
- * items are there, named by matter. Adventures mode counts phases; Discovery counts omens and shades.
+ * items are there, named by matter. Adventures mode counts phases; Discovery counts flux,
+ * prima materia and shades.
  */
 export function MatterGauge() {
     const mode = useWorkspaceStore((s) => s.mode);
@@ -16,7 +17,7 @@ export function MatterGauge() {
         /** @type {{ key: string, name: string, count: number, color: string, deep: string }[]} */
         let list;
         if (mode === 'discovery') {
-            list = /** @type {ReviewState[]} */ (['new', 'ignored']).map((r) => ({
+            list = /** @type {ReviewState[]} */ (['harvested', 'new', 'ignored']).map((r) => ({
                 key: r, name: REVIEW_STAGES[r].matter, color: REVIEW_STAGES[r].color, deep: REVIEW_STAGES[r].deep,
                 count: rawEvents.filter((e) => e.review === r).length,
             }));

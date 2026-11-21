@@ -1,4 +1,5 @@
-"""Database startup: create tables, add new columns, register crawler sources, migrate old data."""
+"""Database startup: create tables, add new columns, register sources, migrate old data,
+backfill the transitions log (once)."""
 
 import logging
 
@@ -57,6 +58,9 @@ async def init_db(sources: dict[str, str]) -> None:
         await session.commit()
 
     await _migrate_saved_places()
+
+    from backend.services.transitions import backfill  # avoids an import cycle
+    await backfill()
 
 
 async def _migrate_saved_places() -> None:

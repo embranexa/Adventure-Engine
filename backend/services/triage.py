@@ -1,27 +1,36 @@
 """Moving matter through the refinery: review raw events and change adventure phases.
 
 Rules (resources/classifier.md, section 4):
+    feed     a source's harvested events -> new (Harvester -> Centrifuge)
+    siphon   a source's new events       -> harvested (Centrifuge -> Harvester)
+    purge    every new event             -> ignored (Centrifuge -> Sump)
     pass     new raw event            -> passed;  new adventure in the Hopper (queued)
-    ignore   new raw event            -> ignored (Limbo)
+    ignore   new raw event            -> ignored (Sump)
     revive   ignored raw event        -> passed;  its killed adventure is restored, else a new one
     kill     adventure (any phase)    -> killed (Necropolis); its raw event -> ignored; data kept
     phase    adventure, by hand       -> any of MANUAL_PHASES, or completed -> decommissioned
     missed   pre-Arena adventure whose event has ended -> killed (automatic, see sweep_missed)
 
-Every change is followed by a broadcast of the updated lists.
+Every change is followed by a broadcast of the updated lists. Moves are logged as
+transitions: automatically for single rows, explicitly for the bulk ones (feed, siphon,
+purge), see services/transitions.py.
 """
 
 import asyncio
 import logging
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.base import SessionLocal, utcnow
-from backend.db.models import MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, WHEN_WHERE_TYPES, Adventure, Event
+from backend.db.models import (
+    CENTRIFUGE_NODE, MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure, Event,
+    EventSource, harvester_node,
+)
 from backend.db.queries import list_adventures, list_events
 from backend.services.hub import hub
+from backend.services.transitions import record_many
 
 log = logging.getLogger(__name__)
 
@@ -68,10 +77,62 @@ def _restore(adventure: Adventure) -> None:
     adventure.phase_before_kill = None
 
 
+# --- harvesters and the centrifuge (bulk) ---
+
+async def _source_id(session: AsyncSession, name: str) -> uuid.UUID:
+    source_id = await session.scalar(select(EventSource.id).where(EventSource.name == name))
+    if source_id is None:
+        raise NotFound(f"no source {name}")
+    return source_id
+
+
+async def _move(session: AsyncSession, where, review: str, values: dict) -> list[uuid.UUID]:
+    """Set every event matching `where` to `review`; returns the ids that moved."""
+    ids = list((await session.scalars(select(Event.id).where(*where))).all())
+    if ids:
+        await session.execute(update(Event).where(Event.id.in_(ids)).values(review=review, **values))
+    return ids
+
+
+async def feed_source(name: str) -> int:
+    """Harvester -> Centrifuge: a source's harvested events become new (shown in Discovery)."""
+    async with SessionLocal() as session:
+        source_id = await _source_id(session, name)
+        ids = await _move(session, (Event.source_id == source_id, Event.review == "harvested"), "new", {})
+        record_many(session, "event", ids, harvester_node(name), CENTRIFUGE_NODE)
+        await session.commit()
+    if ids:
+        await broadcast_pools()
+    return len(ids)
+
+
+async def siphon_source(name: str) -> int:
+    """Centrifuge -> Harvester: a source's new events go back to waiting in its harvester."""
+    async with SessionLocal() as session:
+        source_id = await _source_id(session, name)
+        ids = await _move(session, (Event.source_id == source_id, Event.review == "new"), "harvested", {})
+        record_many(session, "event", ids, CENTRIFUGE_NODE, harvester_node(name))
+        await session.commit()
+    if ids:
+        await broadcast_pools()
+    return len(ids)
+
+
+async def purge_centrifuge() -> int:
+    """Centrifuge -> Sump: every event still new becomes ignored (each can be revived)."""
+    async with SessionLocal() as session:
+        ids = await _move(session, (Event.review == "new",), "ignored", {"reviewed_at": utcnow()})
+        record_many(session, "event", ids, CENTRIFUGE_NODE, SUMP_NODE)
+        await session.commit()
+    if ids:
+        await broadcast_pools()
+    return len(ids)
+
+
 # --- raw events ---
 
 async def pass_event(event_id: uuid.UUID) -> str:
-    """Omen -> ore. Returns the new adventure's id."""
+    """Prima materia -> ore. Returns the new adventure's id."""
     async with SessionLocal() as session:
         event = await _get_event(session, event_id)
         if event.review != "new":
@@ -89,7 +150,7 @@ async def pass_event(event_id: uuid.UUID) -> str:
 
 
 async def ignore_event(event_id: uuid.UUID) -> None:
-    """Omen -> shade."""
+    """Prima materia -> shade (Sump)."""
     async with SessionLocal() as session:
         event = await _get_event(session, event_id)
         if event.review != "new":
