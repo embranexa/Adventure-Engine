@@ -64,7 +64,7 @@ def object_to_dict(o: VirtualObject) -> dict[str, Any]:
     return {
         "id": str(o.id), "type": o.type, "name": o.name, "description": o.description, "url": o.url,
         "address": o.address, "city": o.city, "lat": o.lat, "lon": o.lon, "details": o.details or {},
-        "created_at": _iso(o.created_at),
+        "color": o.color, "created_at": _iso(o.created_at),
     }
 
 
@@ -79,8 +79,8 @@ def adventure_to_dict(
     """An adventure, flattened: its own fields over its linked event's (read through).
 
     `id` is the adventure's id; the raw event's id is `event_id`. The shape matches
-    event_to_dict, so the calendar, Atlas and Refiner can show either. `own` holds just
-    the adventure's own values, which is what the Refiner edits. `objects` are its linked
+    event_to_dict, so the calendar, Atlas and Refinery can show either. `own` holds just
+    the adventure's own values, which is what the Refinery edits. `objects` are its linked
     virtual objects; a hand-made event takes its where from its linked site.
     """
     base = event_to_dict(e, source_name or "") if e else {

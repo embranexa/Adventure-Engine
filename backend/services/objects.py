@@ -11,10 +11,11 @@ Rules:
       own where fields (crawled events keep their source's where; see queries.py)
 
 Every change is broadcast: `objects`, and `adventures` when links or names changed.
-Links and unlinks are logged as transitions (codex <-> refiner); links removed with a
+Links and unlinks are logged as transitions (codex <-> refinery); links removed with a
 delete statement are recorded here, since the automatic recorder only sees ORM objects.
 """
 
+import re
 import uuid
 from typing import Any
 from urllib.parse import urlparse
@@ -64,6 +65,11 @@ def _apply(obj: VirtualObject, changes: dict[str, Any]) -> None:
         obj.name = name
     if "description" in changes:
         obj.description = _text("description", changes["description"], LIMITS["description"])
+    if "color" in changes:
+        color = (changes["color"] or "").strip().lower() or None
+        if color and not re.fullmatch(r"#[0-9a-f]{6}", color):
+            raise InvalidObject('a colour is written "#rrggbb"')
+        obj.color = color
     if "url" in changes:
         url = _text("url", changes["url"], 2000)
         if url and (urlparse(url).scheme not in ("http", "https") or not urlparse(url).netloc):
@@ -99,7 +105,7 @@ def _apply(obj: VirtualObject, changes: dict[str, Any]) -> None:
 
 
 async def _delete_links(session, *where) -> None:
-    """Delete the links matching `where`, recording each as an unlink (refiner -> codex)."""
+    """Delete the links matching `where`, recording each as an unlink (refinery -> codex)."""
     links = (await session.execute(
         select(AdventureObject.adventure_id, AdventureObject.object_id).where(*where))).all()
     for adventure_id, object_id in links:

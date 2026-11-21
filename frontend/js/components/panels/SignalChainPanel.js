@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { OBJECT_TYPES, PHASE_NODES, PHASE_STAGES, REVIEW_STAGES } from '../../lifecycle.js';
-import { LENSES } from '../../lib/lens.js';
-import { pipeFlows, twinModel } from '../../lib/twinModel.js';
-import { CENTRIFUGE, CODEX, FORGE, OUTSIDE, SUMP, twinNodes, twinPipes } from '../../lib/twinTopology.js';
+import { passes, pendingChanges } from '../../filters.js';
+import { freshMinutes, freshTitle } from '../../lib/harvest.js';
+import { LENSES, lensColor, lensValues } from '../../lib/lens.js';
+import { eventNode, pipeFlows, twinModel } from '../../lib/twinModel.js';
+import { CENTRIFUGE, CODEX, FORGE, OUTSIDE, SUMP, nodeStage, twinNodes, twinPipes } from '../../lib/twinTopology.js';
 
 const ZONE_LABELS = { net: 'Net · events', core: 'Core · adventures', viewer: 'Viewers' };
 const RECENT = 15;
@@ -46,7 +48,7 @@ function runAction(action) {
     if (action.shades && !useWorkspaceStore.getState().showShades) s.toggleShades();
     if (action.create) {
         s.setMode('adventures');
-        s.selectItem(null, 'twin'); // the Refiner shows the create buttons when nothing is selected
+        s.selectItem(null, 'twin'); // the Refinery shows the create buttons when nothing is selected
     }
     s.showPanel(action.panel);
 }
@@ -62,6 +64,34 @@ function runCommand(command, nodeId) {
         const n = s.rawEvents.reduce((k, e) => k + (e.review === 'new' ? 1 : 0), 0);
         if (n && window.confirm(`Purge ${n} event${n === 1 ? '' : 's'} from the Centrifuge into the Sump? (Each can be revived.)`)) s.purgeCentrifuge();
     }
+}
+
+/** The lantern's wheel: turn to the next (or previous) lens. @param {number} step */
+function turnLens(step) {
+    const s = useWorkspaceStore.getState();
+    const i = LENSES.findIndex((l) => l.key === s.filters.lens);
+    s.setLens(LENSES[(i + step + LENSES.length) % LENSES.length].key);
+}
+
+/** A vessel's base ring: cycle its stage in the filter, applied at once. @param {string} nodeId */
+function toggleRing(nodeId) {
+    const stage = nodeStage(nodeId);
+    if (stage) useWorkspaceStore.getState().cycleStage(stage.facet, stage.value);
+}
+
+/**
+ * What changed between two applied filters, for the relight: null if nothing that lights
+ * the twin changed, else where the light came from ('calendar' / 'atlas' send a pulse down
+ * their wire first; 'lantern' is a facet, Seal or lens change).
+ * @param {FilterState | null} prev @param {FilterState} next
+ * @returns {'calendar' | 'atlas' | 'lantern' | null}
+ */
+function relightCause(prev, next) {
+    if (!prev || prev === next) return null;
+    if (JSON.stringify(prev.date_range) !== JSON.stringify(next.date_range)) return 'calendar';
+    if (JSON.stringify(prev.ring) !== JSON.stringify(next.ring)) return 'atlas';
+    if (prev.seal !== next.seal || prev.lens !== next.lens || JSON.stringify(prev.facets) !== JSON.stringify(next.facets)) return 'lantern';
+    return null;
 }
 
 /** The lit part of a level as a stacked bar, one segment per lens value. @param {{ level: import('../../lib/twinModel.js').TwinLevel }} props */
@@ -161,7 +191,7 @@ function TwinTable({ nodes, pipes, model, routed, io, transitions, titleOf }) {
 }
 
 /**
- * The Signal Chain: the whole pipeline as a refinery. 3D (machines, liquid levels, pipes,
+ * The Signal Chain: the whole pipeline as a 3D model of machines. 3D (machines, liquid levels, pipes,
  * packets for every move) or as tables. Machines open their panels; harvester and
  * centrifuge buttons sit on their labels. See BUILD_PLAN.md (same folder as ARCHITECTURE.md).
  */
@@ -170,6 +200,8 @@ export function SignalChainPanel() {
     const adventures = useWorkspaceStore((s) => s.adventures);
     const objects = useWorkspaceStore((s) => s.objects);
     const filters = useWorkspaceStore((s) => s.filters);
+    const draftFilters = useWorkspaceStore((s) => s.draftFilters);
+    const selectedId = useWorkspaceStore((s) => s.selectedItemId);
     const sources = useWorkspaceStore((s) => s.sources);
     const transitions = useWorkspaceStore((s) => s.transitions);
     const flows = useWorkspaceStore((s) => s.flows);
@@ -177,6 +209,11 @@ export function SignalChainPanel() {
     const setLens = useWorkspaceStore((s) => s.setLens);
 
     const [view, setView] = useState(savedView);
+    const [now, setNow] = useState(Date.now);
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 60_000); // fresh harvests go stale, events go past
+        return () => clearInterval(timer);
+    }, []);
     const [status, setStatus] = useState(/** @type {'loading' | 'ready' | 'error'} */ ('loading'));
     const hostRef = useRef(/** @type {HTMLDivElement | null} */ (null));
     const sceneRef = useRef(/** @type {any} */ (null));
@@ -188,8 +225,8 @@ export function SignalChainPanel() {
     nodesRef.current = nodes;
     const pipes = useMemo(() => twinPipes(sourceNames), [sourceNames]);
     const model = useMemo(
-        () => twinModel({ rawEvents, adventures, objects, filters, lens: filters.lens, now: Date.now() }),
-        [rawEvents, adventures, objects, filters],
+        () => twinModel({ rawEvents, adventures, objects, filters, lens: filters.lens, now }),
+        [rawEvents, adventures, objects, filters, now],
     );
     const routed = useMemo(() => pipeFlows(flows, pipes), [flows, pipes]);
     const io = useMemo(() => {
@@ -207,6 +244,68 @@ export function SignalChainPanel() {
         for (const e of rawEvents) if (e.review === 'new') out[e.source] = (out[e.source] ?? 0) + 1;
         return out;
     }, [rawEvents]);
+    const eventsById = useMemo(() => new Map(rawEvents.map((e) => [e.id, e])), [rawEvents]);
+    const adventuresById = useMemo(() => new Map(adventures.map((a) => [a.id, a])), [adventures]);
+
+    // the lantern: its lens, whether the hood is closed, the colours on its glass wheel
+    const pending = pendingChanges(draftFilters, filters);
+    const light = useMemo(() => {
+        /** @type {Map<string, number>} */
+        const byValue = new Map();
+        for (const level of Object.values(model.levels)) for (const b of level.bands) byValue.set(b.color, (byValue.get(b.color) ?? 0) + b.count);
+        const colors = [...byValue.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c]) => c);
+        return { lens: filters.lens, lensLabel: LENSES.find((l) => l.key === filters.lens)?.label ?? filters.lens, pending, colors };
+    }, [model, filters.lens, pending]);
+
+    // which stage each vessel's base ring has in the applied filter
+    const stageFilter = useMemo(() => {
+        /** @type {Record<string, FilterMode>} */
+        const out = {};
+        for (const n of nodes) {
+            const stage = nodeStage(n.id);
+            const mode = stage && filters.facets[stage.facet]?.[stage.value];
+            if (mode) out[n.id] = mode;
+        }
+        return out;
+    }, [nodes, filters.facets]);
+
+    // a packet's colour: its row's lens colour (the stage lens keeps the machine's colour),
+    // dim when the row fails the applied filter
+    const packetStyle = useMemo(() => (/** @type {TransitionRecord} */ t) => {
+        const event = t.entity === 'event' ? eventsById.get(t.row_id) : undefined;
+        const adventure = t.entity === 'adventure' ? adventuresById.get(t.row_id) : undefined;
+        const item = /** @type {PoolItem | undefined} */ (event ? { ...event, kind: 'omen' } : adventure ? { ...adventure, kind: 'adventure' } : undefined);
+        if (!item) return null; // row gone: the machine's colour
+        const lit = passes(item, filters, event ? 'discovery' : 'adventures', now);
+        if (filters.lens === 'stage') return { color: null, lit };
+        return { color: lensColor(filters.lens, lensValues(item, filters.lens)[0]), lit };
+    }, [eventsById, adventuresById, filters, now]);
+
+    // harvesters that ran recently: their Harvest button greys out
+    const fresh = useMemo(() => {
+        /** @type {Record<string, string>} */
+        const out = {};
+        for (const src of Object.values(sources)) {
+            const m = freshMinutes(src, now);
+            if (m != null) out[src.name] = freshTitle(m);
+        }
+        return out;
+    }, [sources, now]);
+
+    // the selection's magic circle: the machine holding the selected row, in the row's lens colour
+    const selection = useMemo(() => {
+        const none = { nodeId: /** @type {string | null} */ (null), color: '#ffffff' };
+        if (!selectedId) return none;
+        const adventure = adventuresById.get(selectedId);
+        const event = adventure ? undefined : eventsById.get(selectedId);
+        const item = /** @type {PoolItem | undefined} */ (adventure ? { ...adventure, kind: 'adventure' } : event ? { ...event, kind: 'omen' } : undefined);
+        if (!item) return none;
+        const color = lensColor(filters.lens, lensValues(item, filters.lens)[0]);
+        if (adventure) return { nodeId: PHASE_NODES[adventure.phase], color };
+        const linked = new Set(adventures.map((a) => a.event_id).filter((id) => id != null));
+        return { nodeId: eventNode(/** @type {EventRecord} */ (event), /** @type {Set<string>} */ (linked)), color };
+    }, [selectedId, adventuresById, eventsById, adventures, filters.lens]);
+
     const titleOf = useMemo(() => {
         /** @type {Map<string, string>} */
         const m = new Map();
@@ -236,6 +335,8 @@ export function SignalChainPanel() {
                         if (action) runAction(action);
                     },
                     onCommand: runCommand,
+                    onRing: toggleRing,
+                    onLens: turnLens,
                 });
                 setStatus('ready');
             })
@@ -250,22 +351,34 @@ export function SignalChainPanel() {
         };
     }, [view]);
 
-    // feed the scene; the first time, replay the latest moves so it doesn't open frozen
+    // feed the scene; the first time, replay the latest moves so it doesn't open frozen.
+    // When the applied filter or lens changed, relight first (wire pulse, beam sweep).
     const replayed = useRef(false);
+    const litBy = useRef(/** @type {FilterState | null} */ (null));
     useEffect(() => {
         const scene = sceneRef.current;
-        if (!scene || status !== 'ready') { replayed.current = false; return; }
+        if (!scene || status !== 'ready') { replayed.current = false; litBy.current = null; return; }
+        const cause = relightCause(litBy.current, filters);
+        litBy.current = filters;
+        if (cause) scene.relight({ from: cause === 'lantern' ? null : cause });
         const colors = Object.fromEntries(nodes.map((n) => [n.id, nodeColor(n.id)]));
-        scene.update({ nodes, pipes, levels: model.levels, codex: model.codex, flows: routed.byPipe, colors, sources, io, centrifugeBySource });
+        scene.update({
+            nodes, pipes, levels: model.levels, codex: model.codex, flows: routed.byPipe, colors, sources, io,
+            centrifugeBySource, stageFilter, light, packetStyle, fresh,
+        });
         scene.play(transitions, { replay: !replayed.current });
         replayed.current = true;
-    }, [status, nodes, pipes, model, routed, sources, io, centrifugeBySource, transitions]);
+    }, [status, nodes, pipes, model, routed, sources, io, centrifugeBySource, transitions, filters, stageFilter, light, packetStyle, fresh]);
+
+    useEffect(() => {
+        if (status === 'ready') sceneRef.current?.setSelection(selection.nodeId, selection.color);
+    }, [status, selection]);
 
     return html`
         <div className="panel-body signal-chain">
             <div className="sc-head">
                 <div className="sc-views" role="group" aria-label="View">
-                    <button className=${`sc-view ${view === '3d' ? 'active' : ''}`} onClick=${() => chooseView('3d')}>Refinery</button>
+                    <button className=${`sc-view ${view === '3d' ? 'active' : ''}`} onClick=${() => chooseView('3d')}>3D</button>
                     <button className=${`sc-view ${view === 'table' ? 'active' : ''}`} onClick=${() => chooseView('table')}>Table</button>
                 </div>
                 <span className=${`sc-check ${model.check.ok ? 'ok' : 'bad'}`}
@@ -273,14 +386,14 @@ export function SignalChainPanel() {
                     ${model.check.ok ? '✓ Counts balance' : `⚠ ${model.check.problems[0]}`}
                 </span>
                 <span className="sc-spacer"></span>
-                ${view === '3d' && html`<button className="btn sc-home" title="Frame the whole refinery"
+                ${view === '3d' && html`<button className="btn sc-home" title="Frame everything"
                     onClick=${() => sceneRef.current?.fit()}>⌂</button>`}
-                <label className="sc-lens">Lens
+                ${view === 'table' && html`<label className="sc-lens">Lens
                     <select className="btn" value=${filters.lens}
                         onChange=${(/** @type {any} */ e) => setLens(e.target.value)}>
                         ${LENSES.map((l) => html`<option key=${l.key} value=${l.key}>${l.label}</option>`)}
                     </select>
-                </label>
+                </label>`}
             </div>
 
             ${view === 'table'
@@ -289,7 +402,7 @@ export function SignalChainPanel() {
                 : html`
                     <div className="sc-stage">
                         <div className="twin-host" ref=${hostRef}></div>
-                        ${status === 'loading' && html`<div className="sc-overlay">Starting the refinery…</div>`}
+                        ${status === 'loading' && html`<div className="sc-overlay">Starting the 3D view…</div>`}
                         ${status === 'error' && html`<div className="sc-overlay">The 3D view failed to start (see the console). The Table view still works.</div>`}
                     </div>
                 `}

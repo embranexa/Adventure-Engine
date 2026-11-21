@@ -43,7 +43,7 @@ PHASES = (
 # frontend/js/lifecycle.js. Harvesters are "harvester:<source name>".
 PHASE_NODES = {
     "queued": "hopper",
-    "classifying": "refiner",
+    "classifying": "refinery",
     "decomposing": "alembic",
     "constructing": "crucible",
     "consuming": "arena",
@@ -55,7 +55,7 @@ OUTSIDE_NODE = "outside"        # where harvested events come from
 CENTRIFUGE_NODE = "centrifuge"  # events "new"
 SUMP_NODE = "sump"              # events "ignored" that have no adventure
 FORGE_NODE = "forge"            # hand-made adventures enter here
-CODEX_NODE = "codex"            # objects; links travel codex <-> refiner
+CODEX_NODE = "codex"            # objects; links travel codex <-> refinery
 
 
 def harvester_node(source_name: str) -> str:
@@ -169,6 +169,8 @@ class VirtualObject(Base):
     lon: Mapped[float | None] = mapped_column(Float)
     # type-specific extras: contact {email, phone, handle}
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # "#rrggbb", chosen in the Codex; null = a stable default picked from the id (frontend)
+    color: Mapped[str | None] = mapped_column(String(7))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 

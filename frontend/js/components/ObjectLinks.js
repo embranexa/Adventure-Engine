@@ -6,7 +6,7 @@ import { OBJECT_TYPES } from '../lifecycle.js';
 const MAX_SUGGESTIONS = 8;
 
 /**
- * The adventure's links to virtual objects (the Codex), in the Refiner: chips grouped by
+ * The adventure's links to virtual objects (the Codex), in the Refinery: chips grouped by
  * type (click opens the object in the Codex, ✕ unlinks) and a type-ahead to link an
  * existing object or create a new one. An event has one site: linking another replaces it.
  * @param {{ adventure: PoolItem & { kind: 'adventure' } }} props

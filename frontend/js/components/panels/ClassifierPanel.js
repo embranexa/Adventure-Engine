@@ -3,17 +3,17 @@ import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { FACETS, facetLabel, formatDistance, parseDay, pendingChanges } from '../../filters.js';
 import { buildModel } from '../../lib/classifierGraph.js';
+import { LENSES } from '../../lib/lens.js';
 
-const LAYERS_KEY = 'adventure-engine.classifier.layers';
-/** @type {import('../../lib/classifierGraph.js').Layers} */
-const DEFAULT_LAYERS = { source: true };
-
-function loadLayers() {
-    try {
-        return JSON.parse(localStorage.getItem(LAYERS_KEY) ?? 'null') ?? DEFAULT_LAYERS;
-    } catch {
-        return DEFAULT_LAYERS; // storage blocked (private window etc.)
-    }
+/**
+ * The lens is also the Nexus's layer: the facet it colours by shows as stars (Matter shows
+ * the stage: phases in Adventures, review states in Discovery). Active filters always show.
+ * @param {LensKey} lens @param {PoolMode} mode
+ * @returns {import('../../lib/classifierGraph.js').Layers}
+ */
+function lensLayers(lens, mode) {
+    if (lens === 'stage') return mode === 'adventures' ? { phase: true } : { review: true };
+    return { [lens]: true };
 }
 
 /**
@@ -122,11 +122,14 @@ export function ClassifierPanel() {
     const selectedId = useWorkspaceStore((s) => s.selectedItemId);
     const selectionSource = useWorkspaceStore((s) => s.selectionSource);
     const hoveredId = useWorkspaceStore((s) => s.hoveredItemId);
+    const objects = useWorkspaceStore((s) => s.objects); // object stars' names and colours
 
     const hostRef = useRef(/** @type {HTMLDivElement | null} */ (null));
     const sceneRef = useRef(/** @type {any} */ (null));
     const [status, setStatus] = useState(/** @type {'loading' | 'ready' | 'error'} */ ('loading'));
-    const [layers, setLayers] = useState(loadLayers);
+    const lens = useWorkspaceStore((s) => s.filters.lens);
+    const setLens = useWorkspaceStore((s) => s.setLens);
+    const layers = useMemo(() => lensLayers(lens, mode), [lens, mode]);
     const [collapsed, setCollapsed] = useState(() => new Set(/** @type {string[]} */ ([])));
     const [tick, setTick] = useState(0); // items become past (sealed) as time passes
 
@@ -137,7 +140,7 @@ export function ClassifierPanel() {
 
     const model = useMemo(
         () => buildModel(items, filters, mode, layers, collapsed, Date.now()),
-        [items, filters, mode, layers, collapsed, tick],
+        [items, filters, mode, layers, collapsed, tick, objects],
     );
 
     // Load three.js + the scene only when this panel opens.
@@ -185,12 +188,8 @@ export function ClassifierPanel() {
         sceneRef.current?.setHover(hoveredId);
     }, [hoveredId, status]);
 
-    /** @param {FacetKey} key */
-    const toggleLayer = (key) => {
-        const next = { ...layers, [key]: !layers[key] };
-        setLayers(next);
-        try { localStorage.setItem(LAYERS_KEY, JSON.stringify(next)); } catch { /* storage blocked */ }
-    };
+    // the lenses that mean something in this mode (Matter always does)
+    const lenses = LENSES.filter((l) => l.key === 'stage' || FACETS.find((f) => f.key === l.key)?.modes.includes(mode));
 
     return html`
         <div className="panel-body classifier">
@@ -198,11 +197,11 @@ export function ClassifierPanel() {
             <div className="cls-host" ref=${hostRef} />
             ${status === 'ready' && html`
                 <div className="cls-layers" onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
-                    <span className="cls-layers-title">Layers</span>
-                    ${FACETS.filter((f) => f.modes.includes(mode)).map((f) => html`
-                        <button key=${f.key} className=${`cls-layer ${layers[f.key] ? 'on' : ''}`} onClick=${() => toggleLayer(f.key)}
-                            title=${`Show every ${f.label.toLowerCase()} as a star (active filters always show)`}>
-                            ${f.label}
+                    <span className="cls-layers-title">Lens</span>
+                    ${lenses.map((l) => html`
+                        <button key=${l.key} className=${`cls-layer ${lens === l.key ? 'on' : ''}`} onClick=${() => setLens(l.key)}
+                            title=${`Colour the matter by ${l.label.toLowerCase()} in the Signal Chain, and show each ${l.key === 'stage' ? 'stage' : l.label.toLowerCase()} as a star. Active filters always show.`}>
+                            ${l.label}
                         </button>
                     `)}
                 </div>

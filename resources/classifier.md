@@ -26,7 +26,7 @@ stages are vessels or places.
 | in review | **Centrifuge** | **prima materia** | raw: `new` | Feed from a harvester (Siphon sends them back) |
 | rejected | **Sump** | **shade** | raw: `ignored` | ignore in Discovery, or Purge the Centrifuge |
 | passed, waiting | **Hopper** | **ore** | `queued` | pass in Discovery |
-| classification | **Refiner** | **essence** | `classifying` | by hand |
+| classification | **Refinery** | **essence** | `classifying` | by hand |
 | decomposition | **Alembic** | **distillate** | `decomposing` | by hand |
 | construction | **Crucible** | **alloy** | `constructing` | by hand |
 | consumption | **Arena** | **animus** | `consuming` | by hand |
@@ -39,13 +39,13 @@ stages are vessels or places.
 - **Arena** is the one stage that isn't a machine: it's real life, where the refined
   adventure leaves the factory.
 - Read as a journey: flux (Harvester) → prima materia (Centrifuge, judged in Discovery)
-  → ore (Hopper) → essence (Refiner) → distillate (Alembic) → alloy (Crucible) → animus
+  → ore (Hopper) → essence (Refinery) → distillate (Alembic) → alloy (Crucible) → animus
   (Arena) → artifact (Treasury) → relic (Archive). Side paths: shade (Sump), vestige
   (Necropolis).
 - The **Signal Chain** twin draws every stage as a machine and every move as a packet:
   see `resources/signal chain digital twin/BUILD_PLAN.md`.
 - Module ↔ panel: Harvesters and Centrifuge = Discovery's harvester bar (later the twin),
-  Centrifuge = Discovery mode, Refiner = node card (classification), Nexus = filters and
+  Centrifuge = Discovery mode, Refinery = node card (classification), Nexus = filters and
   lens, Alembic = action roadmap, Crucible = quest log, Arena = real life.
 - Matter colors run cold to warm along the lifecycle: flux steel, prima materia slate, ore blue, essence cyan,
   distillate amber, alloy orange, animus red, artifact violet; side paths are desaturated
@@ -112,7 +112,7 @@ raw event:  harvested ──feed──▶ new ──pass──▶ passed ◀─�
   the Necropolis, that adventure is restored to its previous phase with all its data;
   otherwise a new adventure is created in the Hopper, the same as a first pass.
 - **Missed events**: an adventure whose event ends before it reaches the Arena (still in
-  the Hopper, Refiner, Alembic or Crucible) moves to the Necropolis automatically.
+  the Hopper, Refinery, Alembic or Crucible) moves to the Necropolis automatically.
 - **Decommission** (artifact → relic): by hand, for completed adventures old enough to
   be irrelevant.
 - Pass, ignore, kill and revive will also work **in bulk on a filtered set** (later).

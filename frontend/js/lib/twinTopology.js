@@ -33,7 +33,7 @@ export const SUMP = 'sump';
 export const FORGE = 'forge';
 export const CODEX = 'codex';
 export const NECROPOLIS = PHASE_NODES.killed;
-export const REFINER = PHASE_NODES.classifying;
+export const REFINERY = PHASE_NODES.classifying;
 
 /** Harvesters drawn even before their crawler exists (locked until then). */
 export const KNOWN_HARVESTERS = ['luma', '19hz', 'ra', 'eventbrite'];
@@ -41,7 +41,7 @@ export const KNOWN_HARVESTERS = ['luma', '19hz', 'ra', 'eventbrite'];
 /** @param {string} source */
 export const harvesterId = (source) => `harvester:${source}`;
 
-/** hopper -> refiner -> alembic -> crucible -> arena -> treasury -> archive */
+/** hopper -> refinery -> alembic -> crucible -> arena -> treasury -> archive */
 export const MAIN_CHAIN = [...MAIN_ROUTE.map((p) => PHASE_NODES[p]), PHASE_NODES.decommissioned];
 
 /** @param {Partial<TwinNode> & Pick<TwinNode, 'id' | 'label' | 'zone' | 'kind'>} n @returns {TwinNode} */
@@ -70,7 +70,7 @@ export function twinNodes(sourceNames) {
             action: { panel: 'classifier', mode: 'discovery', shades: true } }),
         node({ id: FORGE, label: 'Forge', zone: 'net', kind: 'dynamo', action: { panel: 'node', create: true } }),
         core('queued', 'vessel', 'Hopper'),
-        core('classifying', 'processor', 'Refiner', { panel: 'node', mode: 'adventures' }),
+        core('classifying', 'processor', 'Refinery', { panel: 'node', mode: 'adventures' }),
         core('decomposing', 'processor', 'Alembic', { panel: 'alembic', mode: 'adventures' }),
         core('constructing', 'processor', 'Crucible', { panel: 'quests', mode: 'adventures' }),
         core('consuming', 'processor', 'Arena'),
@@ -104,7 +104,7 @@ export function twinPipes(sourceNames) {
         pipe(FORGE, MAIN_CHAIN[0]),
         ...MAIN_CHAIN.slice(1).map((b, i) => pipe(MAIN_CHAIN[i], b)),
         ...MAIN_CHAIN.map((n) => pipe(n, NECROPOLIS)),
-        pipe(CODEX, REFINER, 'conveyor'),
+        pipe(CODEX, REFINERY, 'conveyor'),
     ];
 }
 
@@ -130,6 +130,21 @@ export function route(pipesByEnds, from, to) {
         steps.push({ pipe: p, forward: p.a === a });
     }
     return steps;
+}
+
+/**
+ * The stage a node's base ring toggles in the filter: a phase for the core vessels, a
+ * review state for the net (every harvester shares "harvested"). Null for machines that
+ * hold no rows.
+ * @param {string} id
+ * @returns {{ facet: 'phase' | 'review', value: string } | null}
+ */
+export function nodeStage(id) {
+    if (id.startsWith('harvester:')) return { facet: 'review', value: 'harvested' };
+    if (id === CENTRIFUGE) return { facet: 'review', value: 'new' };
+    if (id === SUMP) return { facet: 'review', value: 'ignored' };
+    const phase = Object.entries(PHASE_NODES).find(([, node]) => node === id)?.[0];
+    return phase ? { facet: 'phase', value: phase } : null;
 }
 
 /** Look pipes up by "a~b". @param {TwinPipe[]} pipes */

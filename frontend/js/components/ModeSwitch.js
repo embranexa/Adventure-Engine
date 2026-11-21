@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
+import { freshMinutes, freshTitle } from '../lib/harvest.js';
 
 /** "just now", "5m ago", "3h ago", "2d ago". @param {string | null} iso @param {number} now */
 function ago(iso, now) {
@@ -40,6 +41,11 @@ function HarvesterBar() {
     const purgeCentrifuge = useWorkspaceStore((s) => s.purgeCentrifuge);
 
     const counts = useMemo(() => countBySource(rawEvents), [rawEvents]);
+    const [now, setNow] = useState(Date.now);
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 60_000); // a fresh harvest goes stale
+        return () => clearInterval(timer);
+    }, []);
     const spinning = rawEvents.reduce((n, e) => n + (e.review === 'new' ? 1 : 0), 0);
 
     const purge = () => {
@@ -54,12 +60,13 @@ function HarvesterBar() {
                 const flux = counts[src.name]?.harvested ?? 0;
                 const fed = counts[src.name]?.new ?? 0;
                 const syncing = src.status === 'syncing';
+                const fresh = syncing ? null : freshMinutes(src, now);
                 return html`
                     <div key=${src.name} className=${`hv ${src.status}`}
-                        title=${src.status === 'failed' ? `Last harvest failed: ${src.last_error ?? ''}` : `${flux} flux waiting · ${fed} in the Centrifuge`}>
+                        title=${src.status === 'failed' ? `Last harvest failed: ${src.last_error ?? ''}` : `${flux} flux waiting · ${fed} in the Centrifuge${fresh != null ? ` · ${freshTitle(fresh)}` : ''}`}>
                         <span className="hv-name">${src.name}</span>
                         <b className="hv-count">${flux}</b>
-                        <button className="btn hv-btn" disabled=${syncing} onClick=${() => syncSource(src.name)}
+                        <button className=${`btn hv-btn ${fresh != null ? 'fresh' : ''}`} disabled=${syncing || fresh != null} onClick=${() => syncSource(src.name)}
                             title="Crawl the source: events not harvested before fill this harvester">${syncing ? 'Harvesting…' : 'Harvest'}</button>
                         <button className="btn hv-btn" disabled=${!flux} onClick=${() => feedSource(src.name)}
                             title="Pour this harvester's events into the Centrifuge, to review them">Feed ⟶</button>

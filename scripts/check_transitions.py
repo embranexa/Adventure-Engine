@@ -146,8 +146,8 @@ async def main():
     await step("ignore B", lambda: triage.ignore_event(ids["check-2"]), {("centrifuge", "sump"): 1})
     await step("purge", triage.purge_centrifuge, {("centrifuge", "sump"): 3})
     await step("revive C from the sump", lambda: triage.revive_event(ids["check-3"]), {("sump", "hopper"): 1})
-    await step("A -> classifying", lambda: triage.set_phase(state["A"], "classifying"), {("hopper", "refiner"): 1})
-    await step("A -> decomposing", lambda: triage.set_phase(state["A"], "decomposing"), {("refiner", "alembic"): 1})
+    await step("A -> classifying", lambda: triage.set_phase(state["A"], "classifying"), {("hopper", "refinery"): 1})
+    await step("A -> decomposing", lambda: triage.set_phase(state["A"], "decomposing"), {("refinery", "alembic"): 1})
     await step("kill A", lambda: triage.kill_adventure(state["A"]), {("alembic", "necropolis"): 1})
     await step("revive A", lambda: triage.revive_adventure(state["A"]), {("necropolis", "alembic"): 1})
     await step("revive P via its event", lambda: triage.revive_event(ids["check-0"]), {("necropolis", "hopper"): 1})
@@ -161,18 +161,18 @@ async def main():
         state["s2"] = uuid.UUID((await objects.create_object({"type": "site", "name": "Check site 2"}))["id"])
         state["p"] = uuid.UUID((await objects.create_object({"type": "pillar", "name": "Check pillar"}))["id"])
     await step("create objects", make_sites, {})
-    await step("link site 1 to A", lambda: objects.link(state["A"], state["s1"]), {("codex", "refiner"): 1})
+    await step("link site 1 to A", lambda: objects.link(state["A"], state["s1"]), {("codex", "refinery"): 1})
     await step("link site 2 (replaces 1)", lambda: objects.link(state["A"], state["s2"]),
-               {("refiner", "codex"): 1, ("codex", "refiner"): 1})
-    await step("link pillar", lambda: objects.link(state["A"], state["p"]), {("codex", "refiner"): 1})
-    await step("unlink pillar", lambda: objects.unlink(state["A"], state["p"]), {("refiner", "codex"): 1})
-    await step("delete site 2", lambda: objects.delete_object(state["s2"]), {("refiner", "codex"): 1})
+               {("refinery", "codex"): 1, ("codex", "refinery"): 1})
+    await step("link pillar", lambda: objects.link(state["A"], state["p"]), {("codex", "refinery"): 1})
+    await step("unlink pillar", lambda: objects.unlink(state["A"], state["p"]), {("refinery", "codex"): 1})
+    await step("delete site 2", lambda: objects.delete_object(state["s2"]), {("refinery", "codex"): 1})
 
     async def to_archive():
         for phase in ("classifying", "decomposing", "constructing", "consuming", "completed", "decommissioned"):
             await triage.set_phase(state["F"], phase)
     await step("forge item to the archive", to_archive, {
-        ("hopper", "refiner"): 1, ("refiner", "alembic"): 1, ("alembic", "crucible"): 1,
+        ("hopper", "refinery"): 1, ("refinery", "alembic"): 1, ("alembic", "crucible"): 1,
         ("crucible", "arena"): 1, ("arena", "treasury"): 1, ("treasury", "archive"): 1})
     await step("set the same phase (no-op)", lambda: triage.set_phase(state["F"], "decommissioned"), {})
     print("all checks passed")

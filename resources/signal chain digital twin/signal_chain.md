@@ -8,7 +8,7 @@ Adventure Engine = Processing Chain
 - discovery mode
 - atlas, calendar
 
-3. refiner: ore -> essence
+3. refinery: ore -> essence
 - assign mappings
 - centrifuge
 - codex

@@ -18,11 +18,19 @@ export const UNKNOWN = '∅';
 
 /** Object id -> name, for labels of object facet values (kept current by the store). */
 const objectNames = new Map();
+/** Object id -> its chosen colour (only objects that have one). */
+const objectColors = new Map();
 /** @param {VObject[]} objects */
 export function setObjectNames(objects) {
     objectNames.clear();
-    for (const o of objects) objectNames.set(o.id, o.name);
+    objectColors.clear();
+    for (const o of objects) {
+        objectNames.set(o.id, o.name);
+        if (o.color) objectColors.set(o.id, o.color);
+    }
 }
+/** The colour chosen for an object in the Codex, if any (see objectColor in lib/lens.js). @param {string} id */
+export const chosenObjectColor = (id) => objectColors.get(id) ?? null;
 
 /** Facet values for an object type: the ids of the item's linked objects of that type. @param {ObjectType} type */
 const objectFacet = (type) => ({

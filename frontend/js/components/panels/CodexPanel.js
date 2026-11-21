@@ -2,7 +2,31 @@ import { useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { OBJECT_TYPES, PHASE_STAGES } from '../../lifecycle.js';
+import { PALETTE, objectColor } from '../../lib/lens.js';
 import { Field } from './AdventureEditor.js';
+
+/**
+ * An object's colour (the Nexus, the lens): a preset swatch, any colour, or Auto (the
+ * default picked from its id).
+ * @param {{ obj: VObject, onChange: (color: string | null) => void }} props
+ */
+function ColorPicker({ obj, onChange }) {
+    const current = objectColor(obj.id);
+    return html`
+        <div className="cx-colors" role="group" aria-label="Colour">
+            <span className="cx-colors-title">Colour</span>
+            ${PALETTE.map((c) => html`
+                <button key=${c} className=${`cx-swatch ${obj.color === c ? 'on' : ''}`} style=${{ '--c': c }}
+                    onClick=${() => onChange(c)} title=${c} aria-label=${`Colour ${c}`}></button>
+            `)}
+            <label className=${`cx-swatch cx-custom ${obj.color && !PALETTE.includes(obj.color) ? 'on' : ''}`} style=${{ '--c': current }} title="Any colour">
+                <input type="color" value=${current} onChange=${(/** @type {any} */ e) => onChange(e.target.value)} aria-label="Any colour" />
+            </label>
+            <button className=${`cls-layer ${obj.color ? '' : 'on'}`} onClick=${() => onChange(null)}
+                title="Go back to the default colour">Auto</button>
+        </div>
+    `;
+}
 
 const TYPE_KEYS = /** @type {ObjectType[]} */ (Object.keys(OBJECT_TYPES));
 
@@ -72,8 +96,9 @@ function ObjectDetail({ obj, onBack }) {
         <div className="cx-detail">
             <div className="cx-detail-head">
                 <button className="cls-layer" onClick=${onBack} title="Back to the list">← ${t.plural}</button>
-                <span className=${`cx-badge t-${obj.type}`}>${t.glyph} ${t.label}</span>
+                <span className=${`cx-badge t-${obj.type}`} style=${{ color: objectColor(obj.id) }}>${t.glyph} ${t.label}</span>
             </div>
+            <${ColorPicker} obj=${obj} onChange=${(/** @type {string | null} */ color) => save({ color })} />
 
             <${Field} key=${`${obj.id}-name`} label="Name" ...${text('name')} />
             ${obj.type === 'contact' && html`
@@ -107,7 +132,7 @@ function ObjectDetail({ obj, onBack }) {
 
             <div className="cx-linked">
                 <div className="cx-linked-head">Linked adventures <b>${linked.length}</b></div>
-                ${linked.length === 0 && html`<div className="cx-empty-line">None yet · link it from an adventure in the Refiner</div>`}
+                ${linked.length === 0 && html`<div className="cx-empty-line">None yet · link it from an adventure in the Refinery</div>`}
                 ${linked.map((a) => {
                     const stage = PHASE_STAGES[a.phase];
                     const pooled = Boolean(itemsById[a.id]);
@@ -133,7 +158,7 @@ function ObjectDetail({ obj, onBack }) {
 /**
  * The Codex: virtual objects (pillars, sites, contacts) that adventures link to. Browse
  * by type, search, create; open one to edit it and see its adventures. Linking happens
- * in the Refiner; objects show as stars in the Nexus, sites as pins on the Atlas.
+ * in the Refinery; objects show as stars in the Nexus (in their colour), sites as pins on the Atlas.
  */
 export function CodexPanel() {
     const objects = useWorkspaceStore((s) => s.objects);
@@ -206,7 +231,7 @@ export function CodexPanel() {
                 `}
                 ${shown.map((o) => html`
                     <button key=${o.id} className=${`cx-row t-${o.type}`} onClick=${() => selectObject(o.id)}>
-                        <i>${OBJECT_TYPES[o.type].glyph}</i>
+                        <i style=${{ color: objectColor(o.id) }}>${OBJECT_TYPES[o.type].glyph}</i>
                         <span className="cx-row-text">
                             <b>${o.name}</b>
                             ${subtitle(o) && html`<small>${subtitle(o)}</small>`}

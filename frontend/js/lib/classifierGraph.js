@@ -8,12 +8,24 @@
 // Whether an item passes is decided by filters.js. Every active filter is always a
 // visible star, so all items in a galaxy share the same answer.
 
-import { FACETS, facetLabel, facetValues, inDateRange, inRing, isSealed, passes } from '../filters.js';
+import { FACETS, UNKNOWN, facetLabel, facetValues, inDateRange, inRing, isSealed, passes } from '../filters.js';
+import { objectColor } from './lens.js';
 
 /** Facet star colours (off state). */
 /** Parent colors: monochrome (matter colors are for adventures). Off parents are steel. */
 const FACET_COLOR = '#9aa0aa';
 export const ROLE_COLORS = { include: '#f2f3f5', exclude: '#4a4f58', seal: '#e9c43b' };
+const OBJECT_FACETS = new Set(['pillar', 'site', 'contact']);
+
+/**
+ * A facet star's colour. Objects keep their own colour (from the Codex) unless excluded;
+ * the rest are grey when off and white when included.
+ * @param {FacetKey} facet @param {string} value @param {FilterMode | 'off'} role
+ */
+function starColor(facet, value, role) {
+    if (OBJECT_FACETS.has(facet) && value !== UNKNOWN && role !== 'exclude') return objectColor(value);
+    return role === 'off' ? FACET_COLOR : ROLE_COLORS[role];
+}
 
 /**
  * @typedef {{
@@ -57,7 +69,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
             stars.push({
                 id, kind: 'facet', facet: facet.key, value, group: facet.label,
                 label: facetLabel(facet, value),
-                role, color: role === 'off' ? FACET_COLOR : ROLE_COLORS[role],
+                role, color: starColor(facet.key, value, role),
                 count: counts.get(value) ?? 0, collapsed: collapsed.has(id),
             });
             membership.set(id, (item) => facetValues(item, facet).includes(value));

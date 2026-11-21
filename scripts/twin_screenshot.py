@@ -34,6 +34,7 @@ Stop background servers by PID: `pkill -f` matches the shell running it and kill
 import http.server
 import os
 import time
+import urllib.error
 import urllib.request
 
 APP_PORT = int(os.environ.get("APP_PORT", 8766))
@@ -41,6 +42,10 @@ PROXY_PORT = int(os.environ.get("PROXY_PORT", 8799))
 DELAY = float(os.environ.get("DELAY", 7))
 CAPTURE_S = float(os.environ.get("CAPTURE_S", 5.5))
 W, H = os.environ.get("W", "1500"), os.environ.get("H", "900")
+# optional JS run in the app page EVAL_S seconds after it starts, e.g. to select a row:
+#   EVAL="import('/js/store.js').then(m => m.useWorkspaceStore.getState().selectItem('<id>', 'twin'))"
+EVAL = os.environ.get("EVAL", "")
+EVAL_S = float(os.environ.get("EVAL_S", 2.5))
 
 WRAP = f"""<!doctype html><html><body style="margin:0;background:#000">
 <iframe src="/" style="border:0;width:{W}px;height:{H}px"></iframe>
@@ -60,7 +65,8 @@ var o=document.createElement('canvas');o.width=c.width;o.height=c.height;o.style
 o.getContext('2d').drawImage(c,0,0);document.body.appendChild(o);show('canvas '+c.width+'x'+c.height+' drawn px: '+n);});},CAPTURE_MS);
 var WS=window.WebSocket;window.WebSocket=function(u,p){return new WS(String(u).replace(':PROXY',':APP'),p)};window.WebSocket.prototype=WS.prototype;
 ['CONNECTING','OPEN','CLOSING','CLOSED'].forEach(function(k){window.WebSocket[k]=WS[k]});
-var ce=console.error;console.error=function(){show('CE '+Array.prototype.map.call(arguments,function(a){return a&&a.stack||String(a)}).join(' '));ce.apply(console,arguments)};})();</script>"""
+EVAL_HOOK var ce=console.error;console.error=function(){show('CE '+Array.prototype.map.call(arguments,function(a){return a&&a.stack||String(a)}).join(' '));ce.apply(console,arguments)};})();</script>"""
+        .replace("EVAL_HOOK", f"setTimeout(function(){{try{{{EVAL}}}catch(e){{show('EVAL '+e)}}}},{int(EVAL_S * 1000)});" if EVAL else "")
         .replace("CAPTURE_MS", str(int(CAPTURE_S * 1000)))
         .replace(":PROXY", f":{PROXY_PORT}").replace(":APP", f":{APP_PORT}")).encode()
 
@@ -84,6 +90,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.path == "/":
             body = body.replace(b"<head>", b"<head>" + HOOK, 1)
         self._send(body, ctype)
+
+    def _forward(self):
+        """Pass writes (the app saving its state) through to the app server."""
+        body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        req = urllib.request.Request(f"http://127.0.0.1:{APP_PORT}{self.path}", data=body, method=self.command,
+                                     headers={"Content-Type": self.headers.get("Content-Type", "application/json")})
+        try:
+            with urllib.request.urlopen(req) as r:
+                self._send(r.read(), r.headers.get("Content-Type", ""))
+        except urllib.error.HTTPError as e:
+            self.send_response(e.code)
+            self.end_headers()
+            self.wfile.write(e.read())
+
+    do_PUT = do_POST = do_PATCH = do_DELETE = _forward
 
     def log_message(self, *a):
         pass

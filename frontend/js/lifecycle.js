@@ -22,7 +22,7 @@ export const REVIEW_STAGES = {
 /** Adventure phases, in lifecycle order. @type {Record<Phase, Stage>} */
 export const PHASE_STAGES = {
     queued:         { module: 'Hopper',     matter: 'ore',        color: '#3d7bf0', deep: '#1b3a7a', light: '#a8c6ff', hint: 'Waiting to be assayed' },
-    classifying:    { module: 'Refiner',    matter: 'essence',    color: '#1fc2c9', deep: '#0c5c60', light: '#a9f3f6', hint: 'Why do I want this?' },
+    classifying:    { module: 'Refinery',    matter: 'essence',    color: '#1fc2c9', deep: '#0c5c60', light: '#a9f3f6', hint: 'Why do I want this?' },
     decomposing:    { module: 'Alembic',    matter: 'distillate', color: '#e9c43b', deep: '#6e5a12', light: '#f8e7a6', hint: 'How do I do this?' },
     constructing:   { module: 'Crucible',   matter: 'alloy',      color: '#f28a2e', deep: '#7a3a0c', light: '#ffd3a3', hint: 'What can I do right now?' },
     consuming:      { module: 'Arena',      matter: 'animus',     color: '#ef3e4a', deep: '#7a1a20', light: '#ffb0b6', hint: 'Doing it' },
@@ -70,7 +70,7 @@ export const MATTER_COLORS = Object.fromEntries(
  * @type {Record<Phase, string>}
  */
 export const PHASE_NODES = {
-    queued: 'hopper', classifying: 'refiner', decomposing: 'alembic', constructing: 'crucible',
+    queued: 'hopper', classifying: 'refinery', decomposing: 'alembic', constructing: 'crucible',
     consuming: 'arena', completed: 'treasury', killed: 'necropolis', decommissioned: 'archive',
 };
 

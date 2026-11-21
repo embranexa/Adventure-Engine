@@ -11,8 +11,8 @@ Two ways rows get recorded:
        Adventure.phase a -> b            node(a) -> node(b)   (kill, revive, sweeper, by hand)
        Event.review new -> ignored       centrifuge -> sump   (other review changes are
                                                                recorded by the adventure)
-       new AdventureObject               codex -> refiner     (a link)
-       deleted AdventureObject           refiner -> codex     (an unlink)
+       new AdventureObject               codex -> refinery     (a link)
+       deleted AdventureObject           refinery -> codex     (an unlink)
 2. Explicitly, with record() / record_many(), for SQL statements that change rows without
    ORM objects (harvest, feed, siphon, purge, link deletes): `before_flush` never sees those.
 
@@ -39,7 +39,7 @@ from backend.services.hub import hub
 
 log = logging.getLogger(__name__)
 
-REFINER_NODE = PHASE_NODES["classifying"]  # links arrive where adventures are classified
+REFINERY_NODE = PHASE_NODES["classifying"]  # links arrive where adventures are classified
 _PENDING = "pending_transitions"           # session.info key: rows to broadcast after commit
 _tasks: set[asyncio.Task] = set()          # keep broadcast tasks alive until they finish
 
@@ -109,7 +109,7 @@ def _record_orm_changes(session: Session, flush_context, instances) -> None:
                 origin = SUMP_NODE if old_review.get(obj.event_id) == "ignored" else CENTRIFUGE_NODE
             record(session, "adventure", obj.id, origin, PHASE_NODES[obj.phase or "queued"])
         elif isinstance(obj, AdventureObject):
-            record(session, "link", obj.object_id, CODEX_NODE, REFINER_NODE, ref_id=obj.adventure_id)
+            record(session, "link", obj.object_id, CODEX_NODE, REFINERY_NODE, ref_id=obj.adventure_id)
 
     for obj in list(session.dirty):
         if isinstance(obj, Adventure) and (change := _change(obj, "phase")):
@@ -119,7 +119,7 @@ def _record_orm_changes(session: Session, flush_context, instances) -> None:
 
     for obj in session.deleted:
         if isinstance(obj, AdventureObject):
-            record(session, "link", obj.object_id, REFINER_NODE, CODEX_NODE, ref_id=obj.adventure_id)
+            record(session, "link", obj.object_id, REFINERY_NODE, CODEX_NODE, ref_id=obj.adventure_id)
 
 
 @event.listens_for(Session, "after_commit")
@@ -220,7 +220,7 @@ async def backfill() -> int:
                 written += _path(session, "adventure", a.id, nodes, a.created_at, a.phase_changed_at)
 
             for link in (await session.scalars(select(AdventureObject))).all():
-                record(session, "link", link.object_id, CODEX_NODE, REFINER_NODE,
+                record(session, "link", link.object_id, CODEX_NODE, REFINERY_NODE,
                        ref_id=link.adventure_id, at=link.created_at, synthetic=True)
                 written += 1
 

@@ -59,6 +59,11 @@ async def init_db(sources: dict[str, str]) -> None:
 
     await _migrate_saved_places()
 
+    async with engine.begin() as conn:
+        # the Refiner was renamed the Refinery: logged moves keep working under the new id
+        for column in ("from_node", "to_node"):
+            await conn.execute(text(f"UPDATE transitions SET {column} = 'refinery' WHERE {column} = 'refiner'"))
+
     from backend.services.transitions import backfill  # avoids an import cycle
     await backfill()
 

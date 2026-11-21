@@ -1,6 +1,6 @@
 # Signal Chain — build plan
 
-A new dock module showing the whole pipeline as a 3D refinery. Every row in the database
+A new dock module showing the whole pipeline as a 3D model. Every row in the database
 is a packet of matter, every stage is a machine, and every panel attaches to its machine.
 Filters and lenses are **light**, never plumbing.
 
@@ -12,13 +12,16 @@ a loose guide only.
 
 ## 0. Status and how to resume (read this first)
 
-**Where we are (2026-11-20):** phases 0–3 are built.
+**Where we are (2026-11-20):** phases 0–4 are built.
 - Phases 0–2 are committed in `b7dd63e` ("Signal chain: harvesters, transitions log,
   twin model").
-- Phase 3 (the 3D refinery) is committed (the commit "Signal chain: 3D refinery view", right after `b7dd63e`).
+- Phase 3 (the 3D view) is committed (the commit "Signal chain: 3D refinery view", right after `b7dd63e`).
 - Leave the user's own untracked files out of commits: `resources/19hz.ipynb`,
   `resources/adventure.db`, `resources/upgrades.md`.
-- **Next: phase 4 (the light layer).** Its notes are in section 4.
+- Phase 4 (the light layer), the Refiner → **Refinery** rename, the Harvest cooldown,
+  the Net platform, object colours (Codex picker, Nexus stars) and the selection's magic
+  circle are committed ("Signal chain: light layer, base buttons, object colours").
+- **Next: phase 5 (codex cabinet and conveyor).** Its notes are in section 4.
 
 **Working with the user:**
 - They decide the concept and the names. Raise new names and behaviours with them; don't
@@ -52,7 +55,8 @@ a loose guide only.
 - `node --experimental-default-type=module scripts/check_twin_model.mjs http://127.0.0.1:8000`:
   the model on live data under every lens. Read-only.
 - `scripts/twin_screenshot.py`: headless screenshots that include WebGL. The docstring has
-  the steps.
+  the steps. `EVAL="import('/frontend/js/store.js').then(m => …)"` runs JS in the page
+  after `EVAL_S` seconds (select a row, set the lens). Writes pass through to the app.
 
 **Code map:**
 
@@ -62,8 +66,11 @@ a loose guide only.
 | Transitions log | `backend/services/transitions.py`, `backend/routers/transitions.py`, `Transition` plus `PHASE_NODES` / `*_NODE` in `backend/db/models.py` |
 | Names and colours | `frontend/js/lifecycle.js` (`REVIEW_STAGES`, `PHASE_STAGES`, `PHASE_NODES`) |
 | Twin, pure | `frontend/js/lib/twinTopology.js` (nodes, pipes, `route`), `frontend/js/lib/twinModel.js` (levels, lit, bands, `pipeFlows`, the check), `frontend/js/lib/lens.js` |
-| Twin, 3D | `frontend/js/lib/twinScene.js` |
-| Twin, panel | `frontend/js/components/panels/SignalChainPanel.js` (Refinery / Table views, `runAction`, `runCommand`, node colours) |
+| Twin, 3D | `frontend/js/lib/twinScene.js` (light: `_buildLantern`, `_buildWires`, `relight`, `setSelection`, `_frameBeam`, `_frameSpot`) |
+| Harvest freshness | `frontend/js/lib/harvest.js` (`HARVEST_FRESH_MS` = 1 h) |
+| Magic circles (shared) | `frontend/js/lib/magicCircle.js` (`magicCircleCanvases`: outer rune band + inner hexagram, white, to tint) |
+| Object colours | `objects.color` column; `objectColor(id)` in `lens.js` (chosen, else a default from the id); picker in `CodexPanel.js`; Nexus stars via `starColor` in `classifierGraph.js` |
+| Twin, panel | `frontend/js/components/panels/SignalChainPanel.js` (3D / Table views, `runAction`, `runCommand`, node colours) |
 | Store | `frontend/js/store.js`: `transitions`, `flows`, `loadTransitions`, `addTransitions`, `setLens`, `feedSource`, `siphonSource`, `purgeCentrifuge`; `filters.lens` in `DEFAULT_FILTERS` (`filters.js`) and `backend/schemas/state.py` |
 | Interim Discovery controls | `HarvesterBar` in `frontend/js/components/ModeSwitch.js` (can go once the twin is in use) |
 
@@ -76,7 +83,7 @@ a loose guide only.
 | Channel | Carries | Can change |
 |---|---|---|
 | **Pipes** | matter, meaning rows (events, adventures) | only by a real stage change in the database |
-| **Light** (wires and beams) | filter and lens | only how the refinery *looks* |
+| **Light** (wires and beams) | filter and lens | only how the twin *looks* |
 
 Because of this rule, the counting rules hold whatever filter is on.
 
@@ -90,7 +97,7 @@ Because of this rule, the counting rules hold whatever filter is on.
 | harvesters: 19hz, ra, eventbrite | processor, **locked** | — | unlock on their own once a crawler for them is registered in `CRAWLERS` |
 | **centrifuge** | processor | events `new` (prima materia) | **Purge**; click → Nexus, Discovery mode on |
 | **sump** | vessel | events `ignored` *with no adventure* (shade) | Nexus, Discovery with shades shown |
-| **forge** | dynamo | — (hand-made adventures enter the chain here) | Refiner + create dialog |
+| **forge** | dynamo | — (hand-made adventures enter the chain here) | Refinery + create dialog |
 
 #### Harvester and centrifuge controls
 
@@ -116,7 +123,7 @@ The harvesters are a staging area that Discovery never sees. The inbox indicator
 | Node | Kind | Holds (phase / matter) | Panel on click |
 |---|---|---|---|
 | **hopper** | vessel (bridge between the zones) | `queued` / ore | — |
-| **refiner** | processor | `classifying` / essence | Refiner (node card) |
+| **refinery** | processor | `classifying` / essence | Refinery (node card) |
 | **alembic** | processor | `decomposing` / distillate | Alembic (Scripter as a sibling tab) |
 | **crucible** | processor | `constructing` / alloy | Crucible (quests) |
 | **arena** | processor | `consuming` / animus | — (no panel yet) |
@@ -142,7 +149,7 @@ breakdown by the current lens.
 ### Counting rules (checked on every recount, in dev builds)
 
 ```
-count(adventures) = hopper + refiner + alembic + crucible + arena + treasury + archive + necropolis
+count(adventures) = hopper + refinery + alembic + crucible + arena + treasury + archive + necropolis
 count(events)     = Σ harvesters + centrifuge + sump + count(adventures with an event)
 ```
 
@@ -163,7 +170,7 @@ they appear in the first rule but not the second.
   so the bands still add up to the right total.
 - **Draft pending** (the Nexus draft differs from the applied filter): the lantern's hood
   closes and the status lamp blinks amber. The beam doesn't change.
-- **Pass through**: the hood opens and the beam sweeps the refinery once, relighting it.
+- **Pass through**: the hood opens and the beam sweeps the twin once, relighting it.
 - **Date range / ring changes** (these apply immediately in the app): a pulse runs along
   the copper wire from the calendar or atlas into the lantern, then the relight happens.
 - **Selection**: a narrow spotlight follows the selected row's packet or vessel.
@@ -171,7 +178,7 @@ they appear in the first rule but not the second.
 ### Codex conveyor
 
 The codex is a cabinet of glass jars (⟁ pillars, ⌖ sites, ☉ contacts) that fill with the
-object count. A **chain conveyor**, visually unlike the liquid pipes, runs into the refiner.
+object count. A **chain conveyor**, visually unlike the liquid pipes, runs into the refinery.
 Linking an object to an adventure sends a small token in that type's colour along it.
 Unlinking sends one back, dimmed.
 
@@ -223,8 +230,8 @@ They are not copied into the log.
 | new Adventure, with an event that was `ignored` | sump → `node(phase)` |
 | new Adventure, no event | forge → `node(phase)` |
 | Adventure.phase `a` → `b` | `node(a)` → `node(b)` (covers kill, revive, sweeper, hand moves) |
-| new AdventureObject | codex → refiner (`entity=link`) |
-| deleted AdventureObject | refiner → codex (`entity=link`) |
+| new AdventureObject | codex → refinery (`entity=link`) |
+| deleted AdventureObject | refinery → codex (`entity=link`) |
 
 An `after_commit` listener queues a `transitions` websocket broadcast with the new rows.
 The phase → node map lives in one place on each side: `models.py` (`PHASE_NODES`) and
@@ -246,7 +253,7 @@ so the twin counts them on the client and filters with filters.js.
 
 Without history, every pipe starts at zero width. As built: for each existing row, write
 its *likely path* to its current node as `synthetic` transitions, one per pipe. For
-example, an adventure in the crucible gets centrifuge→hopper→refiner→alembic→crucible.
+example, an adventure in the crucible gets centrifuge→hopper→refinery→alembic→crucible.
 They are timestamped from `first_seen` / `created_at` / `reviewed_at` /
 `phase_changed_at`. The backfill is done once, guarded by the app_state key
 `transitions_backfilled`. The replay skips synthetic rows. Flows include them, but they
@@ -283,9 +290,9 @@ Each phase ends with something you can look at.
 
 ### Phase 0: names and cleanup ✅
 - lifecycle.js modules: Sensorium → **Centrifuge**, Limbo → **Sump**, Nexus (classifying) →
-  **Refiner**. Hopper and Treasury stay.
+  **Refinery**. Hopper and Treasury stay.
 - Centrifuge matter: omen → **prima materia**. Add the harvester stage (matter **flux**).
-- Panels: the **Refiner** takes the classification role, so its title flow becomes
+- Panels: the **Refinery** takes the classification role, so its title flow becomes
   ore → essence. The **Nexus** keeps its name; it is now the lantern (filters and lens),
   so its flow changes to something like matter → light.
 - UI says **harvester**, never crawler. The backend `crawlers/` package keeps its name
@@ -311,13 +318,13 @@ Each phase ends with something you can look at.
   panels. `scripts/check_twin_model.mjs <server url>` checks the model on live data under
   every lens. A hand move that skips stages counts on each chain pipe it passes.
 
-### Phase 3: scene v1, the refinery ✅
+### Phase 3: scene v1, the 3D view ✅
 - Three zones; simple placeholder shapes per machine kind; liquid levels (NET and
   CORE at separate scales); pipes with √ width; live packets plus replay; hover tooltips;
   click → panel; locked machines dimmed and padlocked.
 - Harvester and centrifuge buttons (Harvest / Feed / Siphon / Purge) as in-scene
   controls, plus a harvester filling up while it syncs.
-- As built: `js/lib/twinScene.js`. The panel has two views, **Refinery** (3D) and **Table**
+- As built: `js/lib/twinScene.js`. The panel has two views, **3D** and **Table**
   (the phase 2 tables, kept for analytics); the choice is remembered per browser. ⌂
   frames everything. Packets travel at about 55 units/s, and each hop takes at least
   1.2 s. Bursts of the same move draw at most 8 packets, the last one bigger. On open,
@@ -327,7 +334,37 @@ Each phase ends with something you can look at.
   `requestAnimationFrame`. To look at the scene from a script, copy the canvas into a 2D
   canvas first (with `preserveDrawingBuffer`).
 
-### Phase 4: light layer (next)
+### Phase 4: light layer ✅
+- As built (decided with the user 2026-11-20):
+  - **The lens is the Nexus's layer.** The old "Layers" row is now "Lens" (single choice).
+    The lens facet shows as stars; Matter shows the stage (phases in Adventures, review
+    states in Discovery). Active filters still always show. The twin has a ◀ lens ▶ wheel
+    on the lantern's label; the header select shows in the Table view only.
+  - **Base buttons apply at once** (`cycleStage` in the store: include → exclude → off,
+    mirrored into the draft). Harvesters share `review: harvested` (`nodeStage` in
+    twinTopology.js). Each vessel's base is a rune collar button (big hit area) that
+    lifts on hover and dips when pressed; white = included, red = excluded.
+  - Relight: `relightCause` in SignalChainPanel compares applied filters. Date range →
+    pulse down the calendar's wire, ring → the atlas's, facet / Seal / lens → straight to
+    the beam. The beam sweeps left to right over 1.6 s; each machine takes its new liquid
+    as the beam passes.
+  - Packets: under the stage lens they keep the machine's colour; under any other lens
+    they take the row's colour. Dim and smaller when the row fails the applied filter.
+  - Selection: a **magic circle** (two counter-rotating layers) at the base of the
+    machine holding the selected row, in the row's lens colour. (Replaced a spotlight;
+    the user loves magic circles: reuse `magicCircle.js`.)
+  - The Net has its own raised platform (`NET_Y` = 8).
+  - Harvest is off (disabled, no hover) for an hour after a harvest; the reason shows in
+    the harvester's tooltip.
+  - Object colours: chosen in the Codex (presets, any colour, Auto). They colour Nexus
+    object stars (unless excluded) and the object lenses.
+  - Not checked in a screenshot (timing): the beam sweep and wire pulse. Look at these
+    live.
+- Also done then: Refiner → **Refinery** (the node id too; `init_db` renames logged
+  `refiner` moves), the 3D view tab is now "3D", and a harvester that harvested within
+  the hour has a greyed (still clickable) Harvest button.
+
+Original notes:
 - Lit/ghost liquid, lens bands, packet colours, the lantern with hood, status lamp, beam
   sweep, copper wires plus pulses from the atlas and calendar, selection spotlight, base-ring
   stage toggle.
@@ -359,10 +396,10 @@ Each phase ends with something you can look at.
 ### Phase 5: codex cabinet and conveyor
 - Jars per type, chain conveyor, link/unlink tokens.
 - Already there from phase 3: the cabinet with three jars (pillar/site/contact) filled by
-  count, the codex→refiner pipe (`kind: 'conveyor'`, drawn as a brown pipe), and link
-  packets (brass, slower). Still to do: a real chain look, tokens in each object type's
-  colour (object types have no colours yet: pick some with the user), and dimmed tokens
-  on unlink.
+  count, the codex→refinery pipe (`kind: 'conveyor'`, drawn as a brown pipe), and link
+  packets (brass, slower). Still to do: a real chain look, link tokens (probably in the
+  object's own colour, `objectColor`, now that objects have colours: confirm with the
+  user), and dimmed tokens on unlink.
 
 ### Phase 6: lens in other views
 - Calendar blocks, Atlas pins and Nexus stars coloured by the lens.
@@ -389,7 +426,7 @@ Each phase ends with something you can look at.
 - Should harvested or centrifuge events whose time has passed be vented to the sump
   automatically (the sweeper only handles adventures today)?
 - Whether synthetic backfill rows count toward pipe widths permanently.
-- Panel name: "Signal Chain" for now. Its title question is "all"; the Refiner's is "why" and
+- Panel name: "Signal Chain" for now. Its title question is "all"; the Refinery's is "why" and
   the Nexus's "which" (chosen by Claude, not yet confirmed by the user).
 - Harvesters, forge and gallery positions are hand-placed in `layout()` in twinScene.js;
   they were tuned against screenshots at 1500×900.

@@ -16,6 +16,8 @@ class ObjectFields(BaseModel):
     lon: float | None = None
     # contacts only: email, phone, handle (null clears one)
     details: dict[str, str | None] | None = None
+    # "#rrggbb"; null or "" goes back to the default colour
+    color: str | None = None
 
 
 class ObjectCreate(ObjectFields):

@@ -220,6 +220,8 @@ interface VObject {
     lon: number | null;
     /** contacts: email, phone, handle */
     details: Record<string, string>;
+    /** "#rrggbb" chosen in the Codex; null = default (objectColor in lib/lens.js) */
+    color: string | null;
     created_at: string;
 }
 
@@ -227,6 +229,7 @@ interface VObject {
 type ObjectChanges = Partial<{
     name: string | null; description: string | null; url: string | null; address: string | null;
     city: string | null; lat: number | null; lon: number | null; details: Record<string, string | null>;
+    color: string | null;
 }>;
 
 interface SourceStatus {
@@ -305,6 +308,7 @@ interface WorkspaceState {
     addTransitions(records: TransitionRecord[], options?: { refreshFlows?: boolean }): void;
     /** Pick what colors the matter. Applies at once (to the draft too) and is saved. */
     setLens(lens: LensKey): void;
+    cycleStage(facet: 'phase' | 'review', value: string): void;
 
     initWorkspace(): Promise<void>;
     persistLayout(nextTree: LayoutNode | null): void;

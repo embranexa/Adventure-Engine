@@ -176,6 +176,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 @keyframes hv-fill { 50% { opacity: 0.4; } }
 .hv-btn { padding: 3px 9px; font-size: 10px; border-radius: 999px; }
 .hv-btn:disabled { opacity: 0.35; cursor: default; }
+.hv-btn.fresh, .twin-cmd.fresh { opacity: 0.3; filter: grayscale(1); pointer-events: none; } /* harvested recently: off */
 .shade-toggle {
     display: flex; align-items: center; gap: 6px; cursor: pointer;
     font: 600 12px var(--font-display); letter-spacing: 0.14em; color: var(--text-muted); text-transform: uppercase;
@@ -736,7 +737,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .btn:disabled { opacity: 0.4; cursor: default; border-color: var(--steel-2); color: var(--text-dim); }
 .btn.on { border-color: var(--text-muted); color: var(--text-bright); background: rgba(255, 255, 255, 0.07); }
 
-/* ═════════ Object links (Refiner) ═════════ */
+/* ═════════ Object links (Refinery) ═════════ */
 .ol { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .ol-head { color: var(--text-dim); font: 600 12px var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; }
 .ol-chips { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -804,6 +805,16 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .cx-row em { flex-shrink: 0; min-width: 20px; text-align: right; font: 500 10px var(--font-mono); font-style: normal; color: var(--text-muted); }
 .cx-detail { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; padding-right: 2px; }
 .cx-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cx-colors { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 2px 0 10px; }
+.cx-colors-title { font: 600 10px var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); margin-right: 4px; }
+.cx-swatch {
+    width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.15); padding: 0; cursor: pointer;
+    background: var(--c); box-shadow: 0 0 6px color-mix(in srgb, var(--c) 45%, transparent);
+}
+.cx-swatch.on { outline: 2px solid var(--text-bright); outline-offset: 2px; }
+.cx-custom { position: relative; overflow: hidden; background: conic-gradient(from 0deg, #f0643c, #f2b134, #3ccf8e, #4fb3ff, #c86bf0, #f0643c); }
+.cx-custom.on { background: var(--c); }
+.cx-custom input { position: absolute; inset: -6px; opacity: 0; cursor: pointer; }
 .cx-badge { color: var(--text-muted); font: 600 11px var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; }
 .cx-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .cx-actions .btn { padding: 4px 11px; font-size: 11px; border-radius: 4px; }
@@ -1063,7 +1074,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .sc-bar i.ghost { background: repeating-linear-gradient(45deg, rgba(255,255,255,0.08) 0 3px, transparent 3px 6px); }
 .sc-moves td:nth-child(3) { white-space: normal; }
 
-/* Signal Chain: view switch and the 3D refinery */
+/* Signal Chain: view switch and the 3D view */
 .sc-views { display: flex; border-radius: 999px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--steel-2); }
 .sc-view {
     border: 0; background: transparent; color: var(--text-muted); cursor: pointer; padding: 3px 12px;
@@ -1101,6 +1112,8 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 }
 .twin-cmd:hover:not(:disabled) { border-color: var(--steel-5); color: var(--text-bright); }
 .twin-cmd:disabled { opacity: 0.35; cursor: default; }
+.twin-lens { align-items: center; }
+.twin-lens-name { font: 600 9px var(--font-mono); color: var(--text-bright); min-width: 54px; text-align: center; }
 .twin-zone {
     position: absolute; left: 0; top: 0; will-change: transform;
     font: 700 11px var(--font-display); letter-spacing: 0.4em; text-transform: uppercase; color: rgba(200, 164, 106, 0.55);

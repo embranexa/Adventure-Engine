@@ -508,6 +508,29 @@ const workspaceStore = (set, get) => ({
         saveApplied(get); saveDraft(get);
     },
 
+    // The twin's base rings: cycle one stage (phase or review) include -> exclude -> off,
+    // applied at once (like the ranges), and mirrored into the draft.
+    cycleStage: (facet, value) => {
+        set((state) => {
+            const current = { ...(state.filters.facets[facet] ?? {}) };
+            const mode = nextMode(current[value]);
+            if (mode) current[value] = mode;
+            else delete current[value];
+            const applied = { ...state.filters.facets, [facet]: current };
+            if (!Object.keys(current).length) delete applied[facet];
+            const draftCurrent = { ...(state.draftFilters.facets[facet] ?? {}) };
+            if (mode) draftCurrent[value] = mode;
+            else delete draftCurrent[value];
+            const draft = { ...state.draftFilters.facets, [facet]: draftCurrent };
+            if (!Object.keys(draftCurrent).length) delete draft[facet];
+            return withVisible(state, {
+                filters: { ...state.filters, facets: applied },
+                draftFilters: { ...state.draftFilters, facets: draft },
+            });
+        });
+        saveApplied(get); saveDraft(get);
+    },
+
     setDateRange: (range) => {
         set((state) => withVisible(state, {
             filters: { ...state.filters, date_range: range },

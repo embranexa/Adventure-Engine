@@ -5,7 +5,7 @@
 // facet from filters.js, so a row's lens values are its facet values.
 // See resources/signal chain digital twin/BUILD_PLAN.md, section 1 ("Light").
 
-import { FACETS, UNKNOWN, facetLabel, facetValues } from '../filters.js';
+import { FACETS, UNKNOWN, chosenObjectColor, facetLabel, facetValues } from '../filters.js';
 import { ADVENTURE_TYPES, PHASE_STAGES, REVIEW_STAGES } from '../lifecycle.js';
 
 /** Facets that can't be a lens: the stage lens already covers them. */
@@ -21,7 +21,9 @@ export const LENSES = [
 const SOURCE_COLORS = { luma: '#3ccf8e', '19hz': '#4f8cff', ra: '#f2b134', eventbrite: '#f0643c' };
 const TYPE_COLORS = { event: '#4fb3ff', item: '#e0a43a', song: '#c86bf0' };
 /** Everything else: a value keeps the same color across reloads (picked by its text). */
-const PALETTE = ['#4fb3ff', '#3ccf8e', '#f2b134', '#f0643c', '#c86bf0', '#2fd2c9', '#ff7aa8', '#a3d14b', '#8f8cff', '#ffb27a'];
+export const PALETTE = ['#4fb3ff', '#3ccf8e', '#f2b134', '#f0643c', '#c86bf0', '#2fd2c9', '#ff7aa8', '#a3d14b', '#8f8cff', '#ffb27a'];
+/** Object facets: their values are object ids, coloured by the object. */
+const OBJECT_LENSES = new Set(['pillar', 'site', 'contact']);
 const UNKNOWN_COLOR = '#5b616b';
 /** Value for rows the lens's facet doesn't apply to (raw events under an adventure-only facet). */
 export const NOT_APPLICABLE = 'n/a';
@@ -54,6 +56,14 @@ export function lensValues(item, lens) {
     return facetValues(item, facet);
 }
 
+/**
+ * An object's colour: the one chosen in the Codex, else a stable default from its id.
+ * @param {string} id
+ */
+export function objectColor(id) {
+    return chosenObjectColor(id) ?? PALETTE[hash(id) % PALETTE.length];
+}
+
 /** Display color of one lens value. @param {LensKey} lens @param {string} value */
 export function lensColor(lens, value) {
     if (value === UNKNOWN) return UNKNOWN_COLOR;
@@ -62,6 +72,7 @@ export function lensColor(lens, value) {
         return PHASE_STAGES[/** @type {Phase} */ (value)]?.color ?? REVIEW_STAGES[/** @type {ReviewState} */ (value)]?.color ?? UNKNOWN_COLOR;
     }
     if (lens === 'source') return SOURCE_COLORS[/** @type {keyof typeof SOURCE_COLORS} */ (value)] ?? PALETTE[hash(value) % PALETTE.length];
+    if (OBJECT_LENSES.has(lens)) return objectColor(value);
     if (lens === 'type') return TYPE_COLORS[/** @type {keyof typeof TYPE_COLORS} */ (value)] ?? PALETTE[hash(value) % PALETTE.length];
     return PALETTE[hash(value) % PALETTE.length];
 }
