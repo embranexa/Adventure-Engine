@@ -77,6 +77,24 @@ export function lensColor(lens, value) {
     return PALETTE[hash(value) % PALETTE.length];
 }
 
+/**
+ * A row's colour under the lens: its first lens value's colour (its matter colour under
+ * Matter). Used by views that draw one mark per row (Calendar blocks, Atlas pins).
+ * @param {PoolItem} item @param {LensKey} lens
+ */
+export function itemLensColor(item, lens) {
+    return lens === 'stage' ? item.color : lensColor(lens, lensValues(item, lens)[0]);
+}
+
+/**
+ * A facet value's colour, for any facet (the stage facets `phase` / `review` use the
+ * stage colours). Used by Nexus stars.
+ * @param {FacetKey} facet @param {string} value
+ */
+export function facetColor(facet, value) {
+    return lensColor(NOT_LENSES.has(facet) ? 'stage' : /** @type {LensKey} */ (facet), value);
+}
+
 /** Display label of one lens value. @param {LensKey} lens @param {string} value */
 export function lensLabel(lens, value) {
     if (value === NOT_APPLICABLE) return 'Raw event';

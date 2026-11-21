@@ -16,7 +16,8 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { galaxyRadius, layout } from './classifierGraph.js';
+import { ROLE_COLORS, galaxyRadius, layout } from './classifierGraph.js';
+import { magicCircleCanvases } from './magicCircle.js';
 import { stageOf } from '../lifecycle.js';
 import { deferredResize, isResizing } from './resizing.js';
 
@@ -100,6 +101,8 @@ export class ClassifierScene {
             sphere: new THREE.SphereGeometry(1, 24, 16),
             ring: new THREE.TorusGeometry(1, 0.06, 8, 64),
             glow: this._glowTexture(),
+            plane: new THREE.PlaneGeometry(1, 1),
+            ...this._sigilTextures(),
         };
 
         this.stars = new Map();     // id -> { star, group, core, ring, glow, label, pos, target }
@@ -148,6 +151,28 @@ export class ClassifierScene {
         const tex = new THREE.CanvasTexture(c);
         tex.colorSpace = THREE.SRGBColorSpace;
         return tex;
+    }
+
+    /** The role sigil's two layers (a magic circle, white so each star can tint it). */
+    _sigilTextures() {
+        const { outer, inner } = magicCircleCanvases(256);
+        const tex = (cv) => {
+            const t = new THREE.CanvasTexture(cv);
+            t.colorSpace = THREE.SRGBColorSpace;
+            return t;
+        };
+        return { sigilOuter: tex(outer), sigilInner: tex(inner) };
+    }
+
+    /** One flat sigil layer, lying in the star's horizontal plane. */
+    _sigilLayer(map) {
+        const m = new THREE.Mesh(this.shared.plane, new THREE.MeshBasicMaterial({
+            map, color: 0xffffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending,
+            depthWrite: false, side: THREE.DoubleSide,
+        }));
+        m.rotation.x = -Math.PI / 2;
+        m.scale.setScalar(46);
+        return m;
     }
 
     _glowSprite(color, scale, opacity = 0.8) {
@@ -369,7 +394,13 @@ export class ClassifierScene {
         const ping = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: star.color, transparent: true, opacity: 0 }));
         ping.rotation.x = Math.PI / 2;
         const spark = this._glowSprite('#ffffff', 5, 0.9);
-        group.add(core, ring, ring2, ping, spark, glow);
+        // the role: a magic circle in the role's colour (white include, red exclude, gold seal)
+        const sigil = new THREE.Group();
+        const sigilOuter = this._sigilLayer(this.shared.sigilOuter);
+        const sigilInner = this._sigilLayer(this.shared.sigilInner);
+        sigil.add(sigilOuter, sigilInner);
+        sigil.position.y = -4;
+        group.add(core, ring, ring2, ping, spark, glow, sigil);
         core.userData.star = star.id;
         this.scene.add(group);
 
@@ -380,7 +411,7 @@ export class ClassifierScene {
         label.addEventListener('contextmenu', (ev) => { ev.preventDefault(); this.onStarContext(this.stars.get(star.id)?.star); });
         this.labels.appendChild(label);
 
-        const e = { star, group, core, ring, ring2, ping, spark, glow, label, pos: null, target: null, phase: Math.random() * Math.PI * 2 };
+        const e = { star, group, core, ring, ring2, ping, spark, glow, sigil, sigilOuter, sigilInner, label, pos: null, target: null, phase: Math.random() * Math.PI * 2 };
         this.stars.set(star.id, e);
         return e;
     }
@@ -391,9 +422,16 @@ export class ClassifierScene {
         e.core.material.color.copy(color);
         e.ring.material.color.copy(color);
         e.ring2.material.color.copy(color);
-        e.ping.material.color.copy(color);
         e.glow.material.color.copy(color);
         const active = star.role !== 'off';
+        // the role, never the colour: a sigil and a ping in the role's colour
+        const roleColor = active ? ROLE_COLORS[/** @type {keyof typeof ROLE_COLORS} */ (star.role)] : null;
+        e.sigil.visible = !!roleColor;
+        if (roleColor) {
+            e.sigilOuter.material.color.set(roleColor);
+            e.sigilInner.material.color.set(roleColor);
+            e.ping.material.color.set(roleColor);
+        }
         e.ring.material.opacity = active ? 0.85 : 0.35;
         e.ring2.visible = star.role !== 'exclude';
         e.spark.visible = star.role !== 'exclude';
@@ -408,7 +446,7 @@ export class ClassifierScene {
 
     _removeStar(id, e) {
         this.scene.remove(e.group);
-        for (const o of [e.core, e.ring, e.ring2, e.ping, e.spark, e.glow]) o.material.dispose();
+        for (const o of [e.core, e.ring, e.ring2, e.ping, e.spark, e.glow, e.sigilOuter, e.sigilInner]) o.material.dispose();
         e.label.remove();
         this.stars.delete(id);
     }
@@ -680,6 +718,8 @@ export class ClassifierScene {
             e.spark.position.set(Math.cos(sa) * 12, Math.sin(sa * 0.7) * 4, Math.sin(sa) * 12);
             const pf = ((this.time * 0.4 + e.phase) % 1);
             e.ping.scale.setScalar(6 + pf * 26);
+            e.sigilOuter.rotation.z = this.time * 0.25 + e.phase;
+            e.sigilInner.rotation.z = -this.time * 0.4 - e.phase;
             e.ping.material.opacity = (1 - pf) * 0.5;
             this._place(e.label, e.pos.clone().add(new THREE.Vector3(0, 14, 0)));
         }

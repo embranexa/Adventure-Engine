@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { DEFAULT_RING_RADIUS_KM, useWorkspaceStore } from '../../store.js';
 import { LevelMap, loadMapLibraries } from '../../lib/levelMap.js';
 import { KM_PER_MI, formatDistance } from '../../filters.js';
+import { itemLensColor } from '../../lib/lens.js';
 
 /**
  * Proximity ring controls: place by clicking the map or anchor it on a site; set radius,
@@ -147,6 +148,12 @@ export function MapPanel() {
     const [placing, setPlacing] = useState(false);
     const objects = useWorkspaceStore((s) => s.objects);
     const atlasFocus = useWorkspaceStore((s) => s.atlasFocus);
+    const lens = useWorkspaceStore((s) => s.filters.lens);
+    // pins in the lens colour (Matter: the stage colour each item already has)
+    const tinted = useMemo(
+        () => (lens === 'stage' ? events : events.map((e) => ({ ...e, color: itemLensColor(e, lens) }))),
+        [events, lens, objects],
+    );
     const [siteMenu, setSiteMenu] = useState(/** @type {{ site: VObject, x: number, y: number } | null} */ (null));
 
     // Create the map once; dispose it when the panel unmounts (tab switch, close).
@@ -185,8 +192,8 @@ export function MapPanel() {
     }, []);
 
     useEffect(() => {
-        mapRef.current?.updateNodes(events);
-    }, [events, status]);
+        mapRef.current?.updateNodes(tinted);
+    }, [tinted, status]);
 
     useEffect(() => {
         const map = mapRef.current;

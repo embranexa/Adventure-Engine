@@ -8,24 +8,18 @@
 // Whether an item passes is decided by filters.js. Every active filter is always a
 // visible star, so all items in a galaxy share the same answer.
 
-import { FACETS, UNKNOWN, facetLabel, facetValues, inDateRange, inRing, isSealed, passes } from '../filters.js';
-import { objectColor } from './lens.js';
-
-/** Facet star colours (off state). */
-/** Parent colors: monochrome (matter colors are for adventures). Off parents are steel. */
-const FACET_COLOR = '#9aa0aa';
-export const ROLE_COLORS = { include: '#f2f3f5', exclude: '#4a4f58', seal: '#e9c43b' };
-const OBJECT_FACETS = new Set(['pillar', 'site', 'contact']);
+import { FACETS, facetLabel, facetValues, inDateRange, inRing, isSealed, passes } from '../filters.js';
+import { facetColor } from './lens.js';
 
 /**
- * A facet star's colour. Objects keep their own colour (from the Codex) unless excluded;
- * the rest are grey when off and white when included.
- * @param {FacetKey} facet @param {string} value @param {FilterMode | 'off'} role
+ * A star's colour is its identity, never its role: facet values use their lens colour
+ * (lens.js), whatever the filter. The role (include / exclude / seal) is shown by a
+ * magic circle around the star in the role's colour (classifierScene.js).
  */
-function starColor(facet, value, role) {
-    if (OBJECT_FACETS.has(facet) && value !== UNKNOWN && role !== 'exclude') return objectColor(value);
-    return role === 'off' ? FACET_COLOR : ROLE_COLORS[role];
-}
+export const ROLE_COLORS = { include: '#ffffff', exclude: '#e0524a', seal: '#e9c43b' };
+/** Identity colours of the stars that aren't facet values. */
+const DATE_COLOR = '#c8a46a';
+const RING_COLOR = '#5fe0e6';
 
 /**
  * @typedef {{
@@ -69,7 +63,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
             stars.push({
                 id, kind: 'facet', facet: facet.key, value, group: facet.label,
                 label: facetLabel(facet, value),
-                role, color: starColor(facet.key, value, role),
+                role, color: facetColor(facet.key, value),
                 count: counts.get(value) ?? 0, collapsed: collapsed.has(id),
             });
             membership.set(id, (item) => facetValues(item, facet).includes(value));
@@ -80,7 +74,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
         const r = filters.date_range;
         stars.push({
             id: 'date', kind: 'date', group: 'Date', label: r.start === r.end ? r.start : `${r.start} → ${r.end}`,
-            role: r.mode, color: ROLE_COLORS[r.mode], count: 0, collapsed: collapsed.has('date'),
+            role: r.mode, color: DATE_COLOR, count: 0, collapsed: collapsed.has('date'),
         });
         membership.set('date', (item) => inDateRange(item, r));
     }
@@ -88,7 +82,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
         const ring = filters.ring;
         stars.push({
             id: 'ring', kind: 'ring', group: 'Proximity', label: ring.center.label || 'Ring',
-            role: ring.mode, color: ROLE_COLORS[ring.mode], count: 0, collapsed: collapsed.has('ring'),
+            role: ring.mode, color: RING_COLOR, count: 0, collapsed: collapsed.has('ring'),
         });
         membership.set('ring', (item) => inRing(item, ring));
     }

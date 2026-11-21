@@ -150,9 +150,6 @@ export class TwinScene {
 
         this.labels = el('div', 'twin-labels');
         this.container.appendChild(this.labels);
-        this.tooltip = el('div', 'twin-tip');
-        this.tooltip.style.display = 'none'; // shown on hover
-        this.container.appendChild(this.tooltip);
 
         this.scene = new THREE.Scene();
         this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -4000, 4000);
@@ -939,49 +936,6 @@ export class TwinScene {
         const rec = id ? this.machines.get(id) : null;
         this.renderer.domElement.style.cursor = rec && !rec.node.locked && (ring || rec.node.action) ? 'pointer' : '';
         for (const m of this.machines.values()) m.label.classList.toggle('hover', m.id === id);
-        this._renderTooltip();
-    }
-
-    _renderTooltip() {
-        const rec = this.hoverId ? this.machines.get(this.hoverId) : null;
-        this.tooltip.replaceChildren();
-        this.tooltip.style.display = rec ? '' : 'none';
-        if (!rec || !this.data) return;
-        const n = rec.node;
-        const level = this.data.levels[n.id];
-        const add = (cls, text) => this.tooltip.appendChild(el('div', cls, text));
-        add('twin-tip-title', n.label);
-        add('twin-tip-dim', `${n.kind}${n.matter ? ` · holds ${n.matter}` : ''}`);
-        if (n.locked) add('twin-tip-dim', 'Locked: not built yet');
-        const fresh = n.kind === 'harvester' ? this.data.fresh?.[n.label] : null;
-        if (fresh) add('twin-tip-dim', fresh);
-        if (n.id === 'nexus' && this.data.light) {
-            const light = this.data.light;
-            add('', `Lens: ${light.lensLabel}`);
-            add('twin-tip-dim', light.pending
-                ? `Hood closed: ${light.pending} pending change${light.pending === 1 ? '' : 's'} in the Nexus (Pass through to relight)`
-                : 'Hood open: the applied filter lights the machines');
-        }
-        if (n.holds === 'objects') {
-            const t = this.data.codex.byType;
-            add('', `${this.data.codex.total} objects · ⟁ ${t.pillar ?? 0}  ⌖ ${t.site ?? 0}  ☉ ${t.contact ?? 0}`);
-        } else if (n.holds) {
-            add('', `${level?.total ?? 0} held · ${level?.lit ?? 0} lit by the filter`);
-            for (const b of (level?.bands ?? []).slice(0, 5)) {
-                const row = el('div', 'twin-tip-band');
-                const sw = el('i');
-                sw.style.background = b.color;
-                row.append(sw, document.createTextNode(`${b.label} ${Number.isInteger(b.count) ? b.count : b.count.toFixed(1)}`));
-                this.tooltip.appendChild(row);
-            }
-        }
-        const io = this.data.io?.[n.id];
-        if (io && (io.in || io.out)) add('twin-tip-dim', `7 days: ${io.in} in · ${io.out} out`);
-        if (this.hoverRing) {
-            const next = { include: 'exclude it', exclude: 'clear it' }[rec.ringMode] ?? `show only ${n.matter ?? 'this stage'}`;
-            add('twin-tip-hint', `Base button${rec.ringMode ? ` (${rec.ringMode}d)` : ''}: click to ${next} · applies at once`);
-        } else if (n.action && !n.locked) add('twin-tip-hint', `Click: open ${n.action.label ?? n.action.panel}`);
-        else if (rec.ring && n.holds && n.holds !== 'objects' && !n.locked) add('twin-tip-hint', 'Press its base button to filter by this stage');
     }
 
     _bindEvents() {
@@ -1222,9 +1176,6 @@ export class TwinScene {
             if (!at) continue;
             rec.label.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px) translate(-50%, -100%)`;
             rec.label.style.zIndex = String(1000 - Math.round(at[2] * 500));
-            if (rec.id === this.hoverId) {
-                this.tooltip.style.transform = `translate(${at[0].toFixed(1)}px, ${(at[1] + 8).toFixed(1)}px) translate(-50%, 0)`;
-            }
         }
         for (const z of this.zoneLabels) {
             const at = this._project(z.at);

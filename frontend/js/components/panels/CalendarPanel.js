@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../../store.js';
 import { addDays, hourOf, layoutWeek, sameDay, startOfWeek } from './calendarLayout.js';
 import { dayKey, parseDay } from '../../filters.js';
 import { stageOf } from '../../lifecycle.js';
+import { itemLensColor, lensLabel, lensValues } from '../../lib/lens.js';
 
 const FIRST_HOUR = 6;   // visible range: 06:00 ...
 const LAST_HOUR = 24;   // ... to midnight
@@ -27,12 +28,14 @@ function useNow(ms) {
  * Memoized: hovering or selecting re-renders only the blocks whose flags changed.
  * @param {{
  *   block: import('./calendarLayout.js').CalendarBlock,
- *   selected: boolean, hovered: boolean,
+ *   selected: boolean, hovered: boolean, lens: LensKey,
  *   selectItem: WorkspaceState['selectItem'], hoverItem: WorkspaceState['hoverItem'],
  * }} props
  */
-function CalendarBlockImpl({ block, selected, hovered, selectItem, hoverItem }) {
+function CalendarBlockImpl({ block, selected, hovered, lens, selectItem, hoverItem }) {
     const { event } = block;
+    // coloured and labelled by the lens (Matter: the stage)
+    const tag = lens === 'stage' ? stageOf(event)?.matter ?? '' : lensLabel(lens, lensValues(event, lens)[0]);
     const className = ['cal-block', selected && 'sel', hovered && 'hov',
         block.clippedTop && 'clip-top', block.clippedBottom && 'clip-bottom'].filter(Boolean).join(' ');
     return html`
@@ -41,7 +44,7 @@ function CalendarBlockImpl({ block, selected, hovered, selectItem, hoverItem }) 
             data-id=${event.id}
             title=${`${event.title}\n${fmtTime(block.start)} – ${fmtTime(block.end)}`}
             style=${{
-                '--c': event.color,
+                '--c': itemLensColor(event, lens),
                 top: `${block.top * HOUR_PX}px`,
                 height: `${block.height * HOUR_PX}px`,
                 left: `${(block.lane / block.lanes) * 100}%`,
@@ -52,7 +55,7 @@ function CalendarBlockImpl({ block, selected, hovered, selectItem, hoverItem }) 
             onPointerLeave=${() => hoverItem(null)}
         >
             <b>${event.title}</b>
-            <span>${stageOf(event)?.matter ?? ''} · ${fmtTime(block.start)}</span>
+            <span>${tag} · ${fmtTime(block.start)}</span>
         </div>
     `;
 }
@@ -68,6 +71,8 @@ export function CalendarPanel() {
     const selectionSource = useWorkspaceStore((s) => s.selectionSource);
     const hoveredId = useWorkspaceStore((s) => s.hoveredItemId);
     const selectItem = useWorkspaceStore((s) => s.selectItem);
+    const lens = useWorkspaceStore((s) => s.filters.lens);
+    useWorkspaceStore((s) => s.objects); // object colours (Codex) feed the lens colours
     const hoverItem = useWorkspaceStore((s) => s.hoverItem);
 
     const now = useNow(60_000);
@@ -209,6 +214,7 @@ export function CalendarPanel() {
                                     block=${b}
                                     selected=${b.event.id === selectedId}
                                     hovered=${b.event.id === hoveredId}
+                                    lens=${lens}
                                     selectItem=${selectItem}
                                     hoverItem=${hoverItem}
                                 />
