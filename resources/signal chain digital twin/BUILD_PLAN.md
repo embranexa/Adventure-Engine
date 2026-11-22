@@ -30,17 +30,20 @@ spec, superseded wherever they disagree. `signal_chain.md` gives the chain order
 
 ### 0.2 Where we are (2026-11-21)
 
-Phases 0–4 are built and committed. Phase 5 (the codex conveyor) is **skipped** (the
-user decided 2026-11-21: unclear value). Phase 6 (the lens in other views; the tooltip
-removed) and phase 8 (pop-out windows) are **built, waiting for the user's feedback and
-a commit**. Phase 7 (machine detail) was **parked** by the user (2026-11-21: "we'll come
-back to this"); its plan and open questions are under phase 7.
+Phases 0–4, 6 and 8 are built and committed. Phase 5 (the codex conveyor) is
+**skipped** (the user decided 2026-11-21: unclear value). **Next: phase 7, the
+aesthetics rebuild.** Its design was prototyped and approved as `atelier.html` (this
+folder), and its integration plan, with the user's answers, is **`PHASE7_PLAN.md`**
+(this folder): read that first, then start at stage 7a. Commit only when the user asks
+(not one commit per stage).
 
 | Commit | What |
 |---|---|
 | `b7dd63e` | phases 0–2: names, harvesters, transitions log, twin model (tables) |
 | `cdfcea2` | phase 3: the 3D view |
 | `a32d99e` | phase 4 (the light layer) plus the user's follow-ups: base buttons, magic circle selection, Net platform, Refiner → Refinery, Harvest cooldown, object colours |
+| `20c12f0` | phase 6: lens colours in Nexus, Calendar, Atlas; the twin tooltip removed |
+| `a426947` | phase 8: pop-out windows |
 
 Run `git log --oneline -5` and `git status` first. Later commits may exist that this
 file doesn't mention yet.
@@ -494,7 +497,7 @@ Each phase ends with something you can look at.
   per type? (3) What should the chain look like (links, a belt, glyph tiles)? Is a magic
   circle on the cabinet welcome (likely yes; see 0.4)?
 
-### Phase 6: lens in other views, plus the tooltip fix ✅ (built, not committed)
+### Phase 6: lens in other views, plus the tooltip fix ✅
 - From the user's notes (`resources/upgrades.md`, "[signal chain]"): "cities, sources, etc
   need coloring on nexus too" and "hover panels cover base ring hitbox".
 - **Nexus stars in their lens colour.** Today only object stars have a colour
@@ -544,13 +547,13 @@ Each phase ends with something you can look at.
   - Not verified: Atlas pins up close (the screenshots were too zoomed out to see pin
     colours), and the excluded sigil is faint at the default zoom.
 
-### Phase 7: machine detail and polish (after phase 6)
+### Phase 7: machine detail and polish → see `PHASE7_PLAN.md` (supersedes the notes below)
 - The user's "[signal chain] better aesthetics" note.
 - Proper machines (centrifuge rotor cage, alembic condenser coils, crucible induction glow,
   lantern optics, armillary, astrolabe). Bottleneck highlight: a vessel glows when its
   level is high relative to what flows out of it.
 
-### Phase 8: pop-out windows (a general dock feature) ✅ (built, not committed)
+### Phase 8: pop-out windows (a general dock feature) ✅
 - Any panel can detach into a separate browser window sharing the same store. Closing the
   window puts the panel back in the dock.
 - **User's answers (2026-11-21):** on reload, popped-out panels go back into the dock (no

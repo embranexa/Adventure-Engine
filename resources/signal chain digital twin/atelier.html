@@ -1,0 +1,1544 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>
+<title>Signal Chain Atelier</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workshop bench. Nameplate bar, a control strip, a machine rail on the left (gallery only), the 3D stage filling the rest. */
+:root {
+    --abyss: #07080b;
+    --glass: rgba(14, 16, 20, 0.82);
+    --steel: #2b2f36;
+    --text: #c9ccd2;
+    --dim: #7d838d;
+    --bright: #f1f2f4;
+    --brass: #c8a46a;
+    --font-display: "Saira Condensed", "Arial Narrow", system-ui, sans-serif;
+    --font-body: Inter, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+    color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--abyss); color: var(--text); font: 400 13px/1.45 var(--font-body); overflow: hidden; }
+.app { height: 100%; display: flex; flex-direction: column; }
+.bar, .controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.bar { padding-block: 10px; border-bottom: 1px solid var(--steel); background: linear-gradient(#0d0f13, #0a0b0e); }
+.controls { padding-block: 8px; border-bottom: 1px solid var(--steel); background: #0a0b0e; }
+.brand { font: 600 15px var(--font-display); letter-spacing: 0.22em; text-transform: uppercase; color: var(--bright); display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.brand small { font: 500 11px var(--font-mono); letter-spacing: 0.04em; text-transform: none; color: var(--dim); }
+.spacer { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--steel); border-radius: 7px; overflow: hidden; }
+.seg button, .btn {
+    font: 600 11px var(--font-display); letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--dim); background: transparent; border: 0; padding: 6px 11px; cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--steel); }
+.seg button[aria-pressed="true"] { color: #15110a; background: var(--brass); }
+.btn { border: 1px solid var(--brass); color: var(--brass); border-radius: 7px; }
+.btn:hover { background: rgba(200, 164, 106, 0.12); }
+.seg button:focus-visible, .btn:focus-visible, select:focus-visible { outline: 2px solid var(--brass); outline-offset: -2px; }
+select { font: 500 11px var(--font-mono); color: var(--text); background: #111318; border: 1px solid var(--steel); border-radius: 7px; padding: 5px 8px; max-width: 100%; }
+.seg-label { font: 500 10px var(--font-mono); color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
+.group { display: inline-flex; align-items: center; gap: 7px; }
+main { flex: 1; display: flex; min-height: 0; }
+.rail {
+    width: 220px; flex: none; overflow-y: auto; border-right: 1px solid var(--steel);
+    padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; background: #0a0b0e;
+}
+.rail h2 { font: 600 10px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin: 10px 8px 4px; }
+.rail button {
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; cursor: pointer;
+    background: transparent; border: 0; border-radius: 6px; padding: 6px 8px; color: var(--text); font: 500 12px var(--font-body);
+}
+.rail button i { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.rail button small { margin-left: auto; color: var(--dim); font: 400 10px var(--font-mono); }
+.rail button:hover { background: rgba(255, 255, 255, 0.04); }
+.rail button[aria-current="true"] { background: rgba(200, 164, 106, 0.14); color: var(--bright); }
+.rail button:focus-visible { outline: 2px solid var(--brass); }
+.stage { flex: 1; position: relative; min-width: 0; }
+canvas { display: block; width: 100%; height: 100%; }
+.labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
+.lbl {
+    position: absolute; left: 0; top: 0; white-space: nowrap; text-align: center;
+    font: 600 10px var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bright);
+    padding: 1px 6px; border-radius: 3px; background: rgba(5, 6, 8, 0.62);
+}
+.lbl b { display: block; font: 500 9px var(--font-mono); letter-spacing: 0.02em; text-transform: none; color: var(--c, var(--dim)); }
+.lbl .acts { display: flex; gap: 3px; justify-content: center; margin: 3px 0 1px; }
+.lbl .acts button {
+    pointer-events: auto; cursor: pointer; font: 600 9px var(--font-display); letter-spacing: 0.12em; text-transform: uppercase;
+    color: #15110a; background: var(--brass); border: 0; border-radius: 3px; padding: 2px 6px;
+}
+.lbl .acts button.danger { background: #c9584f; color: #fff; }
+.lbl .acts button:hover { filter: brightness(1.15); }
+.lbl .acts button:focus-visible { outline: 2px solid var(--bright); }
+.caption, .legend {
+    position: absolute; bottom: 16px; padding: 11px 13px; border-radius: 8px;
+    background: var(--glass); box-shadow: inset 0 0 0 1px var(--steel); z-index: 7;
+}
+.caption { left: 16px; max-width: min(430px, calc(100% - 32px)); }
+.caption h3 { margin: 0; font: 600 18px var(--font-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--bright); text-wrap: balance; }
+.caption .holds { font: 500 11px var(--font-mono); color: var(--c, var(--brass)); margin: 2px 0 8px; }
+.caption p { margin: 0; }
+.legend { right: 16px; max-width: 310px; font: 400 11px var(--font-mono); color: var(--dim); }
+.legend b { color: var(--text); font-weight: 500; }
+.legend ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.legend li { display: flex; align-items: center; gap: 5px; }
+.legend li i { width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+.toast {
+    position: absolute; left: 50%; top: 16px; transform: translateX(-50%); z-index: 8;
+    padding: 7px 14px; border-radius: 7px; background: var(--glass); box-shadow: inset 0 0 0 1px var(--brass);
+    font: 500 12px var(--font-mono); color: var(--bright); transition: opacity .3s; pointer-events: none;
+}
+@media (max-width: 760px) {
+    main { flex-direction: column; }
+    .rail { width: auto; height: 110px; border-right: 0; border-bottom: 1px solid var(--steel); flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
+    .rail h2 { display: none; }
+    .rail button { width: auto; }
+    .legend { display: none; }
+}
+</style>
+
+<div class="app">
+    <header class="bar">
+        <span class="brand">Signal Chain Atelier <small>aesthetics prototype · phase 7 · round 8</small></span>
+        <span class="spacer"></span>
+        <span class="group"><span class="seg-label">View</span>
+            <span class="seg" role="group" aria-label="View">
+                <button id="v-gallery" type="button" aria-pressed="false">Gallery</button>
+                <button id="v-twin" type="button" aria-pressed="false">Twin</button>
+            </span>
+        </span>
+        <button class="btn" id="replay" type="button">▶ Replay moves</button>
+    </header>
+    <div class="controls">
+        <span class="group"><span class="seg-label">Lens</span>
+            <span class="seg" role="group" aria-label="Lens">
+                <button data-lens="stage" type="button">Matter</button>
+                <button data-lens="source" type="button">Source</button>
+                <button data-lens="city" type="button">City</button>
+                <button data-lens="type" type="button">Type</button>
+            </span>
+        </span>
+        <label class="group" for="filter"><span class="seg-label">Filter</span>
+            <select id="filter">
+                <option value="none">No filter</option>
+                <option value="la">Only Los Angeles</option>
+                <option value="noitems">Exclude items</option>
+            </select>
+        </label>
+        <label class="group" for="selected"><span class="seg-label">Selected row</span>
+            <select id="selected">
+                <option value="">None</option>
+                <option value="refinery:0">Event in Bristol (Refinery)</option>
+                <option value="hopper:1">Event in Los Angeles (Hopper)</option>
+                <option value="treasury:0">Event in San Diego (Treasury)</option>
+                <option value="sump:0">Dross from Los Angeles (Sump)</option>
+            </select>
+        </label>
+        <label class="group" for="inuse"><span class="seg-label">Panel in use</span>
+            <select id="inuse">
+                <option value="">None</option>
+                <option value="Forge">Forge (new adventure)</option><option>Nexus</option><option>Refinery</option><option>Alembic</option><option>Crucible</option>
+                <option>Codex</option><option>Atlas</option><option>Calendar</option>
+            </select>
+        </label>
+    </div>
+    <main>
+        <nav class="rail" id="rail" aria-label="Machines"></nav>
+        <section class="stage" id="stage">
+            <canvas id="c"></canvas>
+            <div class="labels" id="labels"></div>
+            <div class="toast" id="toast" style="opacity:0"></div>
+            <div class="caption" id="caption"></div>
+            <div class="legend" id="legend"></div>
+        </section>
+    </main>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const TAU = Math.PI * 2;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SILVER = '#cfd6e0';
+
+/* ------------------------------------------------------------------ */
+/*  Data snapshot (from the live app, 2026-11-21)                      */
+/* ------------------------------------------------------------------ */
+// Each zone has its own vessel scale: a full Net heart holds 10x the rows of a full Core
+// heart (raw events are bulk; adventures are refined). The Temper marks the step.
+const CAP = { net: 120, core: 12 };
+const R = (n, source, city, type) => Array.from({ length: n }, () => ({ source, city, type }));
+const ROWS = {
+    sump: [...R(17, 'luma', 'Los Angeles', null), ...R(2, 'luma', 'West Hollywood', null), ...R(1, 'luma', 'La Verne', null), ...R(1, 'luma', 'Whittier', null),
+        ...R(1, 'luma', 'Beverly Hills', null), ...R(1, 'luma', 'Monterey Park', null), ...R(1, 'luma', 'Pasadena', null), ...R(1, 'luma', 'Redondo Beach', null)],
+    hopper: [...R(1, null, null, 'event'), ...R(1, 'luma', 'Los Angeles', 'event'), ...R(2, null, null, 'item')],
+    refinery: [...R(1, null, 'Bristol', 'event'), ...R(1, null, 'Norco', 'event'), ...R(2, null, null, 'song')],
+    crucible: R(3, null, null, 'item'),
+    arena: R(1, null, null, 'item'),
+    treasury: [...R(1, null, 'San Diego', 'event'), ...R(1, null, 'Irvine', 'event')],
+};
+const NODES = [
+    { id: 'harvester:luma', name: 'Luma', kind: 'harvester', zone: 'net', matter: 'flux', light: '#9fb0c4', pos: [-372, 80], vessel: true, actions: ['Harvest', 'Feed', 'Siphon'] },
+    { id: 'harvester:19hz', name: '19hz', kind: 'harvester', zone: 'net', matter: 'flux', light: '#9fb0c4', pos: [-356, 8], vessel: true, locked: true },
+    { id: 'harvester:ra', name: 'RA', kind: 'harvester', zone: 'net', matter: 'flux', light: '#9fb0c4', pos: [-340, -64], vessel: true, locked: true },
+    { id: 'harvester:eventbrite', name: 'Eventbrite', kind: 'harvester', zone: 'net', matter: 'flux', light: '#9fb0c4', pos: [-324, -136], vessel: true, locked: true },
+    { id: 'centrifuge', name: 'Centrifuge', kind: 'centrifuge', zone: 'net', matter: 'prima materia', light: '#b6c1e2', pos: [-210, 0], vessel: true, panel: 'Nexus', actions: ['Purge'] },
+    { id: 'sump', name: 'Sump', kind: 'sump', zone: 'net', matter: 'dross', light: '#8a8d9a', pos: [-205, -122], vessel: true, panel: 'Nexus' },
+    { id: 'forge', name: 'Forge', kind: 'forge', zone: 'net', light: '#ffb27a', color: '#ff7a3c', pos: [-215, 118], panel: 'Refinery', use: 'Forge', sub: 'prima materia' },
+    { id: 'hopper', name: 'Hopper', kind: 'hopper', zone: 'core', matter: 'ore', light: '#a8c6ff', pos: [-110, 0], vessel: true },
+    { id: 'refinery', name: 'Refinery', kind: 'refinery', zone: 'core', matter: 'essence', light: '#a9f3f6', color: '#1fc2c9', pos: [-40, 0], vessel: true, panel: 'Refinery' },
+    { id: 'alembic', name: 'Alembic', kind: 'alembic', zone: 'core', matter: 'distillate', light: '#f8e7a6', color: '#e9c43b', pos: [30, 0], vessel: true, panel: 'Alembic' },
+    { id: 'crucible', name: 'Crucible', kind: 'crucible', zone: 'core', matter: 'alloy', light: '#ffd3a3', color: '#f28a2e', pos: [110, 0], vessel: true, panel: 'Crucible' },
+    { id: 'arena', name: 'Arena', kind: 'arena', zone: 'core', matter: 'animus', light: '#ffb0b6', color: '#ef3e4a', pos: [180, 0], vessel: true },
+    { id: 'treasury', name: 'Treasury', kind: 'treasury', zone: 'core', matter: 'artifact', light: '#dcb8ff', color: '#a855f7', pos: [250, 0], vessel: true },
+    { id: 'archive', name: 'Archive', kind: 'archive', zone: 'core', matter: 'relic', light: '#a89a85', pos: [320, 0], vessel: true },
+    { id: 'necropolis', name: 'Necropolis', kind: 'necropolis', zone: 'core', matter: 'vestige', light: '#c08a8a', pos: [110, -104], vessel: true },
+    { id: 'codex', name: 'Codex', kind: 'codex', zone: 'core', light: '#f0d39a', pos: [-40, 104], panel: 'Codex', objects: 8 },
+    { id: 'entropy_market', name: 'Entropy Market', kind: 'market', zone: 'core', light: '#f2c45a', pos: [180, 104], locked: true },
+    { id: 'atlas', name: 'Atlas', kind: 'atlas', zone: 'gallery', light: '#bff6f8', color: '#5fe0e6', pos: [-40, -204], panel: 'Atlas', sub: 'space' },
+    { id: 'nexus', name: 'Nexus', kind: 'nexus', zone: 'gallery', light: '#a9f3f6', color: '#1fc2c9', pos: [90, -204], panel: 'Nexus', sub: 'topology' },
+    { id: 'calendar', name: 'Calendar', kind: 'calendar', zone: 'gallery', light: '#f8e7a6', color: '#e9c43b', pos: [220, -204], panel: 'Calendar', sub: 'time' },
+];
+// where the harvester pipes merge into one trunk to the Centrifuge
+const MANIFOLD = { id: 'manifold', name: 'Manifold', kind: 'junction', zone: 'net', pos: [-258, 0], virtual: true };
+const NODE = Object.fromEntries([...NODES, MANIFOLD].map((n) => [n.id, n]));
+const CHAIN = ['hopper', 'refinery', 'alembic', 'crucible', 'arena', 'treasury', 'archive'];
+const PIPES = [
+    ...['luma', '19hz', 'ra', 'eventbrite'].map((h) => [`harvester:${h}`, 'manifold']),
+    ['manifold', 'centrifuge'],
+    ['centrifuge', 'sump'], ['centrifuge', 'hopper'], ['forge', 'hopper'],
+    ...CHAIN.slice(1).map((b, i) => [CHAIN[i], b]),
+    ['crucible', 'necropolis'],
+    ['codex', 'refinery', 'plates'],
+    ['entropy_market', 'crucible', 'market'], ['entropy_market', 'arena', 'market'], ['entropy_market', 'treasury', 'market'],
+];
+const FLOWS = [
+    ['alembic', 'crucible', 6], ['arena', 'treasury', 4], ['centrifuge', 'harvester:luma', 26], ['centrifuge', 'hopper', 1],
+    ['centrifuge', 'sump', 25], ['codex', 'refinery', 13], ['crucible', 'arena', 3], ['forge', 'hopper', 13],
+    ['harvester:luma', 'centrifuge', 52], ['hopper', 'refinery', 10], ['refinery', 'alembic', 6], ['treasury', 'arena', 2],
+    // demo only (not in the log): a kill along the chain, a revive through the Centrifuge, market traffic
+    ['hopper', 'necropolis', 2], ['sump', 'hopper', 2], ['entropy_market', 'arena', 2], ['entropy_market', 'treasury', 2],
+];
+// plinth radius of each machine (the plinth carries ports, filter band, keystone, levers)
+const FOOT = { junction: 0, harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, market: 9, nexus: 8, atlas: 7, calendar: 8 };
+const PLINTH_H = 3.4;
+const NOTES = {
+    harvester: 'Its heart is the glass flux tank; brass bands and struts hold it, and a gilt intake rotor crowns it. Locked harvesters stand dark and chained.',
+    centrifuge: 'A glass drum at the heart, its surface swirling, inside a gilt rotor cage that whirls around it.',
+    sump: 'A squat glass well sunk into its plinth, a grate across the top and a dredge wheel on an iron gantry that turns through the dross while its panel is in use.',
+    forge: 'A brick hearth with bellows, and an anvil under a trip hammer. While its panel is in use the hammer strikes, the bellows pump and sparks burst. A dynamo: it holds nothing.',
+    hopper: 'A glass cylinder fed from above by a ribbed brass funnel throat, held up by iron legs.',
+    refinery: 'A glass fractionating column. Gilt trays inside light up once the essence reaches them. In use, a flywheel and piston drive it and the essence bubbles.',
+    alembic: 'A glass pot in copper straps under a copper still-head. Its swan neck falls into an open copper condenser coil that drips into a copper cup.',
+    crucible: 'A glass crucible in a clawed iron cradle, wound with a copper induction coil. In use, a geared stirrer turns in the melt.',
+    arena: 'A glass drum of animus inside a ring of standing stones, runes on their inner faces.',
+    treasury: 'A glass reliquary drum in a gilt chest-cage: corner finials and arched straps over the top.',
+    archive: 'A glass vitrine inside an iron shelving frame stacked with brass-bound crates.',
+    necropolis: 'A glass urn under a columned mausoleum roof.',
+    codex: 'A glass-fronted cabinet of specimen jars, one per object. Objects aren\'t adventures, so its pipe to the Refinery is a gilt plate conveyor.',
+    market: 'A hexagonal kiosk, chained and dark until it is built. It will move costs and rewards, so its pipes are gold-banded.',
+    nexus: 'The lantern: a gilt cage around a glowing prism, with lens rings turning on gimbals.',
+    atlas: 'A terrestrial globe: gilt continents on a dark sea, an engraved graticule and a rune band at the equator, held in a meridian ring over a horizon ring of runes. In use, it spins on its tilted axis.',
+    calendar: 'An armillary sphere: nested gilt rings turning around a small glowing sun.',
+};
+
+/* ------------------------------------------------------------------ */
+/*  Lens, filter, stage filter (plinth band), selection                 */
+/* ------------------------------------------------------------------ */
+const PALETTE = ['#4fb3ff', '#3ccf8e', '#f2b134', '#f0643c', '#c86bf0', '#2fd2c9', '#ff7aa8', '#a3d14b', '#8f8cff', '#ffb27a'];
+const FIXED = { source: { luma: '#3ccf8e', '19hz': '#4f8cff', ra: '#f2b134', eventbrite: '#f0643c' }, type: { event: '#4fb3ff', item: '#e0a43a', song: '#c86bf0' } };
+const hash = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); };
+const state = { view: 'twin', lens: 'stage', filter: 'none', stage: {}, selected: '', inUse: '', galId: 'refinery' };
+/** 1 normally; faster and brighter while the machine's panel is in use */
+const busy = (n) => (state.inUse && (n.use ?? n.panel) === state.inUse ? 3 : 0);
+const accent = (n) => n.color ?? n.light;
+function lensValue(row, n) {
+    if (state.lens === 'stage') return n.matter;
+    if (state.lens === 'type' && n.zone === 'net') return 'raw event';
+    return row[state.lens] ?? 'unknown';
+}
+function lensColor(value, n) {
+    if (state.lens === 'stage') return n.light;
+    if (value === 'unknown') return '#5b616b';
+    if (value === 'raw event') return '#3c4048';
+    return FIXED[state.lens]?.[value] ?? PALETTE[hash(value) % PALETTE.length];
+}
+function passes(row, n) {
+    if (state.stage[n.id] === 'exclude') return false;
+    const zoneIncl = Object.entries(state.stage).filter(([id, m]) => m === 'include' && NODE[id].zone === n.zone);
+    if (zoneIncl.length && state.stage[n.id] !== 'include') return false;
+    if (state.filter === 'la') return row.city === 'Los Angeles';
+    if (state.filter === 'noitems') return n.zone === 'net' || row.type !== 'item';
+    return true;
+}
+function bandsOf(n) {
+    const rows = ROWS[n.id] ?? [];
+    const lit = new Map(); let ghost = 0;
+    for (const r of rows) { if (!passes(r, n)) { ghost++; continue; } const v = lensValue(r, n); lit.set(v, (lit.get(v) ?? 0) + 1); }
+    const bands = [...lit].sort((a, b) => b[1] - a[1]).map(([value, count]) => ({ value, count, color: lensColor(value, n) }));
+    return { bands, ghost, total: rows.length, lit: rows.length - ghost };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Renderer, environment                                               */
+/* ------------------------------------------------------------------ */
+const canvas = document.getElementById('c');
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+const envMap = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+
+/* ------------------------------------------------------------------ */
+/*  Canvas textures                                                     */
+/* ------------------------------------------------------------------ */
+const RUNES = [
+    [[0, -1, 0, 1], [-0.6, -0.3, 0.6, -0.3]], [[-0.6, 1, 0, -1], [0, -1, 0.6, 1]],
+    [[-0.5, -1, -0.5, 1], [-0.5, 0, 0.5, -1], [-0.5, 0, 0.5, 1]], [[0, -1, 0, 1], [0, -0.2, 0.6, -0.8], [0, -0.2, -0.6, -0.8]],
+    [[-0.6, -1, 0.6, -1], [0.6, -1, -0.6, 1], [-0.6, 1, 0.6, 1]], [[-0.5, -1, -0.5, 1], [-0.5, -1, 0.5, -0.4], [0.5, -0.4, -0.5, 0.2]],
+    [[0, -1, 0, 1], [-0.6, 0.4, 0.6, 0.4], [-0.6, -0.4, 0.6, -0.4]], [[-0.6, -1, 0.6, 1], [0.6, -1, -0.6, 1]],
+];
+function rune(g, i, x, y, s) { for (const [x1, y1, x2, y2] of RUNES[i % RUNES.length]) { g.beginPath(); g.moveTo(x + x1 * s, y + y1 * s); g.lineTo(x + x2 * s, y + y2 * s); g.stroke(); } }
+function texture(c, srgb = true) { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+function canvas2d(w, h = w) { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.strokeStyle = g.fillStyle = '#fff'; g.lineCap = 'round'; g.lineJoin = 'round'; return [c, g]; }
+const runeStrip = (() => {
+    const [c, g] = canvas2d(1024, 64); g.lineWidth = 4;
+    for (let i = 0; i < 32; i++) rune(g, i * 5 + 3, 16 + i * 32, 32, 14);
+    const t = texture(c); t.wrapS = THREE.RepeatWrapping; return t;
+})();
+function magicCircle(size = 512) {
+    const mk = () => { const [c, g] = canvas2d(size); g.translate(size / 2, size / 2); return [c, g]; };
+    const Rr = size / 2;
+    const ring = (g, r, w) => { g.lineWidth = w; g.beginPath(); g.arc(0, 0, r, 0, TAU); g.stroke(); };
+    const [oc, og] = mk();
+    ring(og, Rr * 0.97, Rr * 0.02); ring(og, Rr * 0.9, Rr * 0.008); ring(og, Rr * 0.76, Rr * 0.012); ring(og, Rr * 0.72, Rr * 0.006);
+    og.lineWidth = Rr * 0.012;
+    for (let i = 0; i < 28; i++) { og.save(); og.rotate((i / 28) * TAU); rune(og, i * 3 + 1, 0, -Rr * 0.83, Rr * 0.04); og.restore(); }
+    for (let i = 0; i < 72; i++) { og.save(); og.rotate((i / 72) * TAU); og.lineWidth = Rr * (i % 6 ? 0.006 : 0.014); og.beginPath(); og.moveTo(0, -Rr * 0.9); og.lineTo(0, -Rr * (i % 6 ? 0.93 : 0.96)); og.stroke(); og.restore(); }
+    const [ic, ig] = mk();
+    ring(ig, Rr * 0.62, Rr * 0.012); ring(ig, Rr * 0.2, Rr * 0.01);
+    const poly = (n, r, step, w) => { ig.lineWidth = w; ig.beginPath(); for (let i = 0; i <= n; i++) { const a = ((i * step) / n) * TAU - Math.PI / 2; const x = Math.cos(a) * r, y = Math.sin(a) * r; i ? ig.lineTo(x, y) : ig.moveTo(x, y); } ig.stroke(); };
+    poly(6, Rr * 0.62, 2, Rr * 0.01); ig.rotate(Math.PI / 6); poly(6, Rr * 0.62, 2, Rr * 0.01); ig.rotate(-Math.PI / 6);
+    poly(4, Rr * 0.44, 1, Rr * 0.008);
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU; ig.beginPath(); ig.arc(Math.cos(a) * Rr * 0.62, Math.sin(a) * Rr * 0.62, Rr * 0.035, 0, TAU); ig.fill(); }
+    return { outer: texture(oc), inner: texture(ic) };
+}
+const CIRCLE = magicCircle(512);
+// the Atlas globe: gilt continents on a dark sea, a graticule, the tropics and a rune band at the equator
+const GLOBE = (() => {
+    const W = 1024, H = 512, [c, g] = canvas2d(W, H);
+    const P = (lon, lat) => [((lon + 180) / 360) * W, ((90 - lat) / 180) * H];
+    g.fillStyle = '#0d2229'; g.fillRect(0, 0, W, H);
+    const lands = [
+        [[-168, 65], [-140, 70], [-95, 72], [-75, 62], [-55, 50], [-70, 43], [-80, 25], [-97, 18], [-105, 22], [-117, 32], [-125, 40], [-130, 55], [-150, 58]],
+        [[-80, 10], [-60, 8], [-35, -7], [-40, -22], [-58, -38], [-70, -55], [-75, -40], [-70, -18], [-80, -5]],
+        [[-10, 36], [-9, 44], [0, 50], [10, 58], [30, 70], [70, 75], [110, 77], [140, 70], [170, 66], [160, 55], [140, 40], [120, 22], [105, 10], [95, 20], [80, 8], [75, 20], [60, 25], [50, 30], [35, 35], [25, 40], [10, 44]],
+        [[-17, 15], [-10, 35], [10, 37], [32, 31], [43, 12], [51, 12], [40, -15], [32, -28], [20, -35], [12, -15], [8, 4], [-8, 5]],
+        [[114, -22], [122, -17], [135, -12], [145, -15], [153, -28], [145, -38], [130, -32], [115, -34]],
+        [[-45, 60], [-20, 70], [-30, 83], [-60, 82], [-55, 70]],
+    ];
+    g.fillStyle = '#c8a46a'; g.strokeStyle = '#f0d39a'; g.lineWidth = 2;
+    for (const land of lands) { g.beginPath(); land.forEach(([lo, la], i) => { const [x, y] = P(lo, la); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); g.fill(); g.stroke(); }
+    g.fillRect(0, P(0, -72)[1], W, H - P(0, -72)[1]);   // the southern ice
+    g.strokeStyle = 'rgba(232, 200, 140, 0.35)'; g.lineWidth = 1.2;
+    for (let lo = -180; lo <= 180; lo += 15) { const [x] = P(lo, 0); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+    for (let la = -75; la <= 75; la += 15) { const [, y] = P(0, la); g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    g.setLineDash([8, 8]); g.strokeStyle = 'rgba(240, 211, 154, 0.6)';
+    for (const la of [23.4, -23.4, 66.6, -66.6]) { const [, y] = P(0, la); g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    g.setLineDash([]);
+    const [, eq] = P(0, 0); g.fillStyle = 'rgba(10, 20, 24, 0.75)'; g.fillRect(0, eq - 9, W, 18);
+    g.strokeStyle = '#f0d39a'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, eq - 9); g.lineTo(W, eq - 9); g.moveTo(0, eq + 9); g.lineTo(W, eq + 9); g.stroke();
+    for (let i = 0; i < 48; i++) rune(g, i * 3 + 1, 10 + i * (W / 48), eq, 5);
+    // a compass rose in the open ocean
+    const [rx, ry] = P(-35, 25); g.lineWidth = 1.5;
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU, l = i % 2 ? 12 : 24; g.beginPath(); g.moveTo(rx, ry); g.lineTo(rx + Math.cos(a) * l, ry + Math.sin(a) * l * 0.9); g.stroke(); }
+    g.beginPath(); g.arc(rx, ry, 9, 0, TAU); g.stroke();
+    return texture(c);
+})();
+// a soft round dot, for sparks and steam
+const DOT = (() => { const [c, g] = canvas2d(64); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return texture(c); })();
+
+// zone sigils, drawn in white for the floor inlay
+const SIGIL = {
+    net(g, s) { // a sieve: a circle of mesh
+        g.lineWidth = s * 0.05; g.beginPath(); g.arc(0, 0, s, 0, TAU); g.stroke();
+        g.save(); g.beginPath(); g.arc(0, 0, s * 0.92, 0, TAU); g.clip(); g.lineWidth = s * 0.03;
+        for (let i = -6; i <= 6; i++) { g.beginPath(); g.moveTo(i * s * 0.28 - s, -s); g.lineTo(i * s * 0.28 + s, s); g.stroke(); g.beginPath(); g.moveTo(i * s * 0.28 + s, -s); g.lineTo(i * s * 0.28 - s, s); g.stroke(); }
+        g.restore();
+    },
+    core(g, s) { // an athanor: a domed furnace with its flame and a flask in the dome
+        g.lineWidth = s * 0.06;
+        g.beginPath(); g.moveTo(-s * 0.6, s); g.lineTo(-s * 0.6, -s * 0.1); g.arc(0, -s * 0.1, s * 0.6, Math.PI, 0); g.lineTo(s * 0.6, s); g.closePath(); g.stroke();
+        g.beginPath(); g.moveTo(0, -s * 0.7); g.lineTo(0, -s); g.stroke();
+        g.beginPath(); g.moveTo(-s * 0.18, s * 0.75); g.quadraticCurveTo(-s * 0.3, s * 0.35, 0, s * 0.15); g.quadraticCurveTo(s * 0.3, s * 0.35, s * 0.18, s * 0.75); g.stroke();
+        g.beginPath(); g.arc(0, -s * 0.15, s * 0.18, 0, TAU); g.stroke();
+    },
+    gallery(g, s) { // an eye inside a lens
+        g.lineWidth = s * 0.06;
+        g.beginPath(); g.moveTo(-s, 0); g.quadraticCurveTo(0, -s * 0.9, s, 0); g.quadraticCurveTo(0, s * 0.9, -s, 0); g.stroke();
+        g.beginPath(); g.arc(0, 0, s * 0.32, 0, TAU); g.stroke(); g.beginPath(); g.arc(0, 0, s * 0.12, 0, TAU); g.fill();
+        for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU; g.beginPath(); g.moveTo(Math.cos(a) * s * 1.1, Math.sin(a) * s * 1.1); g.lineTo(Math.cos(a) * s * 1.3, Math.sin(a) * s * 1.3); g.stroke(); }
+    },
+};
+function plaqueTexture(zone, name) {
+    const [c, g] = canvas2d(1024, 256);
+    g.lineWidth = 3; g.beginPath(); g.roundRect(6, 6, 1012, 244, 18); g.stroke();
+    g.lineWidth = 1.5; g.beginPath(); g.roundRect(20, 20, 984, 216, 10); g.stroke();
+    for (const x of [128, 896]) { g.save(); g.translate(x, 128); SIGIL[zone](g, 70); g.restore(); }
+    g.font = '600 104px "Saira Condensed", "Arial Narrow", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.letterSpacing = '34px'; g.fillText(name.toUpperCase(), 529, 134);
+    return texture(c);
+}
+// faint engraved floor patterns, one per zone (tileable)
+const FLOOR_PATTERN = {
+    net() { // a hexagonal mesh
+        const [c, g] = canvas2d(222, 256); g.lineWidth = 1.6;
+        const r = 37, h = Math.sqrt(3) * r;   // flat-top hexes: tile is 3r wide, 2h tall
+        for (let col = -1; col < 4; col++) for (let row = -1; row < 4; row++) {
+            const x = col * r * 1.5, y = row * h + (col % 2 ? h / 2 : 0);
+            g.beginPath(); for (let i = 0; i <= 6; i++) { const a = (i / 6) * TAU; const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r; i ? g.lineTo(px, py) : g.moveTo(px, py); } g.stroke();
+        }
+        return c;
+    },
+    core() { // interlocking circles and the planetary seals
+        const [c, g] = canvas2d(512); g.lineWidth = 1.6;
+        for (const [x, y] of [[0, 0], [512, 0], [0, 512], [512, 512], [256, 256]]) for (const r of [180, 120]) { g.beginPath(); g.arc(x, y, r, 0, TAU); g.stroke(); }
+        for (const [x, y] of [[256, 0], [0, 256], [512, 256], [256, 512]]) { g.beginPath(); g.arc(x, y, 76, 0, TAU); g.stroke(); }
+        g.font = '44px serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        ['☉', '☽', '☿', '♀', '♂', '♃', '♄'].forEach((s, i) => { const a = (i / 7) * TAU; g.fillText(s, 256 + Math.cos(a) * 150, 256 + Math.sin(a) * 150); });
+        return c;
+    },
+    gallery() { // a star chart
+        const [c, g] = canvas2d(512); g.lineWidth = 1.2;
+        let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        const stars = Array.from({ length: 60 }, () => [rnd() * 512, rnd() * 512, rnd()]);
+        for (const [x, y, m] of stars) { g.beginPath(); g.arc(x, y, 1 + m * 2.4, 0, TAU); g.fill(); }
+        for (let i = 0; i < 18; i++) { const a = stars[i * 3], b = stars[i * 3 + 1]; if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 160) { g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); } }
+        g.setLineDash([4, 10]); for (const r of [120, 240]) { g.beginPath(); g.arc(256, 256, r, 0, TAU); g.stroke(); } g.setLineDash([]);
+        return c;
+    },
+};
+
+ /* zone floors: sacred-geometry compositions spanning each zone, like a painted ceiling */
+function zoneFloor(zone, r) {
+    const w = r.x1 - r.x0, d = r.z1 - r.z0, k = 2048 / Math.max(w, d), W = Math.round(w * k), H = Math.round(d * k);
+    const [c, g] = canvas2d(W, H);
+    const P = (x, z) => [(x - r.x0) * k, (z - r.z0) * k], S = Math.min(W, H);
+    const ring = (x, y, rad, lw) => { g.lineWidth = lw; g.beginPath(); g.arc(x, y, rad, 0, TAU); g.stroke(); };
+    const poly = (x, y, rad, n, step, rot, lw) => { g.lineWidth = lw; g.beginPath(); for (let i = 0; i <= n; i++) { const a = ((i * step) / n) * TAU + rot; const px = x + Math.cos(a) * rad, py = y + Math.sin(a) * rad; i ? g.lineTo(px, py) : g.moveTo(px, py); } g.stroke(); };
+    const runeRing = (x, y, rad, count, size) => { g.lineWidth = Math.max(1.5, size * 0.2); for (let i = 0; i < count; i++) { g.save(); g.translate(x, y); g.rotate((i / count) * TAU); rune(g, i * 7 + 3, 0, -rad, size); g.restore(); } };
+    const glyphs = (x, y, rad, list, size, rot = -Math.PI / 2) => { g.font = `${Math.round(size)}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; list.forEach((s, i) => { const a = (i / list.length) * TAU + rot; g.fillText(s, x + Math.cos(a) * rad, y + Math.sin(a) * rad); }); };
+    const medallion = (x, y, rad) => { ring(x, y, rad, 4); ring(x, y, rad * 0.95, 1.5); runeRing(x, y, rad * 0.885, Math.max(12, Math.round(rad / 12)), rad * 0.03); ring(x, y, rad * 0.82, 2); };
+    const rays = (x, y, r0, r1, n, lw) => { g.lineWidth = lw; for (let i = 0; i < n; i++) { const a = (i / n) * TAU; g.beginPath(); g.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); g.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); g.stroke(); } };
+    // the frame: a double rule, a frieze of runes, rosettes at the corners
+    const m = S * 0.035;
+    g.lineWidth = 4; g.strokeRect(m, m, W - 2 * m, H - 2 * m); g.lineWidth = 1.5; g.strokeRect(m * 2.2, m * 2.2, W - 4.4 * m, H - 4.4 * m);
+    g.lineWidth = 2;
+    for (let x = m * 4; x < W - m * 4; x += m * 1.3) { rune(g, Math.round(x / 7), x, m * 1.6, m * 0.3); rune(g, Math.round(x / 7) + 3, x, H - m * 1.6, m * 0.3); }
+    for (let y = m * 4; y < H - m * 4; y += m * 1.3) { rune(g, Math.round(y / 7) + 1, m * 1.6, y, m * 0.3); rune(g, Math.round(y / 7) + 5, W - m * 1.6, y, m * 0.3); }
+    for (const [x, y] of [[m * 1.6, m * 1.6], [W - m * 1.6, m * 1.6], [m * 1.6, H - m * 1.6], [W - m * 1.6, H - m * 1.6]]) { ring(x, y, m * 1.3, 2); poly(x, y, m * 1.3, 6, 2, 0, 1.5); poly(x, y, m * 1.3, 6, 2, Math.PI / 6, 1.5); }
+    const cx = W / 2, cy = H / 2;
+    if (zone !== 'gallery') {
+    const ell = (x, y, rx, ry, lw) => { g.lineWidth = lw; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, TAU); g.stroke(); };
+    const ellPt = (rx, ry, t) => [cx + Math.cos(t) * rx, cy + Math.sin(t) * ry];
+    const ellRunes = (rx, ry, count, size) => { g.lineWidth = Math.max(1.5, size * 0.2); for (let i = 0; i < count; i++) { const t = (i / count) * TAU, [x, y] = ellPt(rx, ry, t); g.save(); g.translate(x, y); g.rotate(Math.atan2(ry * Math.cos(t), -rx * Math.sin(t))); rune(g, i * 5 + 2, 0, 0, size); g.restore(); } };
+    const ellPoly = (rx, ry, nv, lw, rot = 0) => { g.lineWidth = lw; g.beginPath(); for (let i = 0; i <= nv; i++) { const [x, y] = ellPt(rx, ry, (i / nv) * TAU + rot); i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); };
+    // the oval: a rune band between rings, ticks, then the zone's own geometry inside
+    const RX = W / 2 - m * 4, RY = H / 2 - m * 4;
+    ell(cx, cy, RX, RY, 4); ell(cx, cy, RX * 0.975, RY * 0.975, 1.5);
+    ellRunes(RX * 0.94, RY * 0.94, Math.round((RX + RY) / 18), m * 0.32);
+    ell(cx, cy, RX * 0.905, RY * 0.905, 2.5);
+    g.lineWidth = 1.2; for (let i = 0; i < 96; i++) { const t = (i / 96) * TAU, [x1, y1] = ellPt(RX * 0.905, RY * 0.905, t), [x2, y2] = ellPt(RX * (i % 4 ? 0.885 : 0.86), RY * (i % 4 ? 0.885 : 0.86), t); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }
+    const IX = RX * 0.84, IY = RY * 0.84;
+    if (zone === 'net') {
+        // the great net: a web strung across the oval, a sieve in its lobes, the earth medallion at its heart
+        const C = Math.min(IX, IY) * 0.5;
+        g.save(); g.beginPath(); g.ellipse(cx, cy, IX, IY, 0, 0, TAU); g.arc(cx, cy, C * 1.15, 0, TAU, true); g.clip('evenodd');
+        g.lineWidth = 1.1; const step = Math.min(W, H) * 0.035;
+        for (let i = -60; i <= 60; i++) { g.beginPath(); g.moveTo(cx + i * step - H, cy - H); g.lineTo(cx + i * step + H, cy + H); g.stroke(); g.beginPath(); g.moveTo(cx + i * step + H, cy - H); g.lineTo(cx + i * step - H, cy + H); g.stroke(); }
+        g.restore();
+        for (let i = 0; i < 24; i++) { const t = (i / 24) * TAU, [x, y] = ellPt(IX, IY, t); g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx + Math.cos(t) * C * 1.15, cy + Math.sin(t) * C * 1.15); g.lineTo(x, y); g.stroke(); }
+        for (let k2 = 1; k2 <= 4; k2++) ellPoly(IX * (0.4 + k2 * 0.15), IY * (0.4 + k2 * 0.15), 24, 1.6);
+        medallion(cx, cy, C);
+        poly(cx, cy, C * 0.66, 3, 1, Math.PI / 2, 3); g.lineWidth = 3; g.beginPath(); g.moveTo(cx - C * 0.29, cy - C * 0.16); g.lineTo(cx + C * 0.29, cy - C * 0.16); g.stroke();
+        ring(cx, cy, C * 0.14, 2.5);
+        // salt and mercury at the two foci
+        const f = Math.sqrt(Math.abs(IY * IY - IX * IX)) * 0.82, alongY = IY > IX;
+        [[-1, '⊖'], [1, '☿']].forEach(([sg, sym]) => { const x = cx + (alongY ? 0 : sg * f), y = cy + (alongY ? sg * f : 0), rr = C * 0.42; g.fillStyle = '#000'; g.beginPath(); g.arc(x, y, rr, 0, TAU); g.fill(); g.fillStyle = '#fff'; ring(x, y, rr, 3); ring(x, y, rr * 0.85, 1.2); glyphs(x, y, 0, [sym], rr * 1.0); });
+    } else {
+        // the great work: seven interlocking circles for the seven metals along the oval, the heptagram at the centre
+        const rc = IY * 0.46, span = IX - rc * 1.05, metals = ['♄', '♃', '♂', '☉', '♀', '☿', '☽'];
+        g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx - IX, cy); g.lineTo(cx, cy - IY); g.lineTo(cx + IX, cy); g.lineTo(cx, cy + IY); g.closePath(); g.stroke();
+        g.setLineDash([6, 10]); ell(cx, cy, IX * 0.62, IY * 0.62, 1.2); g.setLineDash([]);
+        metals.forEach((sym, i) => {
+            const x = cx - span + (i / 6) * span * 2, rr = i === 3 ? rc * 1.25 : rc;
+            ring(x, cy, rr, i === 3 ? 3 : 2);
+            if (i === 3) { poly(x, cy, rr * 0.8, 7, 3, -Math.PI / 2, 2); poly(x, cy, rr * 0.8, 7, 1, -Math.PI / 2, 1); ring(x, cy, rr * 0.3, 2); rays(x, cy, rr * 0.32, rr * 0.45, 16, 1.4); }
+            else { ring(x, cy, rr * 0.86, 1); poly(x, cy, rr * 0.7, i % 2 ? 3 : 4, 1, i % 2 ? Math.PI / 2 : Math.PI / 4, 1.2); }
+            g.fillStyle = '#000'; g.beginPath(); g.arc(x, cy + (i === 3 ? 0 : 0), rr * 0.24, 0, TAU); g.fill(); g.fillStyle = '#fff';
+            glyphs(x, cy, 0, [sym], rr * 0.34);
+        });
+    }
+    } else {
+        // the observatory: a compass rose under the Atlas, a web of nodes under the Nexus, the zodiac under the Calendar
+        const R = H * 0.4, at = (id) => P(NODE[id].pos[0], NODE[id].pos[1]);
+        let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        for (let i = 0; i < 160; i++) { g.beginPath(); g.arc(rnd() * W, rnd() * H, 0.8 + rnd() * 2.2, 0, TAU); g.fill(); }
+        const [ax, ay] = at('atlas'); medallion(ax, ay, R);
+        for (let i = 0; i < 16; i++) { const a = (i / 16) * TAU, l = i % 4 === 0 ? 0.78 : i % 2 === 0 ? 0.55 : 0.4, a1 = a + TAU / 32, a2 = a - TAU / 32; g.lineWidth = 1.8; g.beginPath(); g.moveTo(ax + Math.cos(a1) * R * 0.1, ay + Math.sin(a1) * R * 0.1); g.lineTo(ax + Math.cos(a) * R * l, ay + Math.sin(a) * R * l); g.lineTo(ax + Math.cos(a2) * R * 0.1, ay + Math.sin(a2) * R * 0.1); g.stroke(); }
+        ring(ax, ay, R * 0.1, 2);
+        const [nx, ny] = at('nexus'); medallion(nx, ny, R);
+        const nodes = Array.from({ length: 7 }, (_, i) => { const a = (i / 7) * TAU - Math.PI / 2; return [nx + Math.cos(a) * R * 0.6, ny + Math.sin(a) * R * 0.6]; });
+        g.lineWidth = 1.5; nodes.forEach(([x, y], i) => { for (const j of [i + 2, i + 3]) { const [x2, y2] = nodes[j % 7]; g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.stroke(); } g.beginPath(); g.moveTo(nx, ny); g.lineTo(x, y); g.stroke(); });
+        nodes.forEach(([x, y]) => { ring(x, y, R * 0.06, 2); }); ring(nx, ny, R * 0.1, 2.5);
+        const [kx, ky] = at('calendar'); medallion(kx, ky, R);
+        rays(kx, ky, R * 0.5, R * 0.8, 12, 1.5); ring(kx, ky, R * 0.5, 2);
+        glyphs(kx, ky, R * 0.65, ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'], R * 0.12, -Math.PI / 2 + TAU / 24);
+        ring(kx, ky, R * 0.12, 3); rays(kx, ky, R * 0.15, R * 0.3, 8, 1.5);
+        g.lineWidth = 1.2; g.setLineDash([6, 10]); g.beginPath(); g.moveTo(ax + R, ay); g.lineTo(nx - R, ny); g.moveTo(nx + R, ny); g.lineTo(kx - R, ky); g.stroke(); g.setLineDash([]);
+    }
+    return c;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Materials and shapes                                               */
+/* ------------------------------------------------------------------ */
+const std = (o) => new THREE.MeshStandardMaterial({ envMapIntensity: 1, ...o });
+const M = {
+    brass: std({ color: 0xb08646, metalness: 1, roughness: 0.3, side: THREE.DoubleSide }),
+    gilt: std({ color: 0xe8b85c, metalness: 1, roughness: 0.2 }),
+    copper: std({ color: 0xc06a3e, metalness: 1, roughness: 0.32, side: THREE.DoubleSide }),
+    iron: std({ color: 0x30333a, metalness: 0.85, roughness: 0.5, side: THREE.DoubleSide }),
+    stone: std({ color: 0x24262c, metalness: 0.05, roughness: 0.9 }),
+    wood: std({ color: 0x3a2618, metalness: 0.1, roughness: 0.7 }),
+    glass: std({ color: 0xb8d0e0, metalness: 0, roughness: 0.04, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide }),
+    heart: std({ color: 0xd4e6f2, metalness: 0, roughness: 0.03, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.5 }),
+    dark: std({ color: 0x101114, metalness: 0.5, roughness: 0.6 }),
+    ghost: std({ color: 0x2a2f38, metalness: 0, roughness: 0.3, transparent: true, opacity: 0.6, depthWrite: false }),
+    silver: std({ color: 0xc8ced8, metalness: 1, roughness: 0.25 }),
+    locked: std({ color: 0x15171b, metalness: 0.6, roughness: 0.7 }),
+    lockedGlass: std({ color: 0x3a3f48, metalness: 0, roughness: 0.2, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide }),
+};
+const cache = new Map();
+function glow(color, intensity = 2.2) {
+    const key = `g${color}${intensity}`;
+    if (!cache.has(key)) cache.set(key, std({ color: 0x050505, emissive: new THREE.Color(color), emissiveIntensity: intensity, roughness: 0.4 }));
+    return cache.get(key);
+}
+// liquid: body colour first, only a soft glow (so the hue reads)
+function liquidMat(color) {
+    const key = `l${color}`;
+    if (!cache.has(key)) cache.set(key, std({ color: new THREE.Color(color), emissive: new THREE.Color(color), emissiveIntensity: 0.28, roughness: 0.25, metalness: 0, transparent: true, opacity: 0.94 }));
+    return cache.get(key);
+}
+function additive(map, color, opacity = 0.9) {
+    return new THREE.MeshBasicMaterial({ map, color: new THREE.Color(color), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+}
+const SPHERE = new THREE.SphereGeometry(1, 12, 8);
+const G = () => new THREE.Group();
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+function lathe(pts, mat, seg = 48) { return new THREE.Mesh(new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg), mat); }
+function cyl(rt, rb, h, mat, y = 0, seg = 32, open = false) { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg, 1, open), mat); m.position.y = y + h / 2; return m; }
+function torus(r, t, mat, y = 0, seg = 48) { const m = new THREE.Mesh(new THREE.TorusGeometry(r, t, 10, seg), mat); m.rotation.x = Math.PI / 2; m.position.y = y; return m; }
+function box(w, h, d, mat, x = 0, y = 0, z = 0) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y + h / 2, z); return m; }
+function ball(r, mat, x = 0, y = 0, z = 0) { const m = new THREE.Mesh(SPHERE, mat); m.scale.setScalar(r); m.position.set(x, y, z); return m; }
+function tube(points, r, mat, segs = 32) { return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), segs, r, 8), mat); }
+function rivets(r, y, n, mat = M.gilt, s = 0.32) {
+    const g = new THREE.InstancedMesh(SPHERE, mat, n); const o = new THREE.Object3D();
+    for (let i = 0; i < n; i++) { const a = (i / n) * TAU; o.position.set(Math.cos(a) * r, y, Math.sin(a) * r); o.scale.setScalar(s); o.updateMatrix(); g.setMatrixAt(i, o.matrix); }
+    return g;
+}
+function band(r, y, h = 1.3) {
+    const g = G();
+    g.add(cyl(r, r, h, M.brass, y - h / 2, 48, true), torus(r, 0.2, M.gilt, y - h / 2), torus(r, 0.2, M.gilt, y + h / 2), rivets(r + 0.05, y, Math.max(8, Math.round(r * 2.6))));
+    return g;
+}
+function runeBand(r, y, h, color, repeat = 2, opacity = 0.95) {
+    const t = runeStrip.clone(); t.needsUpdate = true; t.repeat.set(repeat, 1);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 48, 1, true), additive(t, color, opacity));
+    m.position.y = y; return m;
+}
+function curl(size = 3, turns = 1.5, mat = M.gilt) {
+    const pts = [];
+    for (let i = 0; i <= 40; i++) { const t = i / 40, a = t * turns * TAU, r = size * (1 - t * 0.82); pts.push(V(Math.cos(a) * r, Math.sin(a) * r, 0)); }
+    return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 64, size * 0.07, 6, false), mat);
+}
+function curls(g, r, y, n = 4, size = 2.4) {
+    for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + Math.PI / n;
+        for (const s of [-1, 1]) { const c = curl(size); c.position.set(Math.cos(a) * r, y, Math.sin(a) * r); c.rotation.y = -a + Math.PI / 2; c.scale.x = s; g.add(c); }
+    }
+}
+function finial(s = 1, mat = M.gilt) { return lathe([[0, 0], [1.1, 0], [1.1, 0.4], [0.5, 0.8], [0.9, 1.7], [0.3, 2.5], [0.55, 3.0], [0, 4.4]].map(([r, y]) => [r * s, y * s]), mat, 24); }
+function gem(color, s = 1) { return new THREE.Mesh(new THREE.OctahedronGeometry(s), glow(color, 3)); }
+
+/* ------------------------------------------------------------------ */
+/*  The heart: a glass cylinder of matter (lens bands, ghost on top)    */
+/* ------------------------------------------------------------------ */
+function heart(n, r, H, y0, onLevel) {
+    const g = G(), { bands, ghost } = bandsOf(n), cap = CAP[n.zone], unit = (H - 0.4) / cap, rr = r - 0.35;
+    g.add(cyl(r, r, H, M.heart, y0, 48, true));
+    let y = y0 + 0.2;
+    for (const b of bands) { const h = Math.min(y0 + H - 0.2 - y, b.count * unit); if (h <= 0.01) break; g.add(cyl(rr, rr, h, liquidMat(b.color), y, 32)); y += h; }
+    if (y > y0 + 0.25) { const top = new THREE.Mesh(new THREE.CircleGeometry(rr * 0.98, 32), glow(bands[0]?.color ?? n.light, 0.9)); top.rotation.x = -Math.PI / 2; top.position.y = y + 0.02; g.add(top); }
+    onLevel?.(y);
+    if (ghost) { const h = Math.min(y0 + H - 0.2 - y, ghost * unit); if (h > 0.01) g.add(cyl(rr * 0.995, rr * 0.995, h, M.ghost, y, 32)); }
+    // capacity ticks (every 10%) on a thin gilt strip at the front-right
+    const a = Math.PI / 4;
+    g.add(box(0.25, H, 0.25, M.gilt, Math.cos(a) * (r + 0.3), y0, Math.sin(a) * (r + 0.3)));
+    for (let k = 1; k < 10; k++) g.add(box(k % 5 ? 0.7 : 1.3, 0.1, 0.18, M.gilt, Math.cos(a) * (r + 0.6), y0 + (k / 10) * H, Math.sin(a) * (r + 0.6)));
+    return g;
+}
+
+/* ------------------------------------------------------------------ */
+/*  The plinth: ports, filter band, panel keystone, action levers       */
+/* ------------------------------------------------------------------ */
+const FRONT = Math.PI / 4;   // the side facing the camera
+function plinth(g, n, ports, a) {
+    const r = FOOT[n.kind], base = G();
+    base.add(cyl(r + 1.4, r + 1.8, 1.2, M.stone, 0, 56));                  // foot
+    base.add(cyl(r + 0.6, r + 1.0, 2.2, M.stone, 1.2, 56));                // drum
+    base.add(torus(r + 0.6, 0.22, M.iron, PLINTH_H));                       // top edge
+    if (n.vessel && !n.locked) {
+        base.add(torus(r + 0.62, 0.12, glow(accent(n), 1.4), PLINTH_H + 0.12));   // matter accent
+        // filter state on the rim: dim, white = only this stage, red = not this stage
+        const mode = state.stage[n.id];
+        const mc = mode === 'include' ? '#e6ebf2' : mode === 'exclude' ? '#ff4a3d' : n.light, gi = mode === 'include' ? 1.3 : 4;
+        base.add(runeBand(r + 1.05, 2.3, mode ? 1.6 : 1.1, mc, Math.max(2, Math.round(r / 2.6)), mode === 'include' ? 0.7 : mode ? 1 : 0.45));
+        if (mode) base.add(torus(r + 1.2, 0.26, glow(mc, gi), 1.3), torus(r + 1.2, 0.26, glow(mc, gi), 3.2), torus(r + 2.0, 0.2, glow(mc, gi * 0.75), 0.25));
+    }
+    // machines with a panel: a magic circle turning on top of the plinth
+    if (n.panel) {
+        const ring = new THREE.Mesh(new THREE.RingGeometry(Math.max(2, r - 3), r + 0.5, 64), additive(CIRCLE.outer, n.light, 0.75));
+        ring.rotation.x = -Math.PI / 2; ring.position.y = PLINTH_H + 0.06; base.add(ring);
+        a.push((dt) => { ring.rotation.z += dt * 0.25 * (busy(n) || 1); ring.material.opacity = working(n) ? 0.85 : 0.6; });
+    }
+    for (const ang of ports) {
+        const p = G(); p.position.set(Math.cos(ang) * (r + 0.9), 1.6, Math.sin(ang) * (r + 0.9)); p.rotation.y = -ang;
+        const sk = cyl(1.05, 1.05, 1.8, M.iron, 0, 16); sk.rotation.z = Math.PI / 2; sk.position.set(0.9, 0, 0); p.add(sk);
+        const fl = cyl(1.5, 1.5, 0.4, M.brass, 0, 16); fl.rotation.z = Math.PI / 2; fl.position.set(1.8, 0, 0); p.add(fl);
+        base.add(p);
+    }
+    base.traverse((o) => { o.userData.part = 'base'; });
+    g.add(base);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Machines: glass heart, machinery on the housing                     */
+/* ------------------------------------------------------------------ */
+const Y = PLINTH_H;
+/** is the machine's panel in use? (mechanisms run only then) */
+const working = (n) => busy(n) > 0;
+/** a flat gear facing +z */
+function gear(r, teeth, mat = M.brass) { const m = new THREE.Mesh(gearShape(r, teeth, Math.min(0.7, r * 0.18)), mat); m.geometry.translate(0, 0, -0.4); return m; }
+/** bubbles rising through a heart while it works */
+function bubbles(g, n, r, y0, h, a, count = 16) {
+    const items = Array.from({ length: count }, (_, i) => { const b = ball(0.25 + (i % 3) * 0.12, glow(n.light, 0.9)); b.raycast = () => {}; g.add(b); return { b, x: Math.cos(i * 2.4) * r * (0.2 + (i % 5) * 0.15), z: Math.sin(i * 2.4) * r * (0.2 + (i % 5) * 0.15), ph: i / count }; });
+    let t0 = 0;
+    a.push((dt) => {
+        const on = working(n); t0 += dt;
+        for (const it of items) { it.b.visible = on; if (!on) continue; const f = (it.ph + t0 * 0.5) % 1; it.b.position.set(it.x + Math.sin(t0 * 3 + it.ph * 9) * 0.3, y0 + f * h, it.z); }
+    });
+}
+const BUILD = {
+    harvester(n, a) {
+        const g = G(), c = n.locked ? '#4a4f58' : n.light;
+        g.add(cyl(6.9, 7.4, 1.2, M.brass, Y, 32));
+        g.add(heart(n, 6, 14, Y + 1.2));
+        g.add(band(6.3, Y + 2), band(6.3, Y + 14.6));
+        for (let i = 0; i < 6; i++) { const t = (i / 6) * TAU + 0.3; g.add(box(0.5, 14, 0.5, M.brass, Math.cos(t) * 6.6, Y + 1.2, Math.sin(t) * 6.6)); }
+        curls(g, 6.8, Y + 8.4, 3, 1.9);
+        g.add(lathe([[6.6, Y + 15.2], [6.6, Y + 16], [4.8, Y + 17.2], [2, Y + 18.4], [1.1, Y + 19.2]], M.brass));
+        g.add(cyl(0.7, 0.7, 3, M.brass, Y + 19, 12));
+        const rotor = G(); rotor.position.y = Y + 22;
+        rotor.add(torus(5.6, 0.45, M.gilt, 0));
+        for (let i = 0; i < 7; i++) { const b = box(4.6, 0.2, 1.5, M.brass, 2.6, -0.1, 0); b.rotation.x = 0.55; const p = G(); p.rotation.y = (i / 7) * TAU; p.add(b); rotor.add(p); }
+        rotor.add(ball(1, n.locked ? M.dark : glow(c, 2.2)));
+        g.add(rotor);
+        const f = finial(0.9); f.position.y = Y + 22.8; g.add(f);
+        if (n.locked) { for (let k = 0; k < 3; k++) { const ch = torus(7, 0.3, M.iron, Y + 5 + k * 3.5); ch.rotation.z = (k - 1) * 0.12; g.add(ch); } g.add(box(2.4, 2.2, 1.2, M.brass, 0, Y + 7.6, 7.2)); }
+        else a.push((dt) => { rotor.rotation.y += dt * (n.spin ?? 0); if (n.spin > 0) n.spin = Math.max(0, n.spin - dt * 3); });
+        return { group: g, height: Y + 27 };
+    },
+    centrifuge(n, a) {
+        const g = G();
+        g.add(lathe([[9.6, Y], [9.6, Y + 0.8], [8.4, Y + 1.6]], M.iron));
+        let liquidTop = Y + 2;
+        g.add(heart(n, 7.2, 11, Y + 1.6, (y) => { liquidTop = y; }));
+        const vortex = new THREE.Mesh(new THREE.CircleGeometry(6.6, 48), additive(CIRCLE.inner, n.light, 0.35)); vortex.rotation.x = -Math.PI / 2; vortex.position.y = Math.max(liquidTop, Y + 2) + 0.05; g.add(vortex);
+        g.add(band(7.5, Y + 2.2), band(7.5, Y + 12.2));
+        const cage = G(); cage.position.y = Y + 0.8;
+        cage.add(torus(9.6, 0.35, M.gilt, 0), torus(9.6, 0.35, M.gilt, 12.6));
+        for (let i = 0; i < 10; i++) { const t = (i / 10) * TAU; const rod = cyl(0.3, 0.3, 12.6, M.gilt, 0, 8); rod.position.x = Math.cos(t) * 9.6; rod.position.z = Math.sin(t) * 9.6; cage.add(rod); }
+        for (let i = 0; i < 5; i++) { const t = (i / 5) * TAU + 0.3; const fin = box(0.25, 9, 2.2, M.brass, Math.cos(t) * 8.7, 1.8, Math.sin(t) * 8.7); fin.rotation.y = -t; cage.add(fin); }
+        g.add(cage);
+        g.add(lathe([[7.8, Y + 12.8], [7.8, Y + 13.4], [5.8, Y + 15.2], [2.4, Y + 16.6], [1.2, Y + 17.4]], M.brass));
+        const f = finial(1); f.position.y = Y + 17.2; g.add(f);
+        g.add(ball(0.9, glow(n.light, 2.4), 0, Y + 22, 0));
+        a.push((dt) => { const k = busy(n) + (n.spin ?? 0); cage.rotation.y += dt * 1.6 * k; vortex.rotation.z -= dt * 2.2 * k; if (n.spin > 0) n.spin = Math.max(0, n.spin - dt * 1.5); });
+        return { group: g, height: Y + 24 };
+    },
+    sump(n, a) {
+        const g = G();
+        g.add(heart(n, 11.4, 6, Y - 1.4));
+        g.add(lathe([[12.4, Y + 4.4], [12.4, Y + 5.2], [11.6, Y + 5.6]], M.stone, 64), torus(12.1, 0.3, M.brass, Y + 5.4));
+        for (let i = -4; i <= 4; i++) { if (i === 0) continue; g.add(box(0.35, 0.35, Math.sqrt(Math.max(0, 11.4 ** 2 - (i * 2.4) ** 2)) * 2, M.iron, i * 2.4, Y + 5, 0)); }
+        const lamps = [];
+        for (let i = 0; i < 4; i++) {
+            const t = (i / 4) * TAU + Math.PI / 4 + 0.4, x = Math.cos(t) * 12.6, z = Math.sin(t) * 12.6;
+            g.add(cyl(0.4, 0.55, 8, M.iron, Y, 10).translateX(x).translateZ(z));
+            const c = curl(1.5); c.position.set(x, Y + 8, z); c.rotation.y = -t; g.add(c);
+            const l = ball(0.8, std({ color: 0x050505, emissive: new THREE.Color(n.light), emissiveIntensity: 1.6 }), x, Y + 8.6, z); g.add(l); lamps.push(l);
+        }
+        // a dredge wheel on an iron gantry, turning through the dross while the Sump is worked
+        for (const sx of [-3, 3]) { g.add(tube([V(sx, Y + 4.6, -11), V(sx, Y + 9.5, -0.3), V(sx, Y + 4.6, 10.6)], 0.35, M.iron, 12)); }
+        const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 7, 12), M.brass); axle.rotation.z = Math.PI / 2; axle.position.set(0, Y + 9.2, 0); g.add(axle);
+        const wheel = G(); wheel.position.set(0, Y + 9.2, 0);
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(6.2, 0.3, 8, 40), M.brass); rim.rotation.y = Math.PI / 2; wheel.add(rim);
+        for (let i = 0; i < 10; i++) { const sp = G(); sp.rotation.x = (i / 10) * TAU; sp.add(box(0.25, 6.2, 0.25, M.iron), box(4, 0.2, 1.6, M.brass, 0, 5.6, 0)); wheel.add(sp); }
+        g.add(wheel);
+        a.push((dt, t) => { const on = working(n); wheel.rotation.x += dt * (on ? 1.6 : 0); lamps.forEach((l, i) => { l.material.emissiveIntensity = on ? 1.2 + 0.8 * Math.abs(Math.sin(t * 7 + i * 1.7)) : 1.6; }); });
+        return { group: g, height: Y + 16 };
+    },
+    forge(n, a) {
+        const g = G();
+        g.add(cyl(8, 8.6, 6, M.stone, Y, 10), torus(8.2, 0.35, M.brass, Y + 6));
+        const mouthMat = std({ color: 0x050505, emissive: new THREE.Color(n.color), emissiveIntensity: 3 });
+        const mouth = box(4.6, 3, 1, mouthMat, Math.cos(FRONT) * 7.4, Y + 1.2, Math.sin(FRONT) * 7.4); mouth.rotation.y = -FRONT + Math.PI / 2; g.add(mouth);
+        g.add(lathe([[4.6, Y + 6], [3.6, Y + 9], [1.8, Y + 13], [1.5, Y + 18]], M.iron, 10), torus(1.7, 0.3, M.gilt, Y + 17.6));
+        // anvil with a trip hammer on a pivot post
+        const anvil = G(); anvil.position.set(-6, Y, 6); anvil.rotation.y = FRONT;
+        anvil.add(box(2.4, 2.4, 2.4, M.iron), box(1.6, 1, 1.6, M.iron, 0, 2.4, 0), box(5.6, 1.6, 2.4, M.iron, 0.5, 3.4, 0), box(5.8, 0.25, 2.6, M.gilt, 0.5, 5, 0));
+        anvil.add(box(0.9, 9, 0.9, M.iron, -4.6, 0, -2), box(0.9, 9, 0.9, M.iron, -4.6, 0, 2), box(1, 0.6, 5, M.brass, -4.6, 9, 0));
+        const arm = G(); arm.position.set(-4.6, 9, 0);
+        arm.add(box(6.6, 0.6, 0.6, M.wood, 3.3, -0.3, 0), box(1.6, 2, 1.6, M.iron, 5.6, -2.2, 0), box(1.8, 0.3, 1.8, M.gilt, 5.6, -0.4, 0), box(1.4, 0.6, 1.4, M.brass, -0.9, -0.3, 0));
+        anvil.add(arm);
+        g.add(anvil);
+        // bellows feeding the hearth
+        const bel = G(); bel.position.set(7, Y, -5); bel.rotation.y = -FRONT;
+        bel.add(box(4, 0.4, 2.6, M.wood, 0, 0.6, 0));
+        const leather = box(3.6, 1.6, 2.2, std({ color: 0x4a2f1c, roughness: 0.9 }), 0, 1, 0); bel.add(leather);
+        const lid = box(4, 0.4, 2.6, M.wood, 0, 2.6, 0); bel.add(lid, tube([V(-2, 1.6, 0), V(-4, 1.8, 0), V(-5.5, 2.4, 0)], 0.35, M.brass, 8));
+        g.add(bel);
+        const N = 70, pos = new Float32Array(N * 3), life = new Float32Array(N); for (let i = 0; i < N; i++) life[i] = Math.random();
+        const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        const sparks = new THREE.Points(geo, new THREE.PointsMaterial({ map: DOT, color: n.light, size: 1.6, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); sparks.raycast = () => {}; g.add(sparks);
+        let hp = 0;
+        a.push((dt, t) => {
+            const on = working(n);
+            sparks.visible = on;
+            for (let i = 0; i < N; i++) { life[i] += dt * (0.25 + (i % 7) * 0.04) * (on ? 2 : 0); if (life[i] > 1) life[i] -= 1; const k = life[i]; pos.set([Math.sin(i + k * 3) * (1 + k * 2), Y + 18 + k * 14, Math.cos(i * 1.7 + k * 2) * (1 + k * 2)], i * 3); }
+            geo.attributes.position.needsUpdate = true;
+            if (on) { hp = (hp + dt * 1.6) % 1; arm.rotation.z = hp < 0.18 ? 0.45 - (hp / 0.18) * 0.68 : -0.23 + ((hp - 0.18) / 0.82) * 0.68; } else arm.rotation.z = 0.45;
+            const pump = on ? 0.5 + 0.5 * Math.sin(t * 5) : 1; leather.scale.y = 0.35 + 0.65 * pump; leather.position.y = 1.0 + leather.scale.y * 0.8; lid.position.y = 1.0 + leather.scale.y * 1.6;
+            mouthMat.emissiveIntensity = on ? (2.6 + Math.sin(t * 5.5) * 0.6) * (1.4 + (1 - pump) * 0.6) : 2.2;
+        });
+        return { group: g, height: Y + 22 };
+    },
+    hopper(n) {
+        const g = G();
+        g.add(heart(n, 6.4, 12, Y));
+        g.add(band(6.7, Y + 0.8), band(6.7, Y + 11.6));
+        g.add(lathe([[6.8, Y + 12.2], [7.6, Y + 13], [11, Y + 20], [11.6, Y + 20.6], [11.6, Y + 21.4]], M.brass, 48));
+        for (let i = 0; i < 8; i++) { const t = (i / 8) * TAU; g.add(tube([V(Math.cos(t) * 7.6, Y + 13, Math.sin(t) * 7.6), V(Math.cos(t) * 11.2, Y + 20.4, Math.sin(t) * 11.2)], 0.25, M.gilt, 2)); }
+        g.add(torus(11.6, 0.4, M.gilt, Y + 21.4), rivets(11.6, Y + 20.9, 26), torus(11.7, 0.16, glow(accent(n), 1.6), Y + 21.9), torus(6.9, 0.14, glow(accent(n), 1.4), Y + 12.3));
+        for (let i = 0; i < 4; i++) { const t = (i / 4) * TAU + Math.PI / 4 + 0.2; g.add(tube([V(Math.cos(t) * 8.6, Y, Math.sin(t) * 8.6), V(Math.cos(t) * 9.6, Y + 10, Math.sin(t) * 9.6), V(Math.cos(t) * 11.2, Y + 20.6, Math.sin(t) * 11.2)], 0.45, M.iron, 12)); }
+        return { group: g, height: Y + 23 };
+    },
+    refinery(n, a) {
+        const g = G(), H = 26;
+        g.add(cyl(6.2, 6.8, 1.6, M.iron, Y, 24));
+        let level = Y + 1.6;
+        g.add(heart(n, 5.2, H, Y + 1.6, (y) => { level = y; }));
+        const trays = [];
+        for (let i = 0; i < 5; i++) {
+            const y = Y + 4.6 + i * 4.6;
+            g.add(band(5.5, y, 0.8));
+            const tray = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.6, 0.3, 32), glow(n.color, 0.15)); tray.position.y = y; tray.userData.y = y; tray.userData.lit = y < level; g.add(tray); trays.push(tray);
+        }
+        for (let i = 0; i < 4; i++) { const t = (i / 4) * TAU + 0.4; g.add(box(0.5, H, 0.5, M.brass, Math.cos(t) * 5.8, Y + 1.6, Math.sin(t) * 5.8)); }
+        curls(g, 6, Y + 15, 4, 1.8);
+        g.add(lathe([[5.8, Y + 27.6], [5.8, Y + 28.6], [4.4, Y + 30], [2, Y + 31.6], [1, Y + 32.6]], M.brass), runeBand(5.1, Y + 29.2, 0.9, n.light, 2));
+        const crown = gem(n.light, 1.3); crown.position.y = Y + 34.8; g.add(crown);
+        const f = finial(0.8); f.position.y = Y + 32.2; g.add(f);
+        const mats = trays.map(() => std({ color: 0x050505, emissive: new THREE.Color(n.color), emissiveIntensity: 0.15 }));
+        trays.forEach((tr, i) => { tr.material = mats[i]; });
+        bubbles(g, n, 5, Y + 2, H - 2, a);
+        // a flywheel and piston on the right, driving the column while it works
+        const fw = G(); fw.position.set(6.4, Y + 9, -6.4); fw.rotation.y = FRONT; g.add(fw);
+        fw.add(box(0.8, 9, 0.8, M.iron, 0, -9, -1.2));
+        const wheel = G(); wheel.position.z = 0.6; fw.add(wheel);
+        wheel.add(new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.45, 8, 32), M.iron));
+        for (let i = 0; i < 6; i++) { const sp = box(0.3, 3.2, 0.3, M.brass); sp.geometry.translate(0, -1.6 + 1.6, 0); const pv = G(); pv.rotation.z = (i / 6) * TAU; pv.add(sp); wheel.add(pv); }
+        wheel.add(ball(0.6, M.gilt));
+        const pin = ball(0.4, M.gilt, 2.4, 0, 0.4); wheel.add(pin);
+        const rod = box(0.35, 1, 0.35, M.brass); fw.add(rod);
+        const piston = G(); fw.add(piston);
+        piston.add(cyl(0.9, 0.9, 2.2, M.iron, 0, 16));
+        fw.add(cyl(1.1, 1.1, 4, M.glass, 4.6, 16, true));
+        let w = 0, ang = 0;
+        const tmpP = new THREE.Vector3();
+        a.push((dt) => {
+            const on = working(n);
+            w += dt * 2 * busy(n); ang += dt * (on ? 4 : 0); wheel.rotation.z = ang;
+            const px = Math.cos(ang) * 2.4, py = Math.sin(ang) * 2.4, top = 5.2 + py * 0.5 + 1.2;
+            piston.position.set(0, top, 0.6);
+            const dx = 0 - px, dy = top - py, L = Math.hypot(dx, dy); rod.position.set(px / 2, (py + top) / 2, 0.9); rod.scale.y = L; rod.rotation.z = Math.atan2(-dx, dy);
+            trays.forEach((tr, i) => { tr.material.emissiveIntensity = tr.userData.lit ? 1.2 + 0.6 * Math.max(0, Math.sin(w - i * 0.9)) : 0.12; tr.position.y = tr.userData.y + (on ? Math.sin(w * 2 + i) * 0.15 : 0); });
+            crown.rotation.y += dt * busy(n);
+        });
+        return { group: g, height: Y + 37 };
+    },
+    alembic(n, a) {
+        const g = G();
+        g.add(heart(n, 6.6, 12, Y));
+        for (let i = 0; i < 6; i++) { const t = (i / 6) * TAU + 0.2; g.add(tube([V(Math.cos(t) * 6.9, Y, Math.sin(t) * 6.9), V(Math.cos(t) * 6.9, Y + 12, Math.sin(t) * 6.9), V(Math.cos(t) * 5.8, Y + 13.4, Math.sin(t) * 5.8)], 0.3, M.copper, 12)); }
+        g.add(band(6.9, Y + 0.8, 1), band(6.9, Y + 11.6, 1), torus(7.0, 0.14, glow(accent(n), 1.4), Y + 12.3));
+        // the still-head: a copper helm on the heart
+        g.add(lathe([[7, Y + 12.4], [6.2, Y + 14], [3.6, Y + 15.6], [2.2, Y + 17.6], [3, Y + 19], [2.6, Y + 20.4], [0, Y + 21.4]], M.copper, 48), torus(3.05, 0.3, M.gilt, Y + 19), torus(3.1, 0.14, glow(accent(n), 1.8), Y + 19.5));
+        // the swan neck falls into an open copper condenser coil, which drips into a copper cup
+        const cx = 8.5, cz = -8.5;
+        g.add(tube([V(0, Y + 20.4, 0), V(2, Y + 22.6, -2), V(5.5, Y + 22, -5.5), V(cx, Y + 18.6, cz), V(cx, Y + 16.6, cz)], 0.6, M.copper, 40));
+        const coilMat = std({ color: 0xc06a3e, metalness: 1, roughness: 0.3, emissive: new THREE.Color(accent(n)), emissiveIntensity: 0.2 });
+        const coil = []; for (let i = 0; i <= 140; i++) { const t = i / 140, an = t * 5 * TAU; coil.push(V(cx + Math.cos(an) * 2.4, Y + 16.6 - t * 11, cz + Math.sin(an) * 2.4)); }
+        g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(coil), 320, 0.4, 8), coilMat));
+        for (let i = 0; i < 3; i++) { const t = (i / 3) * TAU; g.add(box(0.4, Y + 17, 0.4, M.iron, cx + Math.cos(t) * 3.2, 0, cz + Math.sin(t) * 3.2)); }
+        g.add(torus(3.2, 0.25, M.brass, Y + 17));
+        g.add(lathe([[0, 0], [2, 0], [2.4, 1.6], [2.7, 2.2]], M.copper, 24).translateX(cx).translateZ(cz));
+        const drip = ball(0.32, glow(n.light, 2.4), cx, Y + 5, cz); g.add(drip);
+        bubbles(g, n, 6.2, Y + 0.6, 11, a, 22);
+        // a pressure gauge on the helm, its needle swinging while it boils
+        const gg = G(); gg.position.set(Math.cos(FRONT) * 4.6, Y + 15.4, Math.sin(FRONT) * 4.6); gg.rotation.y = FRONT; gg.rotation.x = -0.35;
+        gg.add(new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.6, 24), M.brass).rotateX(Math.PI / 2), new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.18, 6, 24), M.gilt));
+        const face = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), std({ color: 0xe8e0c8, roughness: 0.6 })); face.position.z = 0.32; gg.add(face);
+        const needle = box(0.12, 1.2, 0.05, M.iron); needle.position.z = 0.36; gg.add(needle);
+        g.add(gg);
+        const steam = new THREE.Sprite(new THREE.SpriteMaterial({ map: DOT, color: n.light, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); steam.scale.set(7, 7, 1); g.add(steam);
+        let ph = 0;
+        a.push((dt, t) => {
+            const k = busy(n), on = k > 0; ph += dt * 0.7 * k; const p = ph % 1;
+            drip.position.y = Y + 5.4 - p * (Y + 3.4); drip.visible = on && p < 0.92;
+            coilMat.emissiveIntensity = on ? 0.8 + 0.4 * Math.sin(t * 6) : 0.2;
+            needle.rotation.z = on ? -0.6 + Math.sin(t * 2.3) * 0.5 + Math.sin(t * 17) * 0.06 : 1.1;
+            steam.material.opacity = on ? 0.3 + 0.15 * Math.sin(t * 3) : 0; steam.position.y = Y + 22 + ((t * 5) % 7);
+        });
+        return { group: g, height: Y + 23 };
+    },
+    crucible(n, a) {
+        const g = G();
+        g.add(heart(n, 6.6, 9, Y + 2.4));
+        g.add(lathe([[0, Y + 2], [6.4, Y + 2], [6.9, Y + 2.6]], M.iron, 40));
+        for (let i = 0; i < 3; i++) {
+            const t = (i / 3) * TAU + 0.5;
+            g.add(tube([V(Math.cos(t) * 9.4, Y, Math.sin(t) * 9.4), V(Math.cos(t) * 9.4, Y + 3, Math.sin(t) * 9.4), V(Math.cos(t) * 7.6, Y + 7, Math.sin(t) * 7.6), V(Math.cos(t) * 7.2, Y + 11.8, Math.sin(t) * 7.2), V(Math.cos(t) * 6.2, Y + 12.6, Math.sin(t) * 6.2)], 0.6, M.iron, 24));
+            g.add(ball(1.1, M.gilt, Math.cos(t) * 9.4, Y + 0.6, Math.sin(t) * 9.4));
+        }
+        const coil = []; for (let i = 0; i <= 150; i++) { const t = i / 150, an = t * 4.5 * TAU; coil.push(V(Math.cos(an) * 8, Y + 3.2 + t * 7.8, Math.sin(an) * 8)); }
+        const coilMat = std({ color: 0xc06a3e, metalness: 1, roughness: 0.3, emissive: new THREE.Color(n.color), emissiveIntensity: 0.15 });
+        g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(coil), 400, 0.45, 8), coilMat));
+        const climb = Array.from({ length: 5 }, (_, i) => { const m = torus(8, 0.5, std({ color: 0x050505, emissive: new THREE.Color(n.color), emissiveIntensity: 0, transparent: true, opacity: 0.85 }), Y + 3.6 + i * 1.75); m.raycast = () => {}; g.add(m); return m; });
+        g.add(torus(6.9, 0.4, M.gilt, Y + 11.4), rivets(6.9, Y + 2.8, 22));
+        let cp = 0;
+        g.add(torus(7.0, 0.14, glow(accent(n), 1.6), Y + 11.9));
+        for (const sx of [-1, 1]) g.add(tube([V(sx * 9.4, Y, sx * -0.0), V(sx * 8.6, Y + 14, 0), V(sx * 4, Y + 19, 0)], 0.4, M.iron, 12));
+        g.add(box(9, 0.8, 1.2, M.brass, 0, Y + 18.8, 0));
+        const stir = G(); stir.position.y = Y + 19.2; g.add(stir);
+        stir.add(cyl(0.3, 0.3, 11, M.iron, -10.4, 8), box(5, 0.6, 0.4, M.iron, 0, -10.6, 0));
+        const g1 = gear(1.8, 12); g1.rotation.x = -Math.PI / 2; g1.position.y = 0.6; stir.add(g1);
+        const g2 = gear(1.2, 8, M.gilt); g2.rotation.x = -Math.PI / 2; g2.position.set(2.9, Y + 19.8, 0); g.add(g2);
+        a.push((dt) => {
+            const on = working(n); cp += dt * (on ? 0.9 : 0);
+            climb.forEach((m, i) => { const f = (cp - i * 0.14) % 1.8; m.material.emissiveIntensity = on && f > 0 && f < 0.35 ? Math.sin((f / 0.35) * Math.PI) * 1.2 : 0; });
+            stir.rotation.y += dt * (on ? 2.4 : 0); g2.rotation.z -= dt * (on ? 2.4 * 1.5 : 0); });
+        return { group: g, height: Y + 15 };
+    },
+    arena(n, a) {
+        const g = G();
+        g.add(heart(n, 6.2, 8, Y));
+        g.add(band(6.5, Y + 0.7, 0.9), band(6.5, Y + 7.6, 0.9));
+        g.add(torus(6.6, 0.14, glow(accent(n), 1.6), Y + 8.2));
+        for (let i = 0; i < 8; i++) {
+            const t = (i / 8) * TAU + 0.2, h = 9 + (i % 3) * 1.6;
+            const st = new THREE.Mesh(new THREE.BoxGeometry(2.4, h, 1.5), M.stone); st.position.set(Math.cos(t) * 10, Y + h / 2, Math.sin(t) * 10); st.rotation.y = -t + Math.PI / 2; g.add(st);
+            const cap = box(2.8, 0.5, 1.9, M.brass); cap.position.set(Math.cos(t) * 10, Y + h, Math.sin(t) * 10); cap.rotation.y = -t + Math.PI / 2; g.add(cap);
+            const r = new THREE.Mesh(new THREE.PlaneGeometry(0.8, h * 0.7), glow(n.color, 1.6)); r.position.set(Math.cos(t) * 9.2, Y + h / 2, Math.sin(t) * 9.2); r.lookAt(0, r.position.y, 0); g.add(r);
+        }
+        return { group: g, height: Y + 14 };
+    },
+    treasury(n, a) {
+        const g = G();
+        g.add(heart(n, 5.8, 10, Y + 0.8));
+        g.add(box(13, 0.8, 13, M.wood, 0, Y, 0), box(13.4, 0.3, 13.4, M.gilt, 0, Y + 0.8, 0));
+        for (const x of [-6, 6]) for (const z of [-6, 6]) { g.add(box(0.9, 11, 0.9, M.gilt, x, Y + 0.8, z)); const f = finial(0.5); f.position.set(x, Y + 11.8, z); g.add(f); const gm2 = gem(accent(n), 0.45); gm2.position.set(x, Y + 14.4, z); g.add(gm2); }
+        g.add(torus(6.1, 0.14, glow(accent(n), 1.6), Y + 11));
+        for (const ry of [0, Math.PI / 2]) { const arch = new THREE.Mesh(new THREE.TorusGeometry(6, 0.35, 8, 32, Math.PI), M.gilt); arch.position.y = Y + 11.8; arch.rotation.y = ry; g.add(arch); }
+        g.add(box(13, 0.4, 0.4, M.gilt, 0, Y + 11.6, 6), box(13, 0.4, 0.4, M.gilt, 0, Y + 11.6, -6), box(0.4, 0.4, 13, M.gilt, 6, Y + 11.6, 0), box(0.4, 0.4, 13, M.gilt, -6, Y + 11.6, 0));
+        const gm = gem(n.light, 1); gm.position.y = Y + 18.4; g.add(gm);
+        return { group: g, height: Y + 20 };
+    },
+    archive(n) {
+        const g = G();
+        g.add(heart(n, 5.4, 14, Y));
+        g.add(band(5.7, Y + 0.8, 0.8), band(5.7, Y + 13.4, 0.8));
+        for (const x of [-8, 8]) for (const z of [-8, 8]) g.add(box(0.7, 17, 0.7, M.iron, x, Y, z));
+        for (let s = 0; s < 3; s++) for (const [x, z, w, d] of [[0, -8, 16.6, 3], [-8, 0, 3, 16.6], [8, 0, 3, 16.6]]) g.add(box(w, 0.35, d, M.iron, x, Y + 2 + s * 5.4, z));
+        let k = 0;
+        for (let s = 0; s < 3; s++) for (const [x, z] of [[-4, -8], [4, -8], [-8, -3], [-8, 3], [8, -3], [8, 3]]) { if ((k++ * 5) % 7 > 4) continue; g.add(box(2.6, 3, 2.4, M.wood, x, Y + 2.35 + s * 5.4, z), box(2.7, 0.25, 2.5, M.brass, x, Y + 3.8 + s * 5.4, z)); }
+        g.add(box(17.4, 0.6, 17.4, M.iron, 0, Y + 17, 0), torus(5.75, 0.14, glow(accent(n), 1.6), Y + 14), box(17.6, 0.2, 0.2, glow(accent(n), 1.4), 0, Y + 17.6, 8.8), box(0.2, 0.2, 17.6, glow(accent(n), 1.4), 8.8, Y + 17.6, 0));
+        const c1 = curl(2.2); c1.position.set(-2, Y + 19.6, 0); g.add(c1); const c2 = curl(2.2); c2.scale.x = -1; c2.position.set(2, Y + 19.6, 0); g.add(c2);
+        return { group: g, height: Y + 22 };
+    },
+    necropolis(n) {
+        const g = G();
+        g.add(heart(n, 4.8, 9, Y + 1.2));
+        g.add(lathe([[0, Y], [6, Y], [6, Y + 1.2], [5.2, Y + 1.2]], M.stone, 40));
+        g.add(lathe([[4.9, Y + 10.2], [5.4, Y + 10.8], [3, Y + 12], [1.4, Y + 12.4]], M.stone, 40));
+        for (let i = 0; i < 6; i++) { const t = (i / 6) * TAU; g.add(cyl(0.55, 0.6, 13, M.stone, Y, 12).translateX(Math.cos(t) * 8).translateZ(Math.sin(t) * 8), box(1.4, 0.5, 1.4, M.gilt, Math.cos(t) * 8, Y + 13, Math.sin(t) * 8)); }
+        g.add(cyl(9.4, 9.4, 1, M.stone, Y + 13.5, 6), new THREE.Mesh(new THREE.CylinderGeometry(0.5, 9.6, 4, 6), M.stone).translateY(Y + 16.5));
+        const f = finial(0.6); f.position.y = Y + 18.4; g.add(f);
+        const gm = gem(accent(n), 0.8); gm.position.y = Y + 23.6; g.add(gm);
+        g.add(torus(5.1, 0.14, glow(accent(n), 1.4), Y + 10.4));
+        return { group: g, height: Y + 25 };
+    },
+    codex(n, a) {
+        const g = G();
+        g.add(box(12, 18, 6, M.wood, 0, Y, -0.4), box(11, 16, 0.2, M.glass, 0, Y + 1, 2.75));
+        for (let s = 0; s < 3; s++) g.add(box(11, 0.4, 5, M.brass, 0, Y + 1.2 + s * 5.4, 0));
+        const kinds = ['#c86bf0', '#3ccf8e', '#4fb3ff'];
+        const lids = [];
+        for (let i = 0; i < n.objects; i++) { const s = Math.floor(i / 3), j = i % 3, jar = G(); jar.position.set(-3.6 + j * 3.6, Y + 1.6 + s * 5.4, 0.8); const lid = cyl(1.3, 1.3, 0.5, std({ color: 0xb08646, metalness: 1, roughness: 0.3, emissive: new THREE.Color(kinds[i % 3]), emissiveIntensity: 0 }), 3.2, 16); jar.add(cyl(1.2, 1.2, 3.2, M.glass, 0, 16, true), cyl(1, 1, 2.2, liquidMat(kinds[i % 3]), 0.1, 16), lid); g.add(jar); lids.push({ lid, jar }); }
+        const cg = [gear(2.2, 14), gear(1.4, 9, M.gilt), gear(1.0, 7)];
+        cg[0].position.set(-1.2, Y + 22.4, 0.6); cg[1].position.set(2.25, Y + 22.4, 0.6); cg[2].position.set(2.25, Y + 24.8, 0.6);
+        for (const c of cg) g.add(c);
+        a.push((dt, t) => {
+            const on = working(n), sp = on ? 1.2 : 0;
+            cg[0].rotation.z += dt * sp; cg[1].rotation.z -= dt * sp * (2.2 / 1.4); cg[2].rotation.z += dt * sp * (2.2 / 1.0);
+            lids.forEach(({ lid, jar }, i) => { const f = (t * 1.2 - i * 0.25) % 2; lid.material.emissiveIntensity = on && f > 0 && f < 0.4 ? 1.5 : 0; jar.position.y = jar.userData.y ?? (jar.userData.y = jar.position.y); if (on) jar.position.y = jar.userData.y + (f > 0 && f < 0.4 ? 0.3 : 0); });
+        });
+        g.add(box(13, 1, 7, M.gilt, 0, Y + 18, 0));
+        return { group: g, height: Y + 27 };
+    },
+    market() {
+        const g = G();
+        g.add(cyl(6.5, 6.5, 10, M.dark, Y, 6), new THREE.Mesh(new THREE.CylinderGeometry(0, 8.5, 4, 6), M.iron).translateY(Y + 12));
+        for (let k = 0; k < 3; k++) { const ch = torus(6.9, 0.3, M.iron, Y + 2.6 + k * 3); ch.rotation.z = (k - 1) * 0.1; g.add(ch); }
+        for (let i = 0; i < 5; i++) g.add(cyl(1.2, 1.2, 0.35, M.gilt, Y + 10 + i * 0.36, 20).translateX(3.2).translateZ(3.2));
+        return { group: g, height: Y + 16 };
+    },
+    nexus(n, a) {
+        const g = G();
+        g.add(lathe([[6, Y], [3, Y + 1], [2.2, Y + 7], [3.6, Y + 8], [5.2, Y + 8.6], [5.2, Y + 9.4]], M.brass, 48), band(2.6, Y + 4, 1));
+        const cage = G(); cage.position.y = Y + 9.4;
+        for (let i = 0; i < 6; i++) { const t = (i / 6) * TAU; cage.add(tube([V(Math.cos(t) * 4.8, 0, Math.sin(t) * 4.8), V(Math.cos(t) * 6.2, 6, Math.sin(t) * 6.2), V(Math.cos(t) * 3, 12.5, Math.sin(t) * 3)], 0.3, M.gilt, 16)); }
+        cage.add(torus(5.2, 0.35, M.gilt, 0), torus(3.2, 0.35, M.gilt, 12.5));
+        const prism = new THREE.Mesh(new THREE.OctahedronGeometry(2.6), std({ color: 0xdffcff, emissive: new THREE.Color(n.color), emissiveIntensity: 2, roughness: 0.05, metalness: 0.1 }));
+        prism.position.y = 6.2; prism.scale.y = 1.5; cage.add(prism);
+        const lens1 = G(), lens2 = G(); lens1.position.y = lens2.position.y = 6.2;
+        lens1.add(new THREE.Mesh(new THREE.TorusGeometry(7.6, 0.28, 8, 64), M.gilt), new THREE.Mesh(new THREE.CircleGeometry(7.4, 48), M.glass));
+        lens2.add(new THREE.Mesh(new THREE.TorusGeometry(9, 0.22, 8, 64), M.brass), new THREE.Mesh(new THREE.RingGeometry(8.6, 9, 64), additive(runeStrip, n.light, 0.5)));
+        cage.add(lens1, lens2); g.add(cage);
+        const f = finial(0.8); f.position.y = Y + 22; g.add(f);
+        let lt = 0;
+        a.push((dt) => { const k = busy(n); lt += dt * k * 0.3; lens1.rotation.y += dt * 0.7 * k; lens1.rotation.x = Math.sin(lt * 1.6) * 0.6; lens2.rotation.x += dt * 0.4 * k; lens2.rotation.z = Math.cos(lt * 1.3) * 0.5; prism.rotation.y += dt * 0.8 * k; });
+        return { group: g, height: Y + 26 };
+    },
+    atlas(n, a) {
+        const g = G(), R = 7, cy = Y + 15;
+        // the stand: a turned brass foot, four curled legs, a horizon ring with a face of runes
+        g.add(lathe([[5.4, Y], [5, Y + 0.8], [2.2, Y + 1.6], [1.4, Y + 3.4], [2, Y + 4]], M.brass, 40));
+        for (let i = 0; i < 4; i++) { const t = (i / 4) * TAU + Math.PI / 4; g.add(tube([V(Math.cos(t) * 1.6, Y + 3.6, Math.sin(t) * 1.6), V(Math.cos(t) * 5, Y + 6, Math.sin(t) * 5), V(Math.cos(t) * 8.4, Y + 10, Math.sin(t) * 8.4), V(Math.cos(t) * 8.8, cy - 0.2, Math.sin(t) * 8.8)], 0.32, M.brass, 20)); const c = curl(1.4); c.position.set(Math.cos(t) * 6.4, Y + 6.6, Math.sin(t) * 6.4); c.rotation.y = -t + Math.PI / 2; g.add(c); }
+        const horizon = G(); horizon.position.y = cy; g.add(horizon);
+        const hFace = new THREE.Mesh(new THREE.RingGeometry(R + 0.8, R + 2.2, 64), additive(runeStrip, n.light, 0.55)); hFace.rotation.x = -Math.PI / 2; horizon.add(hFace);
+        horizon.add(torus(R + 0.8, 0.22, M.gilt, 0), torus(R + 2.2, 0.3, M.gilt, 0));
+        // the meridian ring and the globe, tilted on the earth's axis
+        const merid = G(); merid.position.y = cy; g.add(merid);
+        const tilt = G(); tilt.rotation.z = 0.41; merid.add(tilt);
+        tilt.add(new THREE.Mesh(new THREE.TorusGeometry(R + 0.5, 0.35, 8, 72), M.gilt));
+        for (let i = 0; i < 36; i++) { const a = (i / 36) * TAU, tick = box(0.12, i % 9 ? 0.5 : 1, 0.6, M.brass); tick.position.set(Math.cos(a) * (R + 0.9), Math.sin(a) * (R + 0.9), 0); tick.rotation.z = a - Math.PI / 2; tilt.add(tick); }
+        const globe = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 32), std({ map: GLOBE, metalness: 0.55, roughness: 0.38, envMapIntensity: 1.1 }));
+        tilt.add(globe);
+        tilt.add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, (R + 1.6) * 2, 8), M.gilt));
+        const sun = gem(n.light, 0.8); sun.position.y = R + 1.9; tilt.add(sun);
+        const moon = gem(SILVER, 0.6); moon.position.y = -R - 1.8; tilt.add(moon);
+        const f = finial(0.45); f.position.y = R + 0.9; tilt.add(f);
+        g.add(cyl(0.9, 0.9, cy - R - 2 - (Y + 4), M.brass, Y + 4, 12));
+        a.push((dt, t) => {
+            const on = working(n);
+            globe.rotation.y += dt * (on ? 0.9 : 0);
+            merid.rotation.y = FRONT + (on ? Math.sin(t * 0.6) * 0.45 : 0);
+            hFace.rotation.z -= dt * (on ? 0.3 : 0);
+            sun.rotation.y += dt * (on ? 1.5 : 0);
+        });
+        return { group: g, height: Y + 25 };
+    },
+    calendar(n, a) {
+        const g = G();
+        g.add(lathe([[5.4, Y], [1.4, Y + 1.2], [1.1, Y + 4.5], [1.8, Y + 5.2]], M.brass, 40));
+        const sphere = G(); sphere.position.y = Y + 13;
+        const horizon = new THREE.Mesh(new THREE.TorusGeometry(8.6, 0.3, 8, 72), M.brass); horizon.rotation.x = Math.PI / 2;
+        const inner = G();
+        const eq = new THREE.Mesh(new THREE.TorusGeometry(6.6, 0.28, 8, 72), M.gilt); eq.rotation.x = Math.PI / 2;
+        const ecl = new THREE.Mesh(new THREE.TorusGeometry(6.6, 0.9, 2, 72), additive(runeStrip, n.light, 0.7)); ecl.rotation.x = Math.PI / 2 + 0.41;
+        inner.add(eq, ecl, new THREE.Mesh(new THREE.TorusGeometry(6.2, 0.22, 8, 72), M.brass));
+        sphere.add(new THREE.Mesh(new THREE.TorusGeometry(8, 0.42, 8, 72), M.gilt), horizon, inner, new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 18, 8), M.gilt), ball(1.6, glow(n.color, 2.4)));
+        sphere.rotation.z = 0.3; g.add(sphere);
+        const planets = [3.2, 4.6, 5.8].map((r, i) => { const p = ball(0.45 + i * 0.1, [M.silver, M.copper, M.gilt][i]); sphere.add(p); return { p, r, w: 1.6 - i * 0.4, ph: i * 2 }; });
+        a.push((dt, t) => {
+            const on = working(n); inner.rotation.y += dt * 0.35 * busy(n);
+            sphere.rotation.y += dt * (on ? 0.6 : 0);
+            for (const pl of planets) { pl.ph += dt * pl.w * (on ? 3 : 0.3); pl.p.position.set(Math.cos(pl.ph) * pl.r, Math.sin(pl.ph) * pl.r * 0.4, Math.sin(pl.ph) * pl.r); }
+        });
+        return { group: g, height: Y + 24 };
+    },
+};
+
+/** selection: a magic circle on the floor around the plinth, in the selected row's lens colour */
+function selectionCircle(g, n, a, color) {
+    const r = FOOT[n.kind] + 7, o = new THREE.Mesh(new THREE.CircleGeometry(r, 64), additive(CIRCLE.outer, color, 0.9)), i = new THREE.Mesh(new THREE.CircleGeometry(r * 0.72, 64), additive(CIRCLE.inner, color, 0.8));
+    for (const m of [o, i]) { m.rotation.x = -Math.PI / 2; m.position.y = 0.08; g.add(m); }
+    a.push((dt) => { o.rotation.z += dt * 0.2; i.rotation.z -= dt * 0.35; });
+}
+/** while a machine's panel is in use: sparks spiral up around it inside a faint column of light */
+function aura(g, n, a, height) {
+    const N = 70, pos = new Float32Array(N * 3), r = FOOT[n.kind] + 2.5;
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({ map: DOT, color: n.light, size: 2.6, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+    const pts = new THREE.Points(geo, mat); pts.raycast = () => {}; g.add(pts);
+    const halo = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.1, height, 40, 1, true), new THREE.MeshBasicMaterial({ color: n.light, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+    halo.position.y = height / 2; halo.raycast = () => {}; g.add(halo);
+    let k = 0, t0 = 0;
+    a.push((dt) => {
+        const on = busy(n) > 1; k += ((on ? 1 : 0) - k) * Math.min(1, dt * 4);
+        mat.opacity = k; halo.material.opacity = k * 0.025; pts.visible = halo.visible = k > 0.01;
+        if (!pts.visible) return;
+        t0 += dt;
+        for (let i = 0; i < N; i++) { const f = (i / N + t0 * 0.3) % 1, ang = i * 2.39996 + t0 * 2; pos.set([Math.cos(ang) * r * (1 - f * 0.35), f * height * 1.1, Math.sin(ang) * r * (1 - f * 0.35)], i * 3); }
+        geo.attributes.position.needsUpdate = true;
+    });
+}
+function makeMachine(n, a, ports = []) {
+    const g = G();
+    plinth(g, n, ports, a);
+    const body = BUILD[n.kind](n, a);
+    body.group.traverse((o) => { o.userData.part = 'body'; });
+    g.add(body.group);
+    // locked: the whole machine stands dark
+    if (n.locked) g.traverse((o) => { if (o.isMesh || o.isInstancedMesh) o.material = o.material.transparent ? M.lockedGlass : M.locked; });
+    return { group: g, height: body.height };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Pipes: on the floor into plinth ports; dark until a move runs       */
+/* ------------------------------------------------------------------ */
+const PIPE_Y = 2.4, SCALE = 1.5, TEMPER_L = 20;
+const MARKET_GLASS = std({ color: 0xd8b060, metalness: 0.2, roughness: 0.15, transparent: true, opacity: 0.16, depthWrite: false, envMapIntensity: 0.6 });
+const PIPE_GLASS = std({ color: 0x8fa6b8, metalness: 0, roughness: 0.1, transparent: true, opacity: 0.12, depthWrite: false, envMapIntensity: 0.6 });
+const flowVert = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`;
+const slugFrag = `
+uniform float uLen; uniform float uHead[4]; uniform float uDir[4]; uniform vec3 uCol[4]; varying vec2 vUv;
+void main(){
+    vec3 c = vec3(0.012, 0.014, 0.018);
+    for (int i = 0; i < 4; i++) {
+        if (uHead[i] < -0.5) continue;
+        float d = (vUv.x - uHead[i]) * uLen * uDir[i];
+        float k = d > 0.0 ? exp(-d * d / 6.0) : exp(-d * d / 40.0);
+        c += uCol[i] * k * 3.0;
+    }
+    gl_FragColor = vec4(c, 1.0);
+}`;
+const pipes = [];
+const portsOf = {};   // node id -> port angles
+function portPoint(n, ang) {
+    const r = (FOOT[n.kind] + 2.8) * SCALE;
+    return V(n.pos[0] + Math.cos(ang) * r, PIPE_Y, n.pos[1] + Math.sin(ang) * r);
+}
+function pipeCurve(A, B) {
+    // each end leaves along the major axis, so straight rows stay straight and offsets bend flat on the floor
+    const dx = B.pos[0] - A.pos[0], dz = B.pos[1] - A.pos[1], alongX = B.kind === 'junction' || Math.abs(dx) >= Math.abs(dz);
+    const angA = alongX ? (dx > 0 ? 0 : Math.PI) : (dz > 0 ? Math.PI / 2 : -Math.PI / 2);
+    const angB = angA + Math.PI;
+    (portsOf[A.id] ??= []).push(angA); (portsOf[B.id] ??= []).push(angB);
+    const a = portPoint(A, angA), b = portPoint(B, angB);
+    if (Math.abs(a.z - b.z) < 1 || Math.abs(a.x - b.x) < 1) return new THREE.LineCurve3(a, b);
+    if (alongX) { const h = (b.x - a.x) * 0.5; return new THREE.CubicBezierCurve3(a, V(a.x + h, PIPE_Y, a.z), V(b.x - h, PIPE_Y, b.z), b); }
+    const h = (b.z - a.z) * 0.5; return new THREE.CubicBezierCurve3(a, V(a.x, PIPE_Y, a.z + h), V(b.x, PIPE_Y, b.z - h), b);
+}
+function buildPipes(scene) {
+    for (const [from, to, kind] of PIPES) {
+        const A = NODE[from], B = NODE[to];
+        const curve = pipeCurve(A, B), len = curve.getLength(), segs = Math.max(16, Math.round(len / 2));
+        if (kind === 'plates') {
+            // a conveyor: two iron rails carrying gilt plates (Codex objects) or coins (Market costs and rewards)
+            for (const off of [-1.4, 1.4]) {
+                const pts = curve.getSpacedPoints(segs).map((p, i, arr) => { const t = curve.getTangentAt(i / (arr.length - 1)); return p.clone().add(V(-t.z, 0, t.x).multiplyScalar(off)).setY(1.2); });
+                scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), segs, 0.3, 6), M.iron));
+            }
+            const coin = false, N = Math.round(len / 5);
+            const geo = coin ? new THREE.CylinderGeometry(1, 1, 0.3, 20) : new THREE.BoxGeometry(2.6, 0.4, 2.2);
+            const items = new THREE.InstancedMesh(geo, M.gilt, N);
+            scene.add(items);
+            const p = { from, to, curve, len, conveyor: { items, N, o: new THREE.Object3D(), offset: 0, active: 0, dir: 1, coin }, slugs: [] };
+            placeConveyor(p, 0); pipes.push(p);
+            continue;
+        }
+        const market = kind === 'market';
+        const wide = A.zone === 'net' && B.zone === 'net', tempered = from === 'centrifuge' && to === 'hopper';
+        const shellR = market ? 1.0 : wide ? 1.7 : 1.2;
+        if (tempered) {   // wide up to the Temper, narrow after it
+            const a0 = curve.getPointAt(0), b0 = curve.getPointAt(1), m0 = a0.clone().lerp(b0, 0.5), dir = b0.clone().sub(a0).normalize();
+            scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a0, m0.clone().addScaledVector(dir, -TEMPER_L / 2 + 1)), 8, 1.7, 12), PIPE_GLASS));
+            scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(m0.clone().addScaledVector(dir, TEMPER_L / 2 - 1), b0), 8, 1.2, 12), PIPE_GLASS));
+        } else scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, segs, shellR, 12), market ? MARKET_GLASS : PIPE_GLASS));
+        if (market) {   // gold-banded, like a roll of coins
+            const N = Math.round(len / 3.4);
+            for (let i = 1; i < N; i++) { const t = i / N, pt = curve.getPointAt(t), tan = curve.getTangentAt(t); const c = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.16, 6, 18), i % 4 ? M.brass : M.gilt); c.position.copy(pt); c.quaternion.setFromUnitVectors(V(0, 0, 1), tan); scene.add(c); }
+        }
+        const u = { uLen: { value: len }, uHead: { value: [-1, -1, -1, -1] }, uDir: { value: [1, 1, 1, 1] }, uCol: { value: [new THREE.Color(), new THREE.Color(), new THREE.Color(), new THREE.Color()] } };
+        const core = new THREE.Mesh(new THREE.TubeGeometry(curve, segs, wide ? 1.05 : 0.7, 8), new THREE.ShaderMaterial({ uniforms: u, vertexShader: flowVert, fragmentShader: slugFrag, toneMapped: false }));
+        core.userData.pipe = pipes.length; scene.add(core);
+        const collars = market || tempered ? 0 : Math.max(1, Math.round(len / 40));
+        for (let i = 1; i < collars; i++) {
+            const t = i / collars, p = curve.getPointAt(t), tan = curve.getTangentAt(t);
+            const c = new THREE.Mesh(new THREE.TorusGeometry(shellR + 0.15, 0.28, 8, 20), M.brass); c.position.copy(p); c.quaternion.setFromUnitVectors(V(0, 0, 1), tan); scene.add(c);
+            const saddle = box(1.2, PIPE_Y - 1.1, 3, M.iron); saddle.position.set(p.x, 0, p.z); saddle.rotation.y = Math.atan2(tan.x, tan.z); scene.add(saddle);
+        }
+        pipes.push({ from, to, curve, len, u, core, slugs: [] });
+    }
+}
+function placeConveyor(p, offset) {
+    const c = p.conveyor;
+    for (let i = 0; i < c.N; i++) {
+        const u = (i / c.N + offset) % 1, pt = p.curve.getPointAt(u), tan = p.curve.getTangentAt(u);
+        const y = c.coin ? 2.2 : 1.9;
+        c.o.position.copy(pt).setY(y); c.o.rotation.set(0, 0, 0); c.o.lookAt(pt.clone().add(tan).setY(y));
+        if (c.coin) c.o.rotateZ(Math.PI / 2);   // coins roll on edge along the rails
+        c.o.updateMatrix(); c.items.setMatrixAt(i, c.o.matrix);
+    }
+    c.items.instanceMatrix.needsUpdate = true;
+}
+function route(from, to) {
+    // harvesters share one trunk: harvester -> manifold -> centrifuge
+    if (from.startsWith('harvester:') && to === 'centrifuge') return [...route(from, 'manifold'), ...route('manifold', 'centrifuge')];
+    if (from === 'centrifuge' && to.startsWith('harvester:')) return [...route('centrifuge', 'manifold'), ...route('manifold', to)];
+    const direct = pipes.find((p) => (p.from === from && p.to === to) || (p.from === to && p.to === from));
+    if (direct) return [{ pipe: direct, forward: direct.from === from }];
+    const walk = (a, b) => {
+        const i = CHAIN.indexOf(a), j = CHAIN.indexOf(b); if (i < 0 || j < 0) return null;
+        const steps = [], st = j > i ? 1 : -1;
+        for (let k = i; k !== j; k += st) steps.push(...route(CHAIN[k], CHAIN[k + st]));
+        return steps;
+    };
+    if (to === 'necropolis') { const s = walk(from, 'crucible'); return s ? [...s, ...route('crucible', 'necropolis')] : null; }
+    if (from === 'necropolis') { const s = walk('crucible', to); return s ? [...route('necropolis', 'crucible'), ...s] : null; }
+    if (from === 'sump') { const s = to === 'hopper' ? [] : walk('hopper', to); return s ? [...route('sump', 'centrifuge'), ...route('centrifuge', 'hopper'), ...s] : null; }
+    return walk(from, to);
+}
+const SLUG_SPEED = 110;
+function launch(steps, color) {
+    if (!steps?.length) return;
+    const [step, ...rest] = steps, p = step.pipe;
+    if (p.conveyor) { p.conveyor.active = Math.max(p.conveyor.active, p.len / SLUG_SPEED); p.conveyor.dir = step.forward ? 1 : -1; setTimeout(() => launch(rest, color), (p.len / SLUG_SPEED) * 1000); return; }
+    if (p.slugs.length >= 4) p.slugs.shift();
+    p.slugs.push({ head: step.forward ? 0 : 1, dir: step.forward ? 1 : -1, color: new THREE.Color(color), rest });
+}
+function stepPipes(dt) {
+    for (const p of pipes) {
+        if (p.conveyor) {
+            const c = p.conveyor;
+            if (c.active > 0) { c.active -= dt; c.offset = (c.offset + (c.dir * dt * SLUG_SPEED) / p.len + 1) % 1; placeConveyor(p, c.offset); }
+            continue;
+        }
+        for (const s of p.slugs) s.head += (s.dir * SLUG_SPEED * dt) / p.len;
+        const done = p.slugs.filter((s) => s.head > 1.05 || s.head < -0.05);
+        p.slugs = p.slugs.filter((s) => !done.includes(s));
+        for (const s of done) launch(s.rest, s.color);
+        for (let i = 0; i < 4; i++) { const s = p.slugs[i]; p.u.uHead.value[i] = s ? s.head : -1; p.u.uDir.value[i] = s ? s.dir : 1; if (s) p.u.uCol.value[i].copy(s.color); }
+    }
+}
+function moveColor(from) {
+    const n = NODE[from], rows = ROWS[from];
+    if (state.lens === 'stage' || !rows?.length) return n.light;
+    return lensColor(lensValue(rows[Math.floor(Math.random() * rows.length)], n), n);
+}
+let replayTimers = [];
+function replay() {
+    replayTimers.forEach(clearTimeout); replayTimers = [];
+    const total = FLOWS.reduce((s, f) => s + f[2], 0), target = 50;
+    for (const [from, to, c] of FLOWS) {
+        const n = Math.max(1, Math.round((c / total) * target));
+        for (let i = 0; i < n; i++) replayTimers.push(setTimeout(() => launch(route(from, to), moveColor(from)), Math.random() * 28000));
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  The Temper: a gearbox on the Centrifuge -> Hopper pipe (10 : 1)     */
+/* ------------------------------------------------------------------ */
+function gearShape(r, teeth, depth) {
+    const s = new THREE.Shape();
+    for (let i = 0; i <= teeth * 4; i++) { const a = (i / (teeth * 4)) * TAU, rr = i % 4 < 2 ? r : r - depth; i ? s.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : s.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+    const hole = new THREE.Path(); hole.absarc(0, 0, r * 0.25, 0, TAU, true); s.holes.push(hole);
+    return new THREE.ExtrudeGeometry(s, { depth: 0.8, bevelEnabled: false });
+}
+function buildTemper(scene, anims) {
+    const p = pipes.find((q) => q.from === 'centrifuge' && q.to === 'hopper');
+    const a0 = p.curve.getPointAt(0), b0 = p.curve.getPointAt(1), mid = a0.clone().lerp(b0, 0.5);
+    const L = TEMPER_L, R = 2.3, g = G(); g.position.copy(mid);
+    const alongX = () => { const h = G(); h.rotation.z = Math.PI / 2; g.add(h); return h; };   // children lie along the pipe
+    const ringX = (r, t, mat, x) => { const m = new THREE.Mesh(new THREE.TorusGeometry(r, t, 8, 32), mat); m.rotation.y = Math.PI / 2; m.position.x = x; g.add(m); return m; };
+    const shell = alongX();
+    shell.add(new THREE.Mesh(new THREE.CylinderGeometry(R, R, L - 4, 32, 1, true), M.glass));
+    // the taper inside: Net width in, Core width out
+    shell.add(new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.15, L - 4, 32, 1, true), std({ color: 0x8a6a3a, metalness: 1, roughness: 0.35, side: THREE.DoubleSide, transparent: true, opacity: 0.5 })));
+    for (const sgn of [-1, 1]) {
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.4, R + 0.4, 2, 32), M.iron); cap.position.y = sgn * (L / 2 - 1); shell.add(cap);
+        ringX(R + 0.42, 0.22, M.brass, sgn * (L / 2 - 2)); ringX(R + 0.42, 0.22, M.brass, sgn * L / 2);
+    }
+    for (let i = 0; i < 4; i++) { const t = (i / 4) * TAU + Math.PI / 4; const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, L - 2, 8), M.iron); rod.position.set(Math.cos(t) * (R + 0.15), 0, Math.sin(t) * (R + 0.15)); shell.add(rod); }
+    const spin = alongX(); const band2 = runeBand(R + 0.3, 0, 1.6, SILVER, 4, 0.35); spin.add(band2);
+    // rings of light that travel down the taper and shrink while matter passes
+    const rings = [0, 1, 2].map(() => ringX(1.7, 0.16, glow(SILVER, 2.4), 0));
+    scene.add(g);
+    let ph = 0;
+    anims.push((dt) => {
+        const on = p.slugs.length > 0;
+        ph += dt * (on ? 1.4 : 0.15);
+        band2.rotation.y += dt * (on ? 2 : 0.1); band2.material.opacity = on ? 0.9 : 0.35;
+        rings.forEach((m, i) => { const f = (ph + i / 3) % 1; m.position.x = -(L / 2 - 2) + f * (L - 4); m.scale.setScalar((1.7 - f * 0.55) / 1.7); m.visible = on; });
+    });
+    return V(mid.x - 4, 0, 24);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Zones: silver walls of light, curved corner posts, floor inlays     */
+/* ------------------------------------------------------------------ */
+const ZONES = [{ id: 'net', name: 'Net' }, { id: 'core', name: 'Core' }, { id: 'gallery', name: 'Gallery' }];
+function zoneRect(z) {
+    const ps = NODES.filter((n) => n.zone === z.id).map((n) => n.pos), pad = 46;
+    return { x0: Math.min(...ps.map((p) => p[0])) - pad, x1: Math.max(...ps.map((p) => p[0])) + pad, z0: Math.min(...ps.map((p) => p[1])) - pad, z1: Math.max(...ps.map((p) => p[1])) + pad };
+}
+const wallFrag = `uniform vec3 uColor; varying vec2 vUv; void main(){ float y = vUv.y; float a = 0.04 + pow(1.0 - y, 2.0) * 0.2 + exp(-y * 18.0) * 0.35; a *= smoothstep(1.0, 0.55, y); gl_FragColor = vec4(uColor * a, a); }`;
+function corner() {
+    // two floor rails sweeping up into a short post, one silver-and-gilt piece
+    const g = G(), L = 16;
+    for (const axis of [0, 1]) {
+        const pt = (d, y) => axis ? V(0, y, d) : V(d, y, 0);
+        g.add(tube([pt(L, 0.6), pt(9, 0.6), pt(4, 0.9), pt(1.6, 2.8), pt(0.5, 6), pt(0.3, 9)], 0.42, M.silver, 40));
+        g.add(ball(0.7, M.silver, axis ? 0 : L, 0.6, axis ? L : 0));
+        const c = curl(1.6, 1.4, M.silver); c.position.copy(pt(7, 1.8)); c.rotation.y = axis ? -Math.PI / 2 : 0; g.add(c);
+    }
+    g.add(cyl(1.6, 2, 0.8, M.iron, 0, 16), cyl(0.5, 0.6, 12, M.silver, 0.8, 12), torus(0.75, 0.2, M.gilt, 6), torus(0.75, 0.2, M.gilt, 11));
+    const f = finial(0.55, M.silver); f.position.y = 12.8; g.add(f);
+    const gm = new THREE.Mesh(new THREE.OctahedronGeometry(0.9), glow(SILVER, 2)); gm.position.y = 18; g.add(gm);
+    return g;
+}
+function buildZones(scene) {
+    const color = new THREE.Color(SILVER);
+    for (const z of ZONES) {
+        const r = zoneRect(z), H = 26, w = r.x1 - r.x0, d = r.z1 - r.z0;
+        const tex = texture(zoneFloor(z.id, r), false);
+        const fl = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: tex, color: color.clone().multiplyScalar(0.13), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+        fl.rotation.x = -Math.PI / 2; fl.position.set((r.x0 + r.x1) / 2, 0.04, (r.z0 + r.z1) / 2); scene.add(fl);
+        const edges = [[r.x0, r.z0, r.x1, r.z0], [r.x1, r.z0, r.x1, r.z1], [r.x1, r.z1, r.x0, r.z1], [r.x0, r.z1, r.x0, r.z0]];
+        for (const [ax, az, bx, bz] of edges) {
+            const len = Math.hypot(bx - ax, bz - az), ry = -Math.atan2(bz - az, bx - ax);
+            const wall = new THREE.Mesh(new THREE.PlaneGeometry(len, H), new THREE.ShaderMaterial({ uniforms: { uColor: { value: color } }, vertexShader: flowVert, fragmentShader: wallFrag, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false }));
+            wall.position.set((ax + bx) / 2, H / 2, (az + bz) / 2); wall.rotation.y = ry; scene.add(wall);
+            const line = new THREE.Mesh(new THREE.BoxGeometry(len, 0.2, 0.5), new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(1.2), toneMapped: false }));
+            line.position.set((ax + bx) / 2, 0.1, (az + bz) / 2); line.rotation.y = ry; scene.add(line);
+        }
+        [[r.x0, r.z0, 0], [r.x1, r.z0, -Math.PI / 2], [r.x1, r.z1, Math.PI], [r.x0, r.z1, Math.PI / 2]].forEach(([x, cz, ry]) => { const c = corner(); c.position.set(x, 0, cz); c.rotation.y = ry; scene.add(c); });
+        // the inlay plaque: flush with the floor, just inside the near edge
+        const pl = new THREE.Mesh(new THREE.PlaneGeometry(64, 16), additive(plaqueTexture(z.id, z.name), SILVER, 0.55));
+        pl.rotation.x = -Math.PI / 2; pl.position.set((r.x0 + r.x1) / 2, 0.06, r.z1 - 14); scene.add(pl);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Scenes                                                             */
+/* ------------------------------------------------------------------ */
+function plainFloor(size) {
+    const [c, g] = canvas2d(512);
+    const grad = g.createRadialGradient(256, 256, 0, 256, 256, 256); grad.addColorStop(0, '#13151a'); grad.addColorStop(1, '#07080b');
+    g.fillStyle = grad; g.fillRect(0, 0, 512, 512);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), std({ map: texture(c), roughness: 0.8, metalness: 0.25, envMapIntensity: 0.35 }));
+    m.rotation.x = -Math.PI / 2; return m;
+}
+function baseScene() {
+    const s = new THREE.Scene();
+    s.background = new THREE.Color(0x07080b);
+    s.environment = envMap; s.environmentIntensity = 0.75;
+    s.add(new THREE.HemisphereLight(0x9fb4d0, 0x1a1208, 0.5));
+    const key = new THREE.DirectionalLight(0xffe2b8, 1.6); key.position.set(150, 260, 120); s.add(key);
+    const rim = new THREE.DirectionalLight(0x6fb8ff, 0.7); rim.position.set(-200, 120, -220); s.add(rim);
+    return s;
+}
+function dispose(obj) { obj.traverse((o) => { if (o.geometry && o.geometry !== SPHERE) o.geometry.dispose(); }); }
+
+const twin = { scene: baseScene(), anims: [], machineAnims: [], labels: [], machines: G() };
+twin.scene.fog = new THREE.Fog(0x07080b, 900, 1600);
+twin.scene.add(plainFloor(1600), twin.machines);
+buildPipes(twin.scene);
+const temperLabelAt = buildTemper(twin.scene, twin.anims);
+{   // the manifold: a hub where the harvester pipes merge
+    const hub = G(); hub.position.set(MANIFOLD.pos[0], 0, MANIFOLD.pos[1]);
+    hub.add(cyl(3.6, 4, 1, M.stone, 0, 24), cyl(2.6, 2.6, 3.6, M.iron, 1, 24), torus(2.6, 0.3, M.brass, 4.6), torus(2.65, 0.12, glow(NODE['harvester:luma'].light, 1.2), 2.4));
+    twin.scene.add(hub);
+}
+buildZones(twin.scene);
+function buildMachines() {
+    dispose(twin.machines); twin.machines.clear(); twin.machineAnims = []; twin.labels = [];
+
+    for (const n of NODES) {
+        if (n.virtual) continue;
+        const { group, height } = makeMachine(n, twin.machineAnims, portsOf[n.id] ?? []);
+        group.position.set(n.pos[0], 0, n.pos[1]); group.scale.setScalar(SCALE);
+        group.traverse((o) => { o.userData.node = n.id; });
+        twin.machines.add(group);
+        twin.labels.push({ n, at: V(n.pos[0], height * SCALE + 6, n.pos[1]) });
+    }
+}
+// selection: a magic circle on the floor in the row's matter colour; the old one closes, the new one opens
+const selection = { cur: null, old: [] };
+function selCircle(n) {
+    const g = G(), r = (FOOT[n.kind] + 7) * SCALE;
+    const o = new THREE.Mesh(new THREE.CircleGeometry(r, 64), additive(CIRCLE.outer, n.light, 0)), i = new THREE.Mesh(new THREE.CircleGeometry(r * 0.72, 64), additive(CIRCLE.inner, n.light, 0));
+    for (const m of [o, i]) { m.rotation.x = -Math.PI / 2; m.position.y = 0.1; m.raycast = () => {}; g.add(m); }
+    g.position.set(n.pos[0], 0, n.pos[1]); g.scale.setScalar(0.01); twin.scene.add(g);
+    return { g, o, i, t: 0 };
+}
+function setSelection() {
+    if (selection.cur) { selection.cur.t = 0; selection.old.push(selection.cur); }
+    const id = state.selected.split(':')[0];
+    selection.cur = id && NODE[id] ? selCircle(NODE[id]) : null;
+}
+const ease = (t) => 1 - Math.pow(1 - t, 3);
+function stepSelection(dt) {
+    const c = selection.cur;
+    if (c) {
+        c.t = Math.min(1, c.t + dt / 0.8); const k = ease(c.t);
+        c.g.scale.setScalar(0.05 + 0.95 * k); c.o.material.opacity = 0.9 * k; c.i.material.opacity = 0.8 * k;
+        c.o.rotation.z += dt * (0.2 + (1 - k) * 5); c.i.rotation.z -= dt * (0.35 + (1 - k) * 7);
+    }
+    selection.old = selection.old.filter((s) => {
+        s.t += dt / 0.55; const k = 1 - ease(Math.min(1, s.t));
+        s.g.scale.setScalar(Math.max(0.01, k)); s.o.material.opacity = 0.9 * k; s.i.material.opacity = 0.8 * k;
+        s.o.rotation.z -= dt * 6; s.i.rotation.z += dt * 8;
+        if (s.t >= 1) { twin.scene.remove(s.g); s.g.traverse((o) => o.geometry?.dispose()); return false; }
+        return true;
+    });
+}
+const center = V(-40, 0, -40);
+const twinCam = new THREE.OrthographicCamera(-1, 1, 1, -1, -3000, 3000);
+twinCam.position.copy(center).add(V(520, 560, 700));
+
+const gallery = { scene: baseScene(), anims: [], turntable: G() };
+gallery.scene.add(plainFloor(3000));
+gallery.scene.fog = new THREE.Fog(0x07080b, 160, 560);
+{
+    const o = new THREE.Mesh(new THREE.CircleGeometry(40, 64), additive(CIRCLE.outer, SILVER, 0.16)); o.rotation.x = -Math.PI / 2; o.position.y = 0.05;
+    gallery.scene.add(o, gallery.turntable);
+    gallery.plinthAnim = (dt) => { o.rotation.z += dt * 0.05; };
+}
+const galCam = new THREE.PerspectiveCamera(32, 1, 1, 2000);
+
+/* ------------------------------------------------------------------ */
+/*  Rendering, controls, UI                                            */
+/* ------------------------------------------------------------------ */
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(twin.scene, twinCam);
+composer.addPass(renderPass); composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.5, 0.85)); composer.addPass(new OutputPass());
+const twinControls = new OrbitControls(twinCam, canvas);
+twinControls.target.copy(center); twinControls.enableDamping = true; twinControls.maxPolarAngle = 1.35;
+const galControls = new OrbitControls(galCam, canvas);
+galControls.enableDamping = true; galControls.maxPolarAngle = 1.5; galControls.enabled = false;
+
+const labelsEl = document.getElementById('labels'), caption = document.getElementById('caption'), legend = document.getElementById('legend'), rail = document.getElementById('rail'), toastEl = document.getElementById('toast');
+let toastTimer;
+function toast(msg) { toastEl.textContent = msg; toastEl.style.opacity = '1'; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.style.opacity = '0'; }, 1800); }
+for (const [zone, title] of [['net', 'Net'], ['core', 'Core'], ['gallery', 'Viewers']]) {
+    const h = document.createElement('h2'); h.textContent = title; rail.appendChild(h);
+    for (const n of NODES.filter((m) => m.zone === zone && (!m.locked || m.id === 'harvester:19hz' || m.id === 'entropy_market'))) {
+        const b = document.createElement('button'); b.type = 'button'; b.dataset.id = n.id; b.style.setProperty('--c', n.light);
+        b.innerHTML = `<i></i><span>${n.locked ? `${n.name} (locked)` : n.name}</span>${n.panel ? '<small>panel</small>' : ''}`;
+        b.addEventListener('click', () => { state.galId = n.id; showMachine(); });
+        rail.appendChild(b);
+    }
+}
+function countLine(n) {
+    if (!n.vessel) return n.locked ? 'locked' : n.sub ?? (n.objects ? `${n.objects} objects` : 'dynamo');
+    const { total, lit } = bandsOf(n);
+    return total === 0 || lit === total ? `${total} ${n.matter}` : `${lit} of ${total} ${n.matter} lit`;
+}
+function showMachine() {
+    const n = NODE[state.galId];
+    for (const b of rail.querySelectorAll('button')) b.setAttribute('aria-current', String(b.dataset.id === n.id));
+    dispose(gallery.turntable); gallery.turntable.clear(); gallery.anims = [];
+    const { group } = makeMachine(n, gallery.anims, [Math.PI, 0]);
+    group.traverse((o) => { o.userData.node = n.id; });
+    gallery.turntable.add(group);
+    const box3 = new THREE.Box3().setFromObject(group), size = box3.getSize(V(0, 0, 0)), mid = box3.getCenter(V(0, 0, 0));
+    const r = Math.max(size.x, size.y, size.z, 26);
+    galControls.target.set(mid.x, mid.y, mid.z);
+    galCam.position.set(mid.x + r * 1.4, mid.y + r * 0.7 + 6, mid.z + r * 1.8);
+    galControls.update();
+    caption.style.setProperty('--c', n.light);
+    const vesselNote = n.vessel ? ` Its heart fills at ${CAP[n.zone]} rows (${n.zone === 'net' ? 'Net' : 'Core'} scale).` : '';
+    const base = `${n.panel ? `The turning circle on its base marks a panel: click the machine to open ${n.panel}. ` : ''}${n.vessel && !n.locked ? 'Click its base to filter by its matter (the rim shows the filter). ' : ''}${n.actions ? `Its label holds ${n.actions.join(', ')}.` : ''}`;
+    caption.innerHTML = `<h3>${n.name}</h3><div class="holds">${countLine(n)}${n.panel ? ` · opens the ${n.panel} panel` : ''}</div><p>${NOTES[n.kind]}${vesselNote} ${base}</p>`;
+}
+function renderLegend() {
+    const seen = new Map();
+    for (const n of NODES) for (const b of bandsOf(n).bands) if (!seen.has(b.value)) seen.set(b.value, b.color);
+    const items = [...seen].slice(0, 14).map(([v, c]) => `<li><i style="--c:${c}"></i>${v}</li>`).join('');
+    const filtered = NODES.some((n) => bandsOf(n).ghost);
+    legend.innerHTML = `<b>Hearts</b> fill by row count: Net at ${CAP.net}, Core at ${CAP.core}; the Temper marks the step.<ul>${items}${filtered ? '<li><i style="--c:#2a2f38"></i>filtered out</li>' : ''}</ul><br><b>Click a machine</b> to open its panel (machines with a panel have a circle turning on their base). <b>Click its base</b> to filter by its matter: the rim turns white = only, red = not. Machines move only while their panel is in use. Net actions sit in the labels.<br><br><b>Pipes</b> stay dark until a move runs through. Replay, or click a pipe.`;
+}
+function makeLabels() {
+    labelsEl.replaceChildren();
+    if (state.view !== 'twin') return;
+    for (const l of twin.labels) {
+        const d = document.createElement('div'); d.className = 'lbl';
+        d.style.setProperty('--c', (l.n.vessel || l.n.sub) && !l.n.locked ? l.n.light : 'var(--dim)');
+        d.innerHTML = `${l.n.name}<b>${countLine(l.n)}</b>`;
+        if (l.n.actions && !l.n.locked) {
+            const acts = document.createElement('div'); acts.className = 'acts';
+            for (const name of l.n.actions) {
+                const b = document.createElement('button'); b.type = 'button'; b.textContent = name; if (name === 'Purge') b.className = 'danger';
+                b.addEventListener('click', () => runAction(l.n, name)); acts.appendChild(b);
+            }
+            d.appendChild(acts);
+        }
+        labelsEl.appendChild(d); l.el = d;
+    }
+    const s = document.createElement('div'); s.className = 'lbl'; s.innerHTML = `Temper<b>${CAP.net} : ${CAP.core} scale</b>`; labelsEl.appendChild(s);
+    twin.temperLabel = { el: s, at: temperLabelAt };
+}
+function rebuild() { buildMachines(); if (state.view === 'gallery') showMachine(); makeLabels(); renderLegend(); }
+function syncButtons() {
+    for (const b of document.querySelectorAll('[data-lens]')) b.setAttribute('aria-pressed', String(b.dataset.lens === state.lens));
+    document.getElementById('v-gallery').setAttribute('aria-pressed', String(state.view === 'gallery'));
+    document.getElementById('v-twin').setAttribute('aria-pressed', String(state.view === 'twin'));
+}
+function setView(v) {
+    state.view = v; syncButtons();
+    rail.hidden = v !== 'gallery'; legend.hidden = v !== 'twin'; caption.hidden = v !== 'gallery';
+    document.getElementById('replay').hidden = v !== 'twin';
+    twinControls.enabled = v === 'twin'; galControls.enabled = v === 'gallery';
+    renderPass.scene = v === 'twin' ? twin.scene : gallery.scene;
+    renderPass.camera = v === 'twin' ? twinCam : galCam;
+    if (v === 'gallery') showMachine();
+    makeLabels();
+    if (location.hash !== `#${v}`) history.replaceState(null, '', `#${v}`);
+    resize();
+}
+for (const b of document.querySelectorAll('[data-lens]')) b.addEventListener('click', () => { state.lens = b.dataset.lens; syncButtons(); rebuild(); });
+document.getElementById('filter').addEventListener('change', (e) => { state.filter = e.target.value; rebuild(); });
+document.getElementById('selected').addEventListener('change', (e) => { state.selected = e.target.value; setSelection(); });
+document.getElementById('v-gallery').addEventListener('click', () => setView('gallery'));
+document.getElementById('v-twin').addEventListener('click', () => setView('twin'));
+document.getElementById('replay').addEventListener('click', replay);
+addEventListener('hashchange', () => { const v = location.hash.slice(1); if ((v === 'twin' || v === 'gallery') && v !== state.view) setView(v); });
+
+// clicks: plinth band (filter), keystone (panel), levers (actions), machine body (panel), pipe (one move)
+document.getElementById('inuse').addEventListener('change', (e) => { state.inUse = e.target.value; });
+const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let down = null;
+canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', (e) => {
+    if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    raycaster.setFromCamera(ndc, state.view === 'twin' ? twinCam : galCam);
+    // machine first: the body filters to its matter, the base opens its panel
+    const m = raycaster.intersectObject(state.view === 'twin' ? twin.machines : gallery.turntable, true)[0];
+    if (m) {
+        const n = NODE[m.object.userData.node];
+        if (!n) return;
+        if (m.object.userData.part === 'base' && n.vessel && !n.locked) return cycleFilter(n);
+        if (n.panel) return toast(`Opens the ${n.panel} panel`);
+        return;
+    }
+    if (state.view !== 'twin') return;
+    const p = raycaster.intersectObjects(pipes.filter((q) => q.core).map((q) => q.core))[0];
+    if (p) { const q = pipes[p.object.userData.pipe]; launch([{ pipe: q, forward: true }], moveColor(q.from)); }
+});
+function cycleFilter(n) {
+    const next = { undefined: 'include', include: 'exclude', exclude: undefined }[state.stage[n.id]];
+    if (next) state.stage[n.id] = next; else delete state.stage[n.id];
+    toast(next === 'include' ? `Only ${n.matter}` : next === 'exclude' ? `Not ${n.matter}` : `${n.matter} filter cleared`);
+    rebuild();
+}
+function runAction(n, name) {
+    toast(name);
+    if (name === 'Harvest') n.spin = 14;
+    if (name === 'Feed') launch(route(n.id, 'centrifuge'), n.light);
+    if (name === 'Siphon') launch(route('centrifuge', n.id), NODE.centrifuge.light);
+    if (name === 'Purge') { NODE.centrifuge.spin = 6; for (let i = 0; i < 4; i++) setTimeout(() => launch(route('centrifuge', 'sump'), NODE.centrifuge.light), i * 180); }
+}
+
+function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false); composer.setSize(w, h);
+    const aspect = w / h, half = 350;
+    twinCam.left = -half * aspect; twinCam.right = half * aspect; twinCam.top = half; twinCam.bottom = -half; twinCam.updateProjectionMatrix();
+    galCam.aspect = aspect; galCam.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+const tmp = new THREE.Vector3();
+function place(el, at, cam) {
+    tmp.copy(at).project(cam);
+    const w = stage.clientWidth, h = stage.clientHeight;
+    const off = tmp.z > 1 || Math.abs(tmp.x) > 1.1 || Math.abs(tmp.y) > 1.1;
+    el.style.display = off ? 'none' : '';
+    if (!off) el.style.transform = `translate(${((tmp.x * 0.5 + 0.5) * w).toFixed(1)}px, ${((-tmp.y * 0.5 + 0.5) * h).toFixed(1)}px) translate(-50%, -100%)`;
+}
+let last = performance.now(), time = 0;
+function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const step = reduced ? 0 : dt; time += step;
+    stepPipes(dt);   // moves always run: they carry information
+    if (state.view === 'twin') {
+        for (const f of twin.anims) f(step, time);
+        for (const f of twin.machineAnims) f(step, time);
+        stepSelection(dt);
+        twinControls.update();
+        for (const l of twin.labels) if (l.el) place(l.el, l.at, twinCam);
+        if (twin.temperLabel) place(twin.temperLabel.el, twin.temperLabel.at, twinCam);
+    } else {
+        gallery.plinthAnim(step);
+        for (const f of gallery.anims) f(step, time);
+        gallery.turntable.rotation.y += step * 0.2;
+        galControls.update();
+    }
+    composer.render();
+}
+syncButtons();
+rebuild();
+setView(location.hash === '#gallery' ? 'gallery' : 'twin');
+requestAnimationFrame(frame);
+</script>
+</body></html>
