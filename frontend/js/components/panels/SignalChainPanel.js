@@ -39,6 +39,12 @@ function savedView() {
     try { return localStorage.getItem(VIEW_KEY) === 'table' ? 'table' : '3d'; } catch { return '3d'; }
 }
 
+const BLOOM_KEY = 'signal-chain.bloom';
+/** The Glow switch (bloom), on unless this viewer turned it off. */
+function savedBloom() {
+    try { return localStorage.getItem(BLOOM_KEY) !== 'off'; } catch { return true; }
+}
+
 /**
  * Do what clicking a machine does: switch mode or shades if needed, then open its panel.
  * @param {import('../../lib/twinTopology.js').TwinAction} action
@@ -163,7 +169,7 @@ function TwinTable({ nodes, pipes, model, routed, io, transitions, titleOf }) {
                 <tbody>
                     ${busyPipes.map((p) => html`
                         <tr key=${p.id}>
-                            <td>${p.a === OUTSIDE ? 'outside' : p.a} ${p.kind === 'conveyor' ? '⛓' : '—'} ${p.b}</td>
+                            <td>${p.a === OUTSIDE ? 'outside' : p.a} ${p.kind === 'conveyor' ? '⛓' : p.kind === 'market' ? '¤' : '—'} ${p.b}</td>
                             <td>${routed.byPipe[p.id].forward || ''}</td>
                             <td>${routed.byPipe[p.id].backward || ''}</td>
                         </tr>
@@ -210,6 +216,12 @@ export function SignalChainPanel() {
     const setLens = useWorkspaceStore((s) => s.setLens);
 
     const [view, setView] = useState(savedView);
+    const [bloom, setBloom] = useState(savedBloom);
+    const toggleBloom = () => {
+        const next = !bloom;
+        setBloom(next);
+        try { localStorage.setItem(BLOOM_KEY, next ? 'on' : 'off'); } catch { /* the switch still works for this session */ }
+    };
     const [now, setNow] = useState(Date.now);
     useEffect(() => {
         const timer = setInterval(() => setNow(Date.now()), 60_000); // fresh harvests go stale, events go past
@@ -327,7 +339,7 @@ export function SignalChainPanel() {
         let disposed = false;
         setStatus('loading');
         // @ts-ignore -- the query string hides the module's path from the type checker
-        import('../../lib/twinScene.js?v=1')
+        import('../../lib/twin/twinScene.js?v=1')
             .then(({ TwinScene }) => {
                 if (disposed || !hostRef.current) return;
                 sceneRef.current = new TwinScene(hostRef.current, {
@@ -375,6 +387,10 @@ export function SignalChainPanel() {
         if (status === 'ready') sceneRef.current?.setSelection(selection.nodeId, selection.color);
     }, [status, selection]);
 
+    useEffect(() => {
+        if (status === 'ready') sceneRef.current?.setBloom(bloom);
+    }, [status, bloom]);
+
     return html`
         <div className="panel-body signal-chain">
             <div className="sc-head">
@@ -387,6 +403,9 @@ export function SignalChainPanel() {
                     ${model.check.ok ? '✓ Counts balance' : `⚠ ${model.check.problems[0]}`}
                 </span>
                 <span className="sc-spacer"></span>
+                ${view === '3d' && html`<button className=${`btn sc-glow ${bloom ? 'on' : ''}`} aria-pressed=${bloom}
+                    title="Glow: the soft halo around bright parts (turn off on a slow machine)"
+                    onClick=${toggleBloom}>Glow</button>`}
                 ${view === '3d' && html`<button className="btn sc-home" title="Frame everything"
                     onClick=${() => sceneRef.current?.fit()}>⌂</button>`}
                 ${view === 'table' && html`<label className="sc-lens">Lens

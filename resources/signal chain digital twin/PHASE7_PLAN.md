@@ -1,5 +1,99 @@
 # Signal Chain Twin: Phase 7 Integration Plan
 
+## Resume here (read first in a new session)
+
+**State (2026-11-21):** 7a and 7b are built and committed. **Next: 7c (pipes and
+motion)**, then 7d (panel in use), then 7e (cleanup). The user approves each stage after
+a screenshot round and says when to commit (not one commit per stage).
+
+**Before touching code:**
+1. Read `BUILD_PLAN.md` section 0 (environment, test server on a database copy, the
+   headless screenshot recipe, how to stop servers, the user's working style, names). Its
+   phase notes before phase 7 are partly stale for the 3D scene; this file wins.
+2. Open `atelier.html` (this folder) in a browser or read it: it is the approved design.
+   Port from it rather than reinventing.
+3. Read the code: `frontend/js/lib/twin/twinScene.js` (the scene; large, read in parts),
+   `twin/machines.js`, `twin/zones.js`, `twin/textures.js`, `twin/materials.js`,
+   `frontend/js/lib/twinTopology.js`, `frontend/js/components/panels/SignalChainPanel.js`.
+
+**How the pieces fit now:**
+- `SignalChainPanel.js` builds the data (`nodes`, `pipes`, `levels`, `colors`,
+  `stageFilter`, `light`, `codex`, `flows`, ...) and calls `scene.update(data)`,
+  `scene.play(transitions)`, `scene.setSelection(nodeId, color)`, `scene.setBloom(on)`,
+  `scene.relight({ from })`. The scene calls back `onActivate(id)` (open panel),
+  `onRing(id)` (cycle the stage filter), `onCommand(cmd, id)` (harvest, feed, siphon,
+  purge), `onLens(step)`.
+- `twinScene.js`: `layout()` (positions incl. the manifold), `_buildZones`,
+  `_addMachine` (calls `buildMachine`; machines scaled by `MACHINE_SCALE` 1.5), `update`
+  (hearts via `machine.heart.setBands(bands, total, cap)`, rims via `machine.setRim`),
+  `_frame` (calls `machine.frame(dt, t, ease)`), `this.inUse` (a Set of node ids whose
+  machine should work; empty until 7d), the old pipes (`pipePath`, built in `_rebuild`,
+  bore animated in `_frame`), old packets (`play`, `_launch`, `packetMesh`), the old beam
+  and wires (`_buildLight`, `_buildWires`, `relight`, `_frameBeam`, pulses), and the old
+  selection circle (`setSelection`, `_frameCircle`).
+- `machines.js`: `buildMachine(shop, node, ctx)` with ctx `{ color, working(), spin(),
+  objects(), pending() }`. Base meshes carry `userData.ring`, body meshes `userData.id`
+  (only for nodes with an action). `FOOT` = base radius per body; `PLINTH_H` = 3.4.
+
+**7c, concretely:**
+- Replace the old pipes with the prototype's floor pipes: `pipeCurve` and `buildPipes`
+  in `atelier.html` (around line 1076). Pipes sit at y 2.4, straight when two machines line
+  up, a flat cubic S-bend otherwise, ending at the machines' bases. Net pipes (both ends in
+  the Net, incl. the manifold) are wider (shell 1.7, core 1.05) than Core pipes (1.2,
+  0.7). Market pipes (`kind: 'market'`): gold glass with dense brass/gilt bands. The Codex
+  conveyor (`kind: 'conveyor'`): two iron rails with gilt plates that move only during a
+  Codex link.
+- Add pipe ports on the bases: the prototype's `plinth()` (around line 618) draws a
+  flanged socket per pipe; collect each node's port angles while building pipes and pass
+  them to `buildMachine` (add a `ports` parameter in `machines.js`).
+- Replace packets with slugs: the `slugFrag` shader (around line 1058; 4 slugs per pipe
+  as uniforms), `launch` and `stepPipes`. A transition's route (`route()` in
+  `twinTopology.js`) gives the pipe steps; a slug runs each step in turn in the row's lens
+  colour (`data.packetStyle(t)`, dim if not lit). Keep replay-on-open from `play()`.
+  Links (Codex) run the conveyor instead.
+- The Temper: `buildTemper` (around line 1203) around the middle of the
+  centrifuge-to-hopper pipe; that pipe's glass is wide up to it and narrow after; its rings
+  run only while a slug is in that pipe.
+- Selection transition: the prototype's `setSelection` / `stepSelection` (around line
+  1330): the old circle closes, the new one opens, in the row's **matter** colour (the
+  panel passes `selection.color`; check it is the matter colour, not the lens colour).
+- Checks: type check; `check_twin_model.mjs`; `check_transitions.py` on a database copy;
+  screenshots with moves in flight (make moves through the API about 5 s after starting
+  Firefox, per the screenshot script's docstring).
+
+**7d, concretely:**
+- A store signal for the panel in use: the active tab of the focused dock group, or the
+  focused pop-out window (`poppedOut`, `components/Popout.js`, `lib/windows.js`). The
+  store has no "focused group" yet: track the last group the user clicked or focused (a
+  pointerdown on a `PanelGroup`), and window focus for pop-outs.
+- Map panels to machines (table under Behaviour details) and fill `scene.inUse` from
+  `SignalChainPanel.js`. The Forge counts while the Refinery panel shows the
+  new-adventure buttons or the create dialog (`NodeCard.js` around line 195: create
+  buttons when nothing is selected; `createAdventure` and `editingAdventureId` in
+  `store.js`); decide the exact rule with the user.
+- Ease mechanisms in and out (about 0.5 s) so focus changes don't flicker.
+
+**7e, concretely:**
+- Remove the beam sweep and copper wires: `_buildLight`'s beam, `_buildWires`, `relight`,
+  `_sweepSpan`, `_frameBeam`, pulses, and the panel's `relightCause` / `scene.relight`
+  call (`SignalChainPanel.js` around line 96 and 374). Hearts then update at once (drop
+  `relightAt` / `pendingBands`).
+- Rename shade to dross: `REVIEW_STAGES.ignored.matter` in `frontend/js/lifecycle.js`,
+  the sump node's `matter: 'shade'` in `twinTopology.js`, and UI strings and docs that say
+  shade (grep). The internal `showShades` / `toggleShades` names can stay unless the user
+  asks.
+- Update BUILD_PLAN.md (code map, status) and this file.
+
+**Gotchas met so far:**
+- The headless screenshot copies the WebGL canvas over the page, which hides HTML labels;
+  take a second shot without it if labels matter.
+- The twin's canvas is opaque now (bloom needs it); don't go back to a transparent clear.
+- `git add` by name; never `git add -A` (the user's `resources/19hz.ipynb`,
+  `resources/upgrades.md` stay out).
+- The user's server auto-reloads on backend changes only; frontend edits need a hard
+  refresh.
+
+
 2026-11-21. Mirrors the Claude Doc of the same name. The design reference is
 `atelier.html` in this folder: the approved prototype ("Signal Chain Atelier").
 Open it in a browser (it loads three.js 0.170 from jsDelivr).
@@ -62,6 +156,41 @@ The 1,250-line `twinScene.js` becomes a short orchestrator plus modules in
 
 The panel still hands the scene one data object per change and gets events back
 (activate, ring, command). `resizing.js` (`viewOf`) keeps pop-out windows working.
+
+## Progress
+
+- **7a (foundation): built 2026-11-21, committed.** Vendored the four addons
+  (`frontend/vendor/three-*.js`, entries in `scripts/vendor_deps.py` and the import map;
+  only the new ones were fetched). New modules: `lib/twin/materials.js` (materials and
+  shape helpers), `lib/twin/textures.js` (runes, sigils, plaques, engraved floors),
+  `lib/twin/zones.js` (walls, corner posts, floors, plaques). `twinScene.js`: environment
+  map, warm key and cool rim lights, ACES tone mapping, bloom through EffectComposer with a
+  **Glow** switch on the panel (localStorage `signal-chain.bloom`), an opaque dark ground
+  (bloom needs it; the panel's glass no longer shows through), every zone on the floor, the
+  new layout with the manifold, zones built from the machine positions; the old slabs,
+  grid and HTML zone labels are gone. `twinTopology.js`: manifold, market pipes, one
+  necropolis pipe, no outside or sump-to-hopper pipes; `route` is a shortest path over
+  plain pipes (outside moves get an empty route). `check_twin_model.mjs` pins the new
+  routes. Still as before (later stages): machines, pipes, packets, the lantern, beam and
+  wires. `twinScene.js` moved into `lib/twin/` in 7b.
+- **7b (machines): built 2026-11-21, committed.** `lib/twin/machines.js`:
+  `makeShop` (extra materials, magic-circle, rune, dot and globe textures),
+  `buildMachine(shop, node, ctx)` (base + heart + body; returns `group`, `height`,
+  `heart.setBands`, `setRim`, `frame`, `dispose`) and the 17 bodies ported from the
+  prototype, mechanisms included (they move only while `ctx.working()`, empty until 7d).
+  The heart is animated: band shares in a unit-height group scaled to `rows / cap`
+  (fixed caps 120 Net / 12 Core, an orange overflow ring when over). The base: dark stone,
+  the filter rim (`setRim(mode)`: dim, off-white include, red exclude) for matter-holding
+  machines, a turning magic circle for machines with a panel. Clicks: base meshes carry
+  `userData.ring` (filter), body meshes `userData.id` only when the node has an action
+  (open its panel); machines without a panel ignore clicks. Locked machines stand dark.
+  The Nexus prism dims and pulses amber while a filter draft is pending (the cue kept from
+  the lantern). Harvest spins the harvester's rotor (while syncing); Purge spins the
+  Centrifuge. Labels: the count line in the machine's colour (`4 ore`, `1 of 4 essence
+  lit`, `locked`, `8 objects`) and dynamo sub-lines (Forge prima materia, Atlas space,
+  Calendar time, Nexus topology). The scene moved to `lib/twin/twinScene.js` (import path
+  in `SignalChainPanel.js`); the old lantern builder, liquid segments, rotors and arrival
+  glows are gone. Pipes, packets, the beam and the wires are still the old ones.
 
 ## Build stages
 

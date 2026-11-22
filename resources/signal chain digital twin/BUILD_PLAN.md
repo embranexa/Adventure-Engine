@@ -31,10 +31,11 @@ spec, superseded wherever they disagree. `signal_chain.md` gives the chain order
 ### 0.2 Where we are (2026-11-21)
 
 Phases 0–4, 6 and 8 are built and committed. Phase 5 (the codex conveyor) is
-**skipped** (the user decided 2026-11-21: unclear value). **Next: phase 7, the
+**skipped** (the user decided 2026-11-21: unclear value). **Now: phase 7, the
 aesthetics rebuild.** Its design was prototyped and approved as `atelier.html` (this
 folder), and its integration plan, with the user's answers, is **`PHASE7_PLAN.md`**
-(this folder): read that first, then start at stage 7a. Commit only when the user asks
+(this folder). Stages 7a and 7b are done; read its "Resume here" section first, then
+continue with stage 7c. Commit only when the user asks
 (not one commit per stage).
 
 | Commit | What |
@@ -55,7 +56,7 @@ file doesn't mention yet.
 ### 0.3 First steps in a new session
 
 1. Read this section and the next phase in section 4. Skim section 1 (concept).
-2. Read the files in the code map (0.7) for the area you'll touch. `twinScene.js` is
+2. Read the files in the code map (0.7) for the area you'll touch. `twin/twinScene.js` is
    large (~1250 lines): read it in parts.
 3. Before building, give the user **a short plan plus the open questions** for the phase
    (listed with the phase in section 4), and wait for answers.
@@ -159,7 +160,7 @@ Some older comments call the whole app "the refinery" (the theme: `styles.css`,
 | Filters | `frontend/js/filters.js` (`FACETS`, `passes`, `pendingChanges`, object names and chosen colours via `setObjectNames` / `chosenObjectColor`) |
 | Lens and colours | `frontend/js/lib/lens.js` (`LENSES`, `lensValues`, `lensColor`, `lensLabel`, `PALETTE`, `objectColor(id)` = chosen colour or a default from the id) |
 | Twin, pure | `frontend/js/lib/twinTopology.js` (nodes, pipes, `route`, `nodeStage` = the stage a base button toggles), `frontend/js/lib/twinModel.js` (levels, lit, bands, `eventNode`, `pipeFlows`, the counting check) |
-| Twin, 3D | `frontend/js/lib/twinScene.js`: `layout()` (hand-placed positions), `_buildStage` (slabs: Net, Core, Gallery), `_addMachine` (per kind; the base button collar; the codex cabinet and jars), `_buildLantern`, `_buildWires`, `_buildLight` (beam, magic circle), `update` (no hover tooltip: removed in phase 6), `relight`, `setSelection`, `play` / `_launch` (packets), `_frame*` |
+| Twin, 3D (phase 7: see PHASE7_PLAN.md) | `frontend/js/lib/twin/twinScene.js` (the scene), `twin/machines.js` (bodies, heart, base), `twin/zones.js`, `twin/textures.js`, `twin/materials.js`. Pre-phase-7 notes, partly stale: `layout()` (hand-placed positions), `_buildStage` (slabs: Net, Core, Gallery), `_addMachine` (per kind; the base button collar; the codex cabinet and jars), `_buildLantern`, `_buildWires`, `_buildLight` (beam, magic circle), `update` (no hover tooltip: removed in phase 6), `relight`, `setSelection`, `play` / `_launch` (packets), `_frame*` |
 | Twin, panel | `frontend/js/components/panels/SignalChainPanel.js`: the React boundary. `runAction`, `runCommand`, `toggleRing`, `turnLens`, `relightCause`, and memos for `light`, `stageFilter`, `packetStyle`, `fresh`, `selection`; the Table view (`TwinTable`) |
 | Magic circles (shared) | `frontend/js/lib/magicCircle.js` (`magicCircleCanvases(size)` → `{ outer, inner }` white canvases to tint and counter-rotate) |
 | Pop-out windows | `frontend/js/components/Popout.js` (`popOut`, `mountPopout`, `PopoutShell`), `dockedTree` / `poppedOut` / `popOut` / `dockPopout` / `popoutHooks` in `store.js`, `frontend/js/lib/windows.js` (`focusedWindow`, `confirmHere`), `viewOf` in `lib/resizing.js`; the ⧉ / ⇲ buttons in `PanelGroup.js` |

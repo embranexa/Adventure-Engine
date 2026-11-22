@@ -45,6 +45,11 @@ declare module 'react' {
 // three.js (classifier) is used without types
 declare module 'three';
 declare module 'three/addons/controls/OrbitControls.js';
+declare module 'three/addons/environments/RoomEnvironment.js';
+declare module 'three/addons/postprocessing/EffectComposer.js';
+declare module 'three/addons/postprocessing/RenderPass.js';
+declare module 'three/addons/postprocessing/UnrealBloomPass.js';
+declare module 'three/addons/postprocessing/OutputPass.js';
 
 declare module 'react-dom/client' {
     export function createRoot(container: Element | null): { render(element: any): void; unmount(): void };

@@ -1,5 +1,6 @@
 // @ts-nocheck -- imperative three.js scene; the three ES module is untyped here.
-// SignalChainPanel.js is the typed boundary. Topology: twinTopology.js; numbers: twinModel.js.
+// SignalChainPanel.js is the typed boundary. Topology: ../twinTopology.js; numbers: ../twinModel.js.
+// Machines: machines.js; zones: zones.js; textures: textures.js (phase 7, PHASE7_PLAN.md).
 
 /**
  * TwinScene — the signal chain as machines in three zones (BUILD_PLAN.md, phase 3):
@@ -36,24 +37,32 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { magicCircleCanvases } from './magicCircle.js';
-import { deferredResize, isResizing, viewOf } from './resizing.js';
-import { CENTRIFUGE, CODEX, FORGE, MAIN_CHAIN, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from './twinTopology.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { magicCircleCanvases } from '../magicCircle.js';
+import { deferredResize, isResizing, viewOf } from '../resizing.js';
+import { CENTRIFUGE, CODEX, ENTROPY_MARKET, FORGE, MAIN_CHAIN, MANIFOLD, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from '../twinTopology.js';
+import { makeMaterials } from './materials.js';
+import { buildZones, zoneRects } from './zones.js';
+import { FOOT, bodyOf, buildMachine, makeShop } from './machines.js';
 
-const NET_Y = 8;          // the foundry floor's platform
-const CORE_Y = 26;        // the lab bench
-const GALLERY_Y = 52;     // the viewers' gallery
+// Phase 7: every zone stands on the floor, cordoned by walls of light (twin/zones.js).
+const NET_Y = 0;
+const CORE_Y = 0;
+const GALLERY_Y = 0;
+const GROUND = 0x07080b;  // the twin's own dark floor (bloom needs an opaque canvas)
+const MACHINE_SCALE = 1.5;
+/** Rows that fill a heart: each zone has its own scale (raw events are bulk, adventures refined). */
+const CAP = { net: 120, core: 12 };
+/** Dynamos name what they work with on their label. */
+const SUB = { forge: 'prima materia', atlas: 'space', calendar: 'time', nexus: 'topology' };
 const PIPE_H = 5;         // pipes run this far above a machine's floor
-const MANIFOLD_Z = 62;    // the kill manifold runs in front of the core chain
 const FRUSTUM = 300;
 const VIEW_DIR = new THREE.Vector3(0.55, 0.85, 1.15).normalize();
 
-const SIZE = {
-    vessel: { r: 9, h: 26 },
-    processor: { r: 9, h: 26 },
-    harvester: { r: 6.5, h: 18 },
-};
-const MIN_CAP = { net: 20, core: 6 };   // a zone's scale never shrinks below this many rows
 const PACKET_SPEED = 55;                 // world units per second
 const MIN_TRIP_S = 1.2;                  // even a short hop stays visible this long
 const MAX_PACKETS = 400;
@@ -65,11 +74,13 @@ const SWEEP_S = 1.6;                     // the beam crosses the machines in thi
 const PULSE_S = 0.7;                     // a pulse runs down a copper wire in this long
 const AMBER = 0xf2a33a;
 const COPPER = 0xb87333;
-const RING_COLORS = { include: '#ffffff', exclude: '#e0524a' };
 
 const STEEL = 0x23262b;
 const STEEL_EDGE = 0x7a808a;
 const BRASS = 0xc8a46a;
+
+/** A count for a label: whole numbers as they are, shared rows (object lenses) to one decimal. */
+const fmtCount = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 function el(tag, cls, text) {
     const n = document.createElement(tag);
@@ -78,35 +89,35 @@ function el(tag, cls, text) {
     return n;
 }
 
-/** Where each machine stands. @param {{ id: string, zone: string, kind: string }[]} nodes */
+/**
+ * Where each machine stands (PHASE7_PLAN.md: the approved prototype's layout). The camera
+ * looks from +z, so +z is the near side: the forge, codex and entropy market stand there;
+ * the sump and necropolis on the far side. The manifold is the harvesters' pipe junction.
+ * @param {{ id: string, zone: string, kind: string }[]} nodes
+ */
 function layout(nodes) {
     const pos = new Map();
     const harvesters = nodes.filter((n) => n.kind === 'harvester');
-    // a row that reads left to right on screen (+x and -z together)
-    harvesters.forEach((n, i) => pos.set(n.id, new THREE.Vector3(-430 + i * 50, NET_Y, 80 - i * 72)));
+    // a diagonal row, near to far
+    harvesters.forEach((n, i) => pos.set(n.id, new THREE.Vector3(-372 + i * 16, NET_Y, 80 - i * 72)));
     const fixed = {
-        [CENTRIFUGE]: [-210, NET_Y, 0], [SUMP]: [-210, NET_Y, 104], [FORGE]: [-250, NET_Y, -150],
-        [CODEX]: [-50, CORE_Y, -96], entropy_market: [250, CORE_Y, -96],
-        [NECROPOLIS]: [110, CORE_Y, 112],
-        nexus: [-60, GALLERY_Y, -196], atlas: [70, GALLERY_Y, -196], calendar: [200, GALLERY_Y, -196],
+        [MANIFOLD]: [-258, NET_Y, 0],
+        [CENTRIFUGE]: [-210, NET_Y, 0], [SUMP]: [-205, NET_Y, -122], [FORGE]: [-215, NET_Y, 118],
+        [CODEX]: [-40, CORE_Y, 104], [ENTROPY_MARKET]: [180, CORE_Y, 104],
+        [NECROPOLIS]: [110, CORE_Y, -104],
+        atlas: [-40, GALLERY_Y, -204], nexus: [90, GALLERY_Y, -204], calendar: [220, GALLERY_Y, -204],
     };
-    MAIN_CHAIN.forEach((id, i) => { fixed[id] = [-120 + i * 70, CORE_Y, 0]; });
-    for (const n of nodes) if (fixed[n.id]) pos.set(n.id, new THREE.Vector3(...fixed[n.id]));
+    const chainX = [-110, -40, 30, 110, 180, 250, 320];
+    MAIN_CHAIN.forEach((id, i) => { fixed[id] = [chainX[i] ?? -110 + i * 70, CORE_Y, 0]; });
+    for (const id of [...nodes.map((n) => n.id), MANIFOLD]) if (fixed[id]) pos.set(id, new THREE.Vector3(...fixed[id]));
     return pos;
 }
 
 /** The polyline a pipe follows, from `a` to `b` (right angles, like real plumbing). */
 function pipePath(pipe, pos) {
     const A = pos.get(pipe.a), B = pos.get(pipe.b);
-    if (pipe.a === OUTSIDE) {
-        const p = B.clone().setY(B.y + PIPE_H);
-        return [new THREE.Vector3(p.x - 70, p.y, p.z), p];
-    }
     if (!A || !B) return null;
     const a = A.clone().setY(A.y + PIPE_H), b = B.clone().setY(B.y + PIPE_H);
-    if (pipe.b === NECROPOLIS) {
-        return [a, new THREE.Vector3(a.x, a.y, MANIFOLD_Z), new THREE.Vector3(b.x, b.y, MANIFOLD_Z), b];
-    }
     if (Math.abs(a.x - b.x) < 1e-6 || Math.abs(a.z - b.z) < 1e-6) {
         if (Math.abs(a.y - b.y) < 1e-6) return [a, b];
     }
@@ -145,9 +156,11 @@ export class TwinScene {
         this.container = el('div', 'twin-root');
         parent.appendChild(this.container);
 
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setPixelRatio(Math.min(this.view.devicePixelRatio || 1, 2));
-        this.renderer.setClearColor(0x000000, 0); // the panel's glass shows through
+        this.renderer.setClearColor(GROUND, 1);
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.05;
         this.container.appendChild(this.renderer.domElement);
 
         this.labels = el('div', 'twin-labels');
@@ -166,14 +179,33 @@ export class TwinScene {
         this.controls.maxPolarAngle = Math.PI / 2 - 0.05;
         this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 
-        this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-        const key = new THREE.DirectionalLight(0xffffff, 1.05);
-        key.position.set(160, 320, 220);
+        // brass and glass need something to reflect: a studio environment, plus a warm key and a cool rim
+        this.pmrem = new THREE.PMREMGenerator(this.renderer);
+        this.envMap = this.pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        this.scene.environment = this.envMap;
+        this.scene.environmentIntensity = 0.75;
+        this.scene.add(new THREE.HemisphereLight(0x9fb4d0, 0x1a1208, 0.5));
+        const key = new THREE.DirectionalLight(0xffe2b8, 1.6);
+        key.position.set(150, 260, 120);
         this.scene.add(key);
-        const rim = new THREE.DirectionalLight(0x9fb4c8, 0.45);
-        rim.position.set(-260, 120, -200);
+        const rim = new THREE.DirectionalLight(0x6fb8ff, 0.7);
+        rim.position.set(-200, 120, -220);
         this.scene.add(rim);
 
+        // bloom: the soft halo around bright parts (a switch on the panel; on by default)
+        this.bloomOn = true;
+        this.composer = new EffectComposer(this.renderer);
+        this.composer.setPixelRatio(this.renderer.getPixelRatio());
+        this.composer.addPass(new RenderPass(this.scene, this.camera));
+        this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.5, 0.85);
+        this.composer.addPass(this.bloom);
+        this.composer.addPass(new OutputPass());
+
+        this.kit = makeMaterials();
+        this.shop = makeShop(this.kit);
+        /** node ids whose panel is in use (stage 7d fills this) */
+        this.inUse = new Set();
+        this.zones = null;   // built with the machines (they need the layout)
         this.shared = this._sharedAssets();
         this.scene.add(this._buildStage());
 
@@ -278,37 +310,39 @@ export class TwinScene {
         return s;
     }
 
-    /** Floor grid, the core bench and the viewers' gallery, with zone names. */
+    /** The ground: a dark floor, lighter under the machines. Zones are built with the machines. */
     _buildStage() {
-        const stage = new THREE.Group();
-        const grid = new THREE.GridHelper(900, 45, 0x2a2e35, 0x15171b);
-        grid.material.transparent = true;
-        grid.material.opacity = 0.5;
-        grid.position.set(0, -0.2, 0);
-        stage.add(grid);
+        const c = document.createElement('canvas');
+        c.width = c.height = 512;
+        const g = c.getContext('2d');
+        const grad = g.createRadialGradient(256, 256, 0, 256, 256, 256);
+        grad.addColorStop(0, '#13151a');
+        grad.addColorStop(1, '#07080b');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, 512, 512);
+        const tex = new THREE.CanvasTexture(c);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(1800, 1800), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, metalness: 0.25, envMapIntensity: 0.35 }));
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.set(-40, -0.05, -30);
+        ground.raycast = () => {};
+        this.zoneLabels = [];   // the zones name themselves with floor plaques
+        return ground;
+    }
 
-        const slab = (x0, x1, z0, z1, top, color) => {
-            const geo = new THREE.BoxGeometry(x1 - x0, top, z1 - z0);
-            const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, metalness: 0.5, roughness: 0.7, transparent: true, opacity: 0.55 }));
-            mesh.position.set((x0 + x1) / 2, top / 2, (z0 + z1) / 2);
-            const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), this.shared.edgeLine);
-            mesh.add(edges);
-            stage.add(mesh);
-        };
-        slab(-505, -172, -185, 142, NET_Y, 0x121418);    // net platform
-        slab(-160, 360, -140, 150, CORE_Y, 0x14161a);    // core bench
-        slab(-120, 260, -230, -160, GALLERY_Y, 0x111317); // gallery
+    /** The zones' walls, corners, floors and plaques, around where the machines stand. */
+    _buildZones(nodes) {
+        if (this.zones) { this.scene.remove(this.zones.group); this.zones.dispose(); }
+        const zoneOf = new Map(nodes.map((n) => [n.id, n.zone]));
+        zoneOf.set(MANIFOLD, 'net');
+        const viewers = Object.fromEntries(['atlas', 'nexus', 'calendar'].filter((id) => this.positions.has(id)).map((id) => [id, [this.positions.get(id).x, this.positions.get(id).z]]));
+        this.zones = buildZones(this.kit, zoneRects(this.positions, zoneOf), viewers);
+        this.scene.add(this.zones.group);
+    }
 
-        this.zoneLabels = [
-            { text: 'Net', at: new THREE.Vector3(-350, NET_Y, 130) },
-            { text: 'Core', at: new THREE.Vector3(-150, CORE_Y, 145) },
-            { text: 'Gallery', at: new THREE.Vector3(-110, GALLERY_Y, -165) },
-        ].map((z) => {
-            const label = el('div', 'twin-zone', z.text);
-            this.labels.appendChild(label);
-            return { ...z, label };
-        });
-        return stage;
+    /** Turn the bloom pass on or off (the panel's Glow switch). */
+    setBloom(on) {
+        this.bloomOn = Boolean(on);
     }
 
     /** A cone with its apex at the origin, opening along +Z (scale: radius, radius, length). */
@@ -359,213 +393,28 @@ export class TwinScene {
     /*  Machines                                                           */
     /* ------------------------------------------------------------------ */
 
+    /** One machine (twin/machines.js), standing at `position`. */
     _addMachine(node, position, color) {
-        const group = new THREE.Group();
-        group.position.copy(position);
-        const steel = node.locked ? this.shared.steelDim : this.shared.steel;
-        const rec = { id: node.id, node, group, color, fill: 0, target: 0, segments: [], rotor: null, flare: 0, spin: 0 };
-        const tag = (mesh) => { mesh.userData.id = node.id; return mesh; };
-
-        const size = SIZE[node.kind];
-        if (size) {
-            // plinth, glass column, liquid, cap, and a rune ring in the matter's color
-            const { r, h } = size;
-            group.add(tag(new THREE.Mesh(new THREE.CylinderGeometry(r + 2, r + 3.5, 3, 16), steel)));
-            const glass = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 16, 1, true), new THREE.MeshPhysicalMaterial({
-                color: 0x9fb4c8, transparent: true, opacity: node.locked ? 0.05 : 0.12, roughness: 0.1, metalness: 0, side: THREE.DoubleSide, depthWrite: false,
-            }));
-            glass.position.y = 3 + h / 2;
-            group.add(tag(glass));
-            const rim = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.CylinderGeometry(r, r, h, 8)), this.shared.edgeLine);
-            rim.position.y = 3 + h / 2;
-            group.add(rim);
-            const cap = new THREE.Mesh(new THREE.CylinderGeometry(r + 1.2, r + 1.2, 1.6, 16), steel);
-            cap.position.y = 3 + h + 0.8;
-            group.add(tag(cap));
-            rec.liquidBase = 3.4;
-            rec.liquidMax = h - 1;
-            rec.liquidR = r - 0.9;
-            // the base button: a rune collar round the plinth, with a bright rune ring on
-            // top in the matter's colour (white = included, red = excluded). Pressing it
-            // cycles the stage in the filter.
-            const button = new THREE.Group();
-            const collar = new THREE.Mesh(new THREE.TorusGeometry(r + 5.4, 2.3, 10, 40), new THREE.MeshStandardMaterial({
-                color: 0x2b2f36, metalness: 0.75, roughness: 0.35, emissive: new THREE.Color(color), emissiveIntensity: node.locked ? 0 : 0.2,
-            }));
-            collar.rotation.x = Math.PI / 2;
-            collar.scale.z = 0.55; // flattened: a low, wide button
-            button.add(collar);
-            const ring = new THREE.Mesh(new THREE.TorusGeometry(r + 5.4, 0.5, 6, 40), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: node.locked ? 0.2 : 0.75 }));
-            ring.rotation.x = Math.PI / 2;
-            ring.position.y = 1.35;
-            button.add(ring);
-            button.position.y = 1;
-            group.add(button);
-            rec.ring = ring;
-            rec.collar = collar;
-            rec.button = button;
-            rec.ringMode = null;
-            rec.lift = 0;
-            rec.press = 0;
-            if (!node.locked && node.holds && node.holds !== 'objects') {
-                collar.userData.ring = node.id;
-                // a generous invisible hit area over the whole collar
-                const hit = new THREE.Mesh(new THREE.CylinderGeometry(r + 8.5, r + 8.5, 4, 32, 1, true), new THREE.MeshBasicMaterial({
-                    transparent: true, opacity: 0, depthWrite: false, colorWrite: false, side: THREE.DoubleSide,
-                }));
-                hit.userData.ring = node.id;
-                button.add(hit);
-                const hitTop = new THREE.Mesh(new THREE.RingGeometry(r + 2, r + 8.5, 32), hit.material);
-                hitTop.rotation.x = -Math.PI / 2;
-                hitTop.position.y = 2;
-                hitTop.userData.ring = node.id;
-                button.add(hitTop);
-            }
-
-            if (node.kind === 'processor' || node.kind === 'harvester') {
-                // kinetic machinery outside the glass: a turning cage
-                const cage = new THREE.Group();
-                for (let i = 0; i < 4; i++) {
-                    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, h + 2, 6), this.shared.brass);
-                    const a = (i / 4) * Math.PI * 2;
-                    bar.position.set(Math.cos(a) * (r + 2.2), 3 + h / 2, Math.sin(a) * (r + 2.2));
-                    cage.add(bar);
-                }
-                const hoop = new THREE.Mesh(new THREE.TorusGeometry(r + 2.2, 0.55, 6, 24), this.shared.brass);
-                hoop.rotation.x = Math.PI / 2;
-                hoop.position.y = 3 + h * 0.75;
-                cage.add(hoop);
-                if (node.kind === 'harvester') {
-                    const drill = new THREE.Mesh(new THREE.ConeGeometry(3.2, 9, 8), this.shared.brass);
-                    drill.position.y = 3 + h + 6;
-                    drill.rotation.x = Math.PI;
-                    cage.add(drill);
-                }
-                group.add(cage);
-                rec.rotor = cage;
-            }
-        } else if (node.kind === 'dynamo') {
-            // no glass, no liquid: a housing and a flywheel
-            const box = new THREE.Mesh(new THREE.BoxGeometry(22, 10, 18), steel);
-            box.position.y = 5;
-            group.add(tag(box));
-            const wheel = new THREE.Group();
-            const rimMesh = new THREE.Mesh(new THREE.TorusGeometry(9, 1.4, 8, 24), node.locked ? steel : this.shared.brass);
-            wheel.add(tag(rimMesh));
-            for (let i = 0; i < 3; i++) {
-                const spoke = new THREE.Mesh(new THREE.BoxGeometry(17, 1.2, 1.2), steel);
-                spoke.rotation.z = (i / 3) * Math.PI;
-                wheel.add(spoke);
-            }
-            wheel.position.set(0, 19, 0);
-            group.add(wheel);
-            rec.rotor = wheel;
-            rec.rotorAxis = 'z';
-            if (node.id === FORGE) {
-                const core = new THREE.Mesh(new THREE.SphereGeometry(3.6, 16, 12), new THREE.MeshStandardMaterial({ color: 0x3a1206, emissive: color, emissiveIntensity: 1.2 }));
-                core.position.set(0, 12, 0);
-                group.add(tag(core));
-            }
-        } else if (node.kind === 'cabinet') {
-            // the codex: a cabinet of three jars (pillars, sites, contacts), filled in phase 5
-            const box = new THREE.Mesh(new THREE.BoxGeometry(34, 4, 16), steel);
-            box.position.y = 2;
-            group.add(tag(box));
-            rec.jars = [-10, 0, 10].map((x) => {
-                const jar = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 14, 12, 1, true), new THREE.MeshPhysicalMaterial({
-                    color: 0x9fb4c8, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false,
-                }));
-                jar.position.set(x, 11, 0);
-                group.add(tag(jar));
-                const fill = new THREE.Mesh(this.shared.liquid, new THREE.MeshStandardMaterial({ color: 0x2a2010, emissive: BRASS, emissiveIntensity: 0.8 }));
-                fill.position.set(x, 4.2, 0);
-                fill.scale.set(3, 0.01, 3);
-                group.add(fill);
-                return fill;
-            });
-        } else if (node.id === 'nexus') {
-            this._buildLantern(rec, tag, steel);
-        } else if (node.kind === 'viewer') {
-            // armillary rings on a pedestal
-            const ped = new THREE.Mesh(new THREE.CylinderGeometry(5, 7, 8, 12), steel);
-            ped.position.y = 4;
-            group.add(tag(ped));
-            const rings = new THREE.Group();
-            for (let i = 0; i < 3; i++) {
-                const ring = new THREE.Mesh(new THREE.TorusGeometry(9 - i * 1.6, 0.5, 6, 32), this.shared.brass);
-                ring.rotation.set(i * 0.9, i * 0.6, 0);
-                rings.add(tag(ring));
-            }
-            rings.position.y = 19;
-            group.add(rings);
-            rec.rotor = rings;
-        }
-
-        rec.glow = this._glow(color, 40, 0);
-        rec.glow.position.y = 14;
-        group.add(rec.glow);
-
-        this.machineGroup.add(group);
+        const rec = { id: node.id, node, color, spin: 0, syncing: false, pendingBands: null, relightAt: 0 };
+        const machine = buildMachine(this.shop, node, {
+            color,
+            working: () => this.inUse.has(node.id),
+            spin: () => rec.spin,
+            objects: () => this.data?.codex?.total ?? 0,
+            pending: () => (this.data?.light?.pending ?? 0) > 0,
+        });
+        machine.group.position.copy(position);
+        machine.group.scale.setScalar(MACHINE_SCALE);
+        Object.assign(rec, { machine, group: machine.group, height: machine.height * MACHINE_SCALE, liquidMax: Boolean(machine.heart) });
+        this.machineGroup.add(machine.group);
         rec.label = this._makeLabel(node);
         this.machines.set(node.id, rec);
         return rec;
     }
 
-    /**
-     * The nexus as a lantern: a lamp on a post, a hood that drops over it while the Nexus
-     * draft is pending, a status lamp, and a wheel of coloured glass (the lens) around it.
-     */
-    _buildLantern(rec, tag, steel) {
-        const g = rec.group;
-        const ped = new THREE.Mesh(new THREE.CylinderGeometry(6, 8, 6, 12), steel);
-        ped.position.y = 3;
-        g.add(tag(ped));
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 12, 8), this.shared.brass);
-        post.position.y = 12;
-        g.add(post);
-        const lamp = new THREE.Mesh(new THREE.SphereGeometry(4.2, 18, 14), new THREE.MeshStandardMaterial({
-            color: 0x332a18, emissive: 0xfff1d0, emissiveIntensity: 1.6,
-        }));
-        lamp.position.y = 22;
-        g.add(tag(lamp));
-        const cage = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.CylinderGeometry(6, 6, 11, 6)), new THREE.LineBasicMaterial({ color: BRASS }));
-        cage.position.y = 22;
-        g.add(cage);
-        // the hood: a brass cap that slides down over the lamp
-        const hood = new THREE.Group();
-        const shell = new THREE.Mesh(new THREE.CylinderGeometry(3, 7.4, 9, 16, 1, true), new THREE.MeshStandardMaterial({
-            color: BRASS, metalness: 0.85, roughness: 0.35, side: THREE.DoubleSide,
-        }));
-        hood.add(tag(shell));
-        const top = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 0.8, 16), this.shared.brass);
-        top.position.y = 4.5;
-        hood.add(top);
-        hood.position.y = 33;
-        g.add(hood);
-        // status lamp on the pedestal: amber blinking = draft pending
-        const status = new THREE.Mesh(new THREE.SphereGeometry(1.4, 10, 8), new THREE.MeshBasicMaterial({ color: 0x3ccf8e, toneMapped: false }));
-        status.position.set(0, 4.5, 7.6);
-        g.add(status);
-        // the lens wheel: discs of coloured glass, one per lens value
-        const wheel = new THREE.Group();
-        wheel.position.y = 22;
-        const discs = [];
-        for (let i = 0; i < 8; i++) {
-            const disc = new THREE.Mesh(new THREE.CircleGeometry(2.1, 14), new THREE.MeshBasicMaterial({
-                color: 0x555555, transparent: true, opacity: 0.85, side: THREE.DoubleSide, toneMapped: false,
-            }));
-            const a = (i / 8) * Math.PI * 2;
-            disc.position.set(Math.cos(a) * 9.5, 0, Math.sin(a) * 9.5);
-            disc.lookAt(0, 0, 0);
-            wheel.add(disc);
-            discs.push(disc);
-        }
-        g.add(wheel);
-        rec.lantern = { lamp, hood, status, wheel, discs, hoodY: 33, open: 1, turn: 0, lensKey: null };
-    }
-
     _makeLabel(node) {
         const label = el('div', `twin-label kind-${node.kind}${node.locked ? ' locked' : ''}`);
+        label.style.setProperty('--c', this.data?.colors?.[node.id] ?? '#9aa0aa');
         const name = el('button', 'twin-label-name', node.label + (node.locked ? ' 🔒' : ''));
         name.type = 'button';
         name.addEventListener('click', () => { if (!node.locked) this.onActivate(node.id); });
@@ -588,7 +437,10 @@ export class TwinScene {
                     siphon: "Draw this source's events back out of the Centrifuge",
                     purge: 'Send everything left in the Centrifuge to the Sump',
                 }[cmd];
-                b.addEventListener('click', () => this.onCommand(cmd, node.id));
+                b.addEventListener('click', () => {
+                    if (cmd === 'purge') { const c = this.machines.get(CENTRIFUGE); if (c) c.spin = 6; }
+                    this.onCommand(cmd, node.id);
+                });
                 row.appendChild(b);
                 label[`_${cmd}`] = b;
             }
@@ -613,33 +465,6 @@ export class TwinScene {
         return label;
     }
 
-    /** Replace the liquid with one stacked segment per band (bottom up). */
-    _setSegments(rec, bands) {
-        while (rec.segments.length > bands.length) {
-            const s = rec.segments.pop();
-            rec.group.remove(s.mesh);
-            s.mesh.material.dispose();
-        }
-        while (rec.segments.length < bands.length) {
-            const mesh = new THREE.Mesh(this.shared.liquid, new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveIntensity: 0.85, roughness: 0.4 }));
-            mesh.userData.id = rec.id;
-            rec.group.add(mesh);
-            rec.segments.push({ mesh, share: 0 });
-        }
-        const total = bands.reduce((n, b) => n + b.count, 0) || 1;
-        bands.forEach((b, i) => {
-            const s = rec.segments[i];
-            s.share = b.count / total;
-            this._c.set(b.color);
-            s.mesh.material.emissive.copy(this._c);
-            s.mesh.material.color.copy(this._c).multiplyScalar(0.25);
-            s.mesh.material.opacity = b.ghost ? 0.5 : 1;
-            s.mesh.material.transparent = Boolean(b.ghost);
-            s.mesh.material.depthWrite = !b.ghost;
-            s.mesh.material.emissiveIntensity = b.ghost ? 0.3 : 0.85; // ghosts: dark, see-through
-        });
-    }
-
     /* ------------------------------------------------------------------ */
     /*  Data                                                               */
     /* ------------------------------------------------------------------ */
@@ -654,36 +479,20 @@ export class TwinScene {
         const key = data.nodes.map((n) => `${n.id}:${n.locked}`).join('|');
         if (key !== this._nodeKey) this._rebuild(data);
 
-        // each zone on its own scale (the core holds a tenth of what the net does)
-        const caps = { net: MIN_CAP.net, core: MIN_CAP.core };
-        for (const n of data.nodes) {
-            const level = data.levels[n.id];
-            if (level && caps[n.zone] !== undefined) caps[n.zone] = Math.max(caps[n.zone], level.total * 1.2);
-        }
         for (const rec of this.machines.values()) {
             const n = rec.node;
             const level = data.levels[n.id] ?? { total: 0, lit: 0, bands: [] };
-            if (rec.liquidMax) {
-                rec.target = Math.min(1, level.total / (caps[n.zone] ?? MIN_CAP.core));
-                // lit liquid in lens bands, ghosts (rows the filter leaves out) on top
+            if (rec.machine.heart) {
+                // lit liquid in lens bands, ghosts (rows the filter leaves out) on top; each zone on its own scale
                 const bands = level.total > level.lit
                     ? [...level.bands, { color: data.colors[n.id] ?? '#888', count: level.total - level.lit, ghost: true }]
                     : level.bands;
-                if (this.time < (rec.relightAt ?? 0)) rec.pendingBands = bands; // the beam hasn't reached it yet
-                else { this._setSegments(rec, bands); rec.pendingBands = null; }
+                const cap = CAP[n.zone] ?? CAP.core;
+                if (this.time < (rec.relightAt ?? 0)) rec.pendingBands = { bands, total: level.total, cap }; // the beam hasn't reached it yet
+                else { rec.machine.heart.setBands(bands, level.total, cap); rec.pendingBands = null; }
             }
-            if (rec.ring) {
-                rec.ringMode = data.stageFilter?.[n.id] ?? null;
-                const c = rec.ringMode ? RING_COLORS[rec.ringMode] : (data.colors[n.id] ?? '#888');
-                rec.ring.material.color.set(c);
-                rec.collar.material.emissive.set(c);
-            }
-            if (rec.lantern) this._updateLantern(rec, data.light);
-            if (rec.jars) {
-                const byType = data.codex.byType;
-                const max = Math.max(4, ...Object.values(byType));
-                ['pillar', 'site', 'contact'].forEach((t, i) => { rec.jarTargets ??= []; rec.jarTargets[i] = (byType[t] ?? 0) / max; });
-            }
+            rec.machine.setRim(data.stageFilter?.[n.id] ?? null);
+            if (n.id === 'nexus' && rec.label._lens && data.light) rec.label._lens.textContent = data.light.lensLabel;
             const syncing = n.kind === 'harvester' && data.sources[n.label]?.status === 'syncing';
             rec.syncing = syncing;
             this._updateLabel(rec, level, syncing);
@@ -698,25 +507,13 @@ export class TwinScene {
         if (!this._fitted) { this.fit(); this._fitted = true; }
     }
 
-    _updateLantern(rec, light) {
-        if (!light) return;
-        const L = rec.lantern;
-        if (L.lensKey !== null && L.lensKey !== light.lens) L.turn += Math.PI / 4; // the wheel turns a notch
-        L.lensKey = light.lens;
-        L.pending = light.pending > 0;
-        L.discs.forEach((d, i) => {
-            const c = light.colors[i];
-            d.visible = Boolean(c);
-            if (c) d.material.color.set(c);
-        });
-        if (rec.label._lens) rec.label._lens.textContent = light.lensLabel;
-    }
-
     _updateLabel(rec, level, syncing) {
         const { label, node } = rec;
-        if (node.holds === 'objects') label._count.textContent = String(this.data.codex.total);
-        else if (node.holds && !node.locked) label._count.textContent = String(level.total);
-        else label._count.textContent = '';
+        // what it holds, in its matter's colour; dynamos name what they work with
+        if (node.locked) label._count.textContent = 'locked';
+        else if (node.holds === 'objects') label._count.textContent = `${this.data.codex.total} objects`;
+        else if (node.holds) label._count.textContent = level.lit < level.total ? `${fmtCount(level.lit)} of ${level.total} ${node.matter} lit` : `${level.total} ${node.matter}`;
+        else label._count.textContent = SUB[node.id] ?? '';
         if (label._harvest) {
             // harvested recently: off (no hover, no click) until it goes stale
             const fresh = syncing ? undefined : this.data.fresh?.[node.label];
@@ -734,10 +531,7 @@ export class TwinScene {
         for (const rec of this.machines.values()) {
             rec.label.remove();
             this.machineGroup.remove(rec.group);
-            rec.group.traverse((o) => {
-                if (o.geometry && o.geometry !== this.shared.liquid) o.geometry.dispose();
-                if (o.material && !Object.values(this.shared).includes(o.material)) o.material.dispose();
-            });
+            rec.machine.dispose();
         }
         for (const p of this.pipes.values()) {
             for (const m of [...p.meshes, ...p.joints]) { this.pipeGroup.remove(m); m.material.dispose(); }
@@ -751,6 +545,7 @@ export class TwinScene {
         this.packets = [];
 
         this.positions = layout(data.nodes);
+        this._buildZones(data.nodes);
         for (const n of data.nodes) {
             const at = this.positions.get(n.id);
             if (at) this._addMachine(n, at, data.colors[n.id] ?? '#888');
@@ -855,7 +650,7 @@ export class TwinScene {
             const rec = this.machines.get(nodeId);
             if (rec) {
                 this.circle.position.copy(rec.group.position).setY(rec.group.position.y + 0.25);
-                this.circleSize = ((SIZE[rec.node.kind]?.r ?? 10) + 8) * 3.6; // diameter: well outside the base button
+                this.circleSize = ((FOOT[bodyOf(rec.node)] ?? 9) + 7) * MACHINE_SCALE * 2; // diameter: just outside the base
                 this.circleOn = 0; // draw it in afresh
             }
         }
@@ -970,6 +765,7 @@ export class TwinScene {
         const w = this.container.clientWidth, h = this.container.clientHeight;
         if (!w || !h) return;
         this.renderer.setSize(w, h, false);
+        this.composer.setSize(w, h);
         const aspect = w / h;
         this.camera.left = (-FRUSTUM * aspect) / 2;
         this.camera.right = (FRUSTUM * aspect) / 2;
@@ -983,7 +779,7 @@ export class TwinScene {
         if (!this.positions.size) return;
         const box = new THREE.Box3();
         for (const p of this.positions.values()) box.expandByPoint(p).expandByPoint(p.clone().setY(p.y + 40));
-        box.expandByPoint(new THREE.Vector3(box.min.x - 70, 0, 0)); // the harvesters' intakes
+        box.expandByPoint(new THREE.Vector3(box.min.x - 46, 0, box.max.z + 46)).expandByPoint(new THREE.Vector3(box.max.x + 46, 0, box.min.z - 46)); // the zones' margins
         const center = box.getCenter(new THREE.Vector3());
         this.controls.target.copy(center);
         this.camera.position.copy(center).addScaledVector(VIEW_DIR, 800);
@@ -1016,45 +812,14 @@ export class TwinScene {
         const ease = 1 - Math.exp(-dt * 3);
 
         for (const rec of this.machines.values()) {
-            if (rec.liquidMax) {
-                rec.fill += (rec.target - rec.fill) * ease;
-                let y = rec.liquidBase;
-                const height = Math.max(0.01, rec.fill * rec.liquidMax);
-                for (const s of rec.segments) {
-                    const sh = Math.max(0.01, height * s.share);
-                    s.mesh.position.y = y;
-                    s.mesh.scale.set(rec.liquidR, sh, rec.liquidR);
-                    y += sh;
-                }
-                rec.glow.position.y = rec.liquidBase + height + 2;
-            }
-            if (rec.jars) rec.jars.forEach((fill, i) => {
-                const t = rec.jarTargets?.[i] ?? 0;
-                fill.scale.y += (Math.max(0.01, t * 12) - fill.scale.y) * ease;
-            });
-            if (rec.rotor && !rec.node.locked) {
-                const speed = rec.syncing ? 5 : rec.node.kind === 'viewer' ? 0.25 : 0.5 + rec.flare * 4;
-                if (rec.rotorAxis === 'z') rec.rotor.rotation.z += dt * speed;
-                else rec.rotor.rotation.y += dt * speed;
-            }
-            rec.flare = Math.max(0, rec.flare - dt * 1.2);
-            const pulse = rec.syncing ? 0.35 + 0.25 * Math.sin(this.time * 6) : 0;
-            rec.glow.material.opacity = Math.min(0.9, rec.flare * 0.7 + pulse + (rec.id === this.hoverId ? 0.12 : 0));
             if (rec.pendingBands && this.time >= (rec.relightAt ?? 0)) {
-                this._setSegments(rec, rec.pendingBands); // the beam reached it
+                const { bands, total, cap } = rec.pendingBands;   // the beam reached it
+                rec.machine.heart.setBands(bands, total, cap);
                 rec.pendingBands = null;
-                rec.flare = Math.max(rec.flare, 0.5);
             }
-            if (rec.ring) {
-                const hot = rec.id === this.hoverId && this.hoverRing && !rec.node.locked;
-                rec.ring.material.opacity = rec.node.locked ? 0.2 : hot || rec.ringMode ? 1 : 0.75;
-                // the button lifts under the pointer and dips when pressed
-                rec.lift += ((hot ? 1 : 0) - rec.lift) * Math.min(1, dt * 10);
-                rec.press = Math.max(0, rec.press - dt * 4);
-                rec.button.position.y = 1 + rec.lift * 0.9 - rec.press * 1.6;
-                rec.collar.material.emissiveIntensity = rec.node.locked ? 0 : 0.2 + (rec.ringMode ? 0.45 : 0) + rec.lift * 0.5 + rec.press * 0.6;
-            }
-            if (rec.lantern) this._frameLantern(rec, dt, ease);
+            // a harvester's rotor spins while it harvests; the centrifuge whirls after a purge
+            rec.spin = rec.syncing ? 14 : Math.max(0, rec.spin - dt * 3);
+            rec.machine.frame(dt, this.time, ease);
         }
 
         for (const p of this.pipes.values()) {
@@ -1072,8 +837,7 @@ export class TwinScene {
             pk.d += dt * Math.max(PACKET_SPEED, pk.length / MIN_TRIP_S) * (pk.link ? 0.6 : 1);
             if (pk.d >= pk.length) {
                 const dest = this.machines.get(pk.to);
-                if (dest) dest.flare = 1;
-                this.packets.splice(i, 1);
+                    this.packets.splice(i, 1);
                 continue;
             }
             pointAt(pk.points, pk.d, this._v);
@@ -1103,19 +867,8 @@ export class TwinScene {
         }
         for (const w of this.wires.values()) w.mesh.material.emissiveIntensity = this.pulses.some((pl) => pl.curve === w.curve) ? 0.6 : 0.08;
 
-        this.renderer.render(this.scene, this.camera);
+        if (this.bloomOn) this.composer.render(); else this.renderer.render(this.scene, this.camera);
         this._placeLabels();
-    }
-
-    _frameLantern(rec, dt, ease) {
-        const L = rec.lantern;
-        const open = L.pending ? 0 : 1;
-        L.open += (open - L.open) * ease * 1.6;
-        L.hood.position.y = L.hoodY - (1 - L.open) * 11; // drops down over the lamp
-        L.lamp.material.emissiveIntensity = 0.25 + 1.35 * L.open + (this._sweeping() ? 0.8 : 0);
-        L.status.material.color.setHex(L.pending ? (Math.sin(this.time * 7) > 0 ? AMBER : 0x3a2808) : 0x3ccf8e);
-        L.wheel.rotation.y += (L.turn - L.wheel.rotation.y) * ease + dt * 0.08;
-        L.turn += dt * 0.08; // the wheel drifts slowly; a lens change kicks it a notch
     }
 
     _sweeping() {
@@ -1172,8 +925,7 @@ export class TwinScene {
 
     _placeLabels() {
         for (const rec of this.machines.values()) {
-            const top = SIZE[rec.node.kind]?.h ?? 22;
-            const at = this._project(this._v.copy(rec.group.position).setY(rec.group.position.y + top + 18));
+            const at = this._project(this._v.copy(rec.group.position).setY(rec.group.position.y + rec.height + 8));
             rec.label.style.display = at ? '' : 'none';
             if (!at) continue;
             rec.label.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px) translate(-50%, -100%)`;
@@ -1202,6 +954,12 @@ export class TwinScene {
         });
         for (const v of Object.values(this.shared)) v?.dispose?.();
         for (const t of this.circleTextures) t.dispose();
+        this.zones?.dispose();
+        this.kit.dispose();
+        this.bloom.dispose();
+        this.composer.dispose();
+        this.envMap.dispose();
+        this.pmrem.dispose();
         this.renderer.dispose();
         this.container.remove();
     }

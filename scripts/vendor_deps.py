@@ -33,6 +33,22 @@ DEPS = {
     "three/addons/controls/OrbitControls.js":
                         ("three@0.170.0/examples/jsm/controls/OrbitControls.js",
                                                     "three-orbit-controls.js", "&external=three"),
+    # the Signal Chain twin's lighting and glow (environment map, bloom)
+    "three/addons/environments/RoomEnvironment.js":
+                        ("three@0.170.0/examples/jsm/environments/RoomEnvironment.js",
+                                                    "three-room-environment.js", "&external=three"),
+    "three/addons/postprocessing/EffectComposer.js":
+                        ("three@0.170.0/examples/jsm/postprocessing/EffectComposer.js",
+                                                    "three-effect-composer.js", "&external=three"),
+    "three/addons/postprocessing/RenderPass.js":
+                        ("three@0.170.0/examples/jsm/postprocessing/RenderPass.js",
+                                                    "three-render-pass.js", "&external=three"),
+    "three/addons/postprocessing/UnrealBloomPass.js":
+                        ("three@0.170.0/examples/jsm/postprocessing/UnrealBloomPass.js",
+                                                    "three-unreal-bloom-pass.js", "&external=three"),
+    "three/addons/postprocessing/OutputPass.js":
+                        ("three@0.170.0/examples/jsm/postprocessing/OutputPass.js",
+                                                    "three-output-pass.js", "&external=three"),
 }
 
 # output file -> exact URL (pin versions in the URL)

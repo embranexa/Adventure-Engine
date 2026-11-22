@@ -3,7 +3,9 @@
 //
 // Node ids match the transitions log (backend/db/models.py): PHASE_NODES for adventures,
 // "harvester:<source>", centrifuge, sump, forge, codex, plus "outside" (where harvested
-// events come from; not drawn as a machine).
+// events come from; not drawn, and no pipe leads from it). The manifold is a pipe junction
+// where the harvesters' pipes merge into one trunk to the centrifuge; it holds nothing and
+// never appears in the log. Phase 7 layout: resources/signal chain digital twin/PHASE7_PLAN.md.
 
 import { MAIN_ROUTE, PHASE_NODES, PHASE_STAGES } from '../lifecycle.js';
 
@@ -25,13 +27,22 @@ import { MAIN_ROUTE, PHASE_NODES, PHASE_STAGES } from '../lifecycle.js';
  * create dialog. `label` (the panel's name) is filled in by the panel.
  * @typedef {{ panel: PanelId, mode?: PoolMode, shades?: boolean, create?: boolean, label?: string }} TwinAction
  */
-/** @typedef {{ id: string, a: string, b: string, kind: 'pipe' | 'conveyor' }} TwinPipe */
+/**
+ * A pipe. `pipe` carries adventures and events; `conveyor` carries Codex objects; `market`
+ * carries the Entropy Market's costs and rewards. Only plain pipes route moves between stages.
+ * @typedef {{ id: string, a: string, b: string, kind: 'pipe' | 'conveyor' | 'market' }} TwinPipe
+ */
 
 export const OUTSIDE = 'outside';
 export const CENTRIFUGE = 'centrifuge';
 export const SUMP = 'sump';
 export const FORGE = 'forge';
 export const CODEX = 'codex';
+export const MANIFOLD = 'manifold';
+export const ENTROPY_MARKET = 'entropy_market';
+export const CRUCIBLE = PHASE_NODES.constructing;
+export const ARENA = PHASE_NODES.consuming;
+export const TREASURY = PHASE_NODES.completed;
 export const NECROPOLIS = PHASE_NODES.killed;
 export const REFINERY = PHASE_NODES.classifying;
 
@@ -78,7 +89,7 @@ export function twinNodes(sourceNames) {
         core('decommissioned', 'vessel', 'Archive'),
         core('killed', 'vessel', 'Necropolis'),
         node({ id: CODEX, label: 'Codex', zone: 'core', kind: 'cabinet', holds: 'objects', action: { panel: 'codex' } }),
-        node({ id: 'entropy_market', label: 'Entropy Market', zone: 'core', kind: 'dynamo', locked: true }),
+        node({ id: ENTROPY_MARKET, label: 'Entropy Market', zone: 'core', kind: 'dynamo', locked: true }),
         node({ id: 'nexus', label: 'Nexus', zone: 'viewer', kind: 'viewer', action: { panel: 'classifier' } }),
         node({ id: 'atlas', label: 'Atlas', zone: 'viewer', kind: 'viewer', action: { panel: 'map' } }),
         node({ id: 'calendar', label: 'Calendar', zone: 'viewer', kind: 'viewer', action: { panel: 'calendar' } }),
@@ -89,46 +100,71 @@ export function twinNodes(sourceNames) {
 const pipe = (a, b, kind = 'pipe') => ({ id: `${a}~${b}`, a, b, kind });
 
 /**
- * Every pipe. Pipes are two-way (siphon runs back up the feed pipe, revive back up the
- * kill pipe); `a` -> `b` is the usual direction.
+ * Every pipe. Pipes are two-way (siphon runs back up a harvester's pipe, revive back
+ * through the centrifuge); `a` -> `b` is the usual direction. Harvesters merge at the
+ * manifold; only the crucible has a pipe to the necropolis (kills from other stages run
+ * along the chain to it); the sump reaches the hopper through the centrifuge.
  * @param {string[]} sourceNames
  * @returns {TwinPipe[]}
  */
 export function twinPipes(sourceNames) {
     const harvesters = [...new Set([...KNOWN_HARVESTERS, ...sourceNames])].map(harvesterId);
     return [
-        ...harvesters.flatMap((h) => [pipe(OUTSIDE, h), pipe(h, CENTRIFUGE)]),
+        ...harvesters.map((h) => pipe(h, MANIFOLD)),
+        pipe(MANIFOLD, CENTRIFUGE),
         pipe(CENTRIFUGE, SUMP),
         pipe(CENTRIFUGE, MAIN_CHAIN[0]),
-        pipe(SUMP, MAIN_CHAIN[0]),
         pipe(FORGE, MAIN_CHAIN[0]),
         ...MAIN_CHAIN.slice(1).map((b, i) => pipe(MAIN_CHAIN[i], b)),
-        ...MAIN_CHAIN.map((n) => pipe(n, NECROPOLIS)),
+        pipe(CRUCIBLE, NECROPOLIS),
         pipe(CODEX, REFINERY, 'conveyor'),
+        pipe(ENTROPY_MARKET, CRUCIBLE, 'market'),
+        pipe(ENTROPY_MARKET, ARENA, 'market'),
+        pipe(ENTROPY_MARKET, TREASURY, 'market'),
     ];
 }
 
 /**
- * The pipe steps a move from `from` to `to` travels: the pipe joining them, else the
- * main chain walked forward or back (a phase set by hand can skip stages). Null when
- * there's no way (drawn as a jump; counted on no pipe).
+ * The pipe steps a move from `from` to `to` travels: the pipe joining them directly, else
+ * the shortest way along plain pipes (a phase set by hand can skip stages; a kill runs to
+ * the crucible and on; a revive from the sump runs through the centrifuge). Conveyors and
+ * market pipes only carry moves between their own two ends. Moves from or to the outside
+ * (harvest arrivals) have no pipe: an empty route, drawn and counted nowhere. Null when
+ * there's no way at all.
  * @param {Map<string, TwinPipe>} pipesByEnds  from pipeIndex()
  * @param {string} from @param {string} to
  * @returns {{ pipe: TwinPipe, forward: boolean }[] | null}
  */
 export function route(pipesByEnds, from, to) {
+    if (from === OUTSIDE || to === OUTSIDE) return [];
     const direct = pipesByEnds.get(`${from}~${to}`) ?? pipesByEnds.get(`${to}~${from}`);
     if (direct) return [{ pipe: direct, forward: direct.a === from }];
-    const i = MAIN_CHAIN.indexOf(from), j = MAIN_CHAIN.indexOf(to);
-    if (i < 0 || j < 0) return null;
-    const step = j > i ? 1 : -1;
-    const steps = [];
-    for (let k = i; k !== j; k += step) {
-        const a = MAIN_CHAIN[k], b = MAIN_CHAIN[k + step];
-        const p = pipesByEnds.get(`${a}~${b}`) ?? pipesByEnds.get(`${b}~${a}`);
-        if (!p) return null;
-        steps.push({ pipe: p, forward: p.a === a });
+    // breadth-first over plain pipes, so the shortest way wins (ties: pipe order)
+    /** @type {Map<string, { pipe: TwinPipe, forward: boolean }[]>} */
+    const next = new Map();
+    for (const p of pipesByEnds.values()) {
+        if (p.kind !== 'pipe') continue;
+        if (!next.has(p.a)) next.set(p.a, []);
+        if (!next.has(p.b)) next.set(p.b, []);
+        next.get(p.a)?.push({ pipe: p, forward: true });
+        next.get(p.b)?.push({ pipe: p, forward: false });
     }
+    /** @type {Map<string, { from: string, step: { pipe: TwinPipe, forward: boolean } } | null>} */
+    const seen = new Map([[from, null]]);
+    const queue = [from];
+    while (queue.length) {
+        const at = /** @type {string} */ (queue.shift());
+        if (at === to) break;
+        for (const step of next.get(at) ?? []) {
+            const there = step.forward ? step.pipe.b : step.pipe.a;
+            if (seen.has(there)) continue;
+            seen.set(there, { from: at, step });
+            queue.push(there);
+        }
+    }
+    if (!seen.has(to)) return null;
+    const steps = [];
+    for (let at = to, prev = seen.get(at); prev; at = prev.from, prev = seen.get(at)) steps.unshift(prev.step);
     return steps;
 }
 
