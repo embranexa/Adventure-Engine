@@ -41,7 +41,7 @@ function Corner({ pos }) {
             <path d="M3 44 V12 L12 3 H44" fill="none" stroke="#1a1c20" stroke-width="7" stroke-linejoin="bevel"></path>
             <path d="M3 44 V12 L12 3 H44" fill="none" stroke="#5c626c" stroke-width="3" stroke-linejoin="bevel"></path>
             <path d="M3 44 V12 L12 3 H44" fill="none" stroke="#aab0b9" stroke-width="0.8" stroke-linejoin="bevel" opacity="0.7"></path>
-            <circle cx="15" cy="15" r="8.5" fill="#111317" stroke="#4a4f58" stroke-width="3" stroke-dasharray="2.2 1.8"></circle>
+            <circle className="gear" cx="15" cy="15" r="8.5" fill="#111317" stroke="#4a4f58" stroke-width="3" stroke-dasharray="2.2 1.8"></circle>
             <circle cx="15" cy="15" r="5" fill="#16181c" stroke="#7a808a" stroke-width="0.8"></circle>
             <polygon points="15,11.6 18.2,17 11.8,17" fill="none" stroke="#c8a46a" stroke-width="0.9"></polygon>
             <path className="trace" d="M25 15 H33 L36 12 H43" fill="none" stroke-width="1"></path>
@@ -61,8 +61,22 @@ export function Corners() {
     `;
 }
 
+/** What each panel is for: shown when hovering its rune icon. */
+const PANEL_HELP = {
+    node: 'The selected adventure or event as a trading card. Triage it, move it along the chain, edit it, link it to Codex objects. Here ore becomes essence: why do I want this?',
+    classifier: 'The whole pool as a constellation. Stars are facets (source, city, type, matter…); galaxies group the items that share them. Click a star: include → exclude → off. The sphere holds what passes; Pass through sends it to the Calendar and Atlas.',
+    map: 'Where things happen: events as towers on the map, sites from the Codex, and the proximity ring that filters by distance.',
+    calendar: 'When things happen, by week or month. Weekly events show on every day they repeat; all-day ones as banners. Drag across the day headers to filter by date.',
+    alembic: 'How to do it: the adventure’s roadmap, a graph of actions. Completing the first action turns distillate into alloy.',
+    scripter: 'The roadmap as text: one statement per line, e.g. A1[Buy tickets] --> A2[Pack].',
+    codex: 'The objects adventures link to: pillars (themes), sites (places), contacts (people), organizations and skills.',
+    quests: 'What can I do right now: the next actions of every alloy adventure, ready to tick off.',
+    signal_chain: 'The whole pipeline as a 3D twin: every machine, every move between them, lit by the lens.',
+};
+
 /**
  * Two-line panel title: [icon] NAME / QUESTION · INPUT ⟶ OUTPUT.
+ * Hovering the icon shows what the panel is for (PANEL_HELP).
  * Input/output words that name a matter take its color.
  * @param {{ meta: PanelMeta, input?: string }} props  `input` overrides the meta (e.g. "prima materia" in Discovery)
  */
@@ -70,7 +84,14 @@ export function PanelTitle({ meta, input }) {
     const [inWord, outWord] = [input ?? meta.flow[0], meta.flow[1]];
     const color = (/** @type {string} */ w) => MATTER_COLORS[w] ?? '#b4b9c1';
     return html`
-        <div className="vial"><${Icon} name=${meta.icon} /></div>
+        <div className="vial" tabIndex="0" aria-describedby=${`help-${meta.id}`}>
+            <${Icon} name=${meta.icon} />
+            <div className="panel-info" role="tooltip" id=${`help-${meta.id}`}>
+                <b>${meta.name}</b>
+                <span className="panel-info-flow">${meta.question} · ${inWord} ⟶ ${outWord}</span>
+                ${PANEL_HELP[/** @type {keyof typeof PANEL_HELP} */ (meta.id)] ?? ''}
+            </div>
+        </div>
         <div className="ptitle">
             <span className="ptitle-name">${meta.name}</span>
             <span className="ptitle-flow">

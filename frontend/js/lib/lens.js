@@ -23,7 +23,7 @@ const TYPE_COLORS = { event: '#4fb3ff', item: '#e0a43a', song: '#c86bf0' };
 /** Everything else: a value keeps the same color across reloads (picked by its text). */
 export const PALETTE = ['#4fb3ff', '#3ccf8e', '#f2b134', '#f0643c', '#c86bf0', '#2fd2c9', '#ff7aa8', '#a3d14b', '#8f8cff', '#ffb27a'];
 /** Object facets: their values are object ids, coloured by the object. */
-const OBJECT_LENSES = new Set(['pillar', 'site', 'contact']);
+const OBJECT_LENSES = new Set(['pillar', 'site', 'contact', 'organization', 'skill']);
 const UNKNOWN_COLOR = '#5b616b';
 /** Value for rows the lens's facet doesn't apply to (raw events under an adventure-only facet). */
 export const NOT_APPLICABLE = 'n/a';

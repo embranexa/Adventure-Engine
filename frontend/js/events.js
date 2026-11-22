@@ -75,7 +75,10 @@ function formatter(timeZone, options) {
 }
 
 /**
- * "Thu, Nov 20, 5:00 PM – 7:00 PM PST" in the event's timezone.
+ * When an event happens, in its own timezone, on the 24-hour clock:
+ *   "Thu, Nov 20, 17:00 – 19:00 PST"           a one-off
+ *   "Sat, Nov 21 – Mon, Nov 23 · all day"       whole days (the last one counts)
+ *   "Weekly Mon, Thu · 18:30 – 21:00 PST · from Nov 2 · until Nov 30"
  * @param {PoolRecord} ev
  */
 export function formatEventWhen(ev) {
@@ -83,9 +86,23 @@ export function formatEventWhen(ev) {
     if (!start) return 'Unknown time';
     const end = parseTime(ev.end);
     const day = formatter(ev.timezone, { weekday: 'short', month: 'short', day: 'numeric' });
-    const time = formatter(ev.timezone, { hour: 'numeric', minute: '2-digit' });
+    const time = formatter(ev.timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
     const zone = formatter(ev.timezone, { timeZoneName: 'short' })
         .formatToParts(start).find((p) => p.type === 'timeZoneName')?.value ?? '';
+    const rule = ev.recurrence;
+    if (rule && rule.days?.length) {
+        const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const days = [...rule.days].sort((a, b) => a - b).map((d) => names[d]).join(', ');
+        const short = formatter(ev.timezone, { month: 'short', day: 'numeric' });
+        const hours = ev.all_day ? 'all day' : `${time.format(start)}${end ? ` – ${time.format(end)}` : ''} ${zone}`;
+        const until = rule.until ? ` · until ${short.format(new Date(rule.until + 'T12:00:00'))}` : '';
+        return `Weekly ${days} · ${hours} · from ${short.format(start)}${until}`;
+    }
+    if (ev.all_day) {
+        const last = end && end > start ? end : start;
+        const first = day.format(start), lastText = day.format(last);
+        return first === lastText ? `${first} · all day` : `${first} – ${lastText} · all day`;
+    }
     if (!end) return `${day.format(start)}, ${time.format(start)} ${zone}`;
     const sameDay = day.format(start) === day.format(end);
     const endText = sameDay ? time.format(end) : `${day.format(end)}, ${time.format(end)}`;

@@ -32,7 +32,7 @@ from backend.db.models import (  # noqa: E402
     CENTRIFUGE_NODE, PHASE_NODES, SUMP_NODE, Adventure, Event, EventSource, Transition, harvester_node,
 )
 from backend.db.setup import init_db  # noqa: E402
-from backend.services import adventures, objects, sync, triage  # noqa: E402
+from backend.services import adventures, objects, roadmap, sync, triage  # noqa: E402
 from backend.services.hub import hub  # noqa: E402
 
 if DB_PATH.resolve() == (DATA_DIR / "adventure.db").resolve():
@@ -146,6 +146,31 @@ async def main():
             await s.commit()
         assert await triage.sweep_missed() == 1
     await step("sweeper kills P", age_p, {("hopper", "necropolis"): 1})
+    # weekly and all-day events (resources/UPGRADES_PLAN.md, U4): the sweeper waits for their end
+    async def make_timed():
+        now = utcnow()
+        state["W"] = uuid.UUID((await adventures.create_adventure({
+            "type": "event", "title": "Check weekly", "start_time": now - timedelta(days=10),
+            "end_time": now - timedelta(days=10) + timedelta(hours=2), "recurrence": {"days": [0, 3]}}))["id"])
+        today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        state["D"] = uuid.UUID((await adventures.create_adventure({
+            "type": "event", "title": "Check all day", "start_time": today - timedelta(days=2),
+            "end_time": today, "all_day": True}))["id"])
+        async with SessionLocal() as s:
+            for key in ("W", "D"):
+                await s.execute(update(Adventure).where(Adventure.id == state[key])
+                                .values(phase_changed_at=now - timedelta(days=11)))
+            await s.commit()
+    await step("forge a weekly and an all-day event", make_timed, {("forge", "hopper"): 2})
+
+    async def sweep_none():
+        assert await triage.sweep_missed() == 0, "the sweeper killed a weekly or an all-day event too early"
+    await step("sweeper spares weekly and all-day", sweep_none, {})
+
+    async def end_weekly():
+        await adventures.update_adventure(state["W"], {"recurrence": {"days": [0, 3], "until": (utcnow() - timedelta(days=5)).date()}})
+        assert await triage.sweep_missed() == 1
+    await step("weekly with a past end is missed", end_weekly, {("hopper", "necropolis"): 1})
     await step("ignore B", lambda: triage.ignore_event(ids["check-2"]), {("centrifuge", "sump"): 1})
     await step("purge", triage.purge_centrifuge, {("centrifuge", "sump"): held - 3})  # all but A, P and B
     await step("revive C from the sump", lambda: triage.revive_event(ids["check-3"]), {("sump", "hopper"): 1})
@@ -158,6 +183,28 @@ async def main():
     async def forge():
         state["F"] = uuid.UUID((await adventures.create_adventure({"type": "item", "title": "Check item"}))["id"])
     await step("forge an item", forge, {("forge", "hopper"): 1})
+
+    # the roadmap moves its adventure (resources/UPGRADES_PLAN.md, U3)
+    async def forge_r():
+        state["R"] = uuid.UUID((await adventures.create_adventure({"type": "item", "title": "Check roadmap"}))["id"])
+        for phase in ("classifying", "decomposing"):
+            await triage.set_phase(state["R"], phase)
+    await step("forge R into the alembic", forge_r, {("forge", "hopper"): 1, ("hopper", "refinery"): 1, ("refinery", "alembic"): 1})
+
+    def plan(done):
+        return lambda: roadmap.save_roadmap(state["R"], {
+            "actions": [{"id": "A1", "title": "One"}, {"id": "A2", "title": "Two"}], "edges": [], "done": done})
+    await step("roadmap drafted (nothing done)", plan([]), {})
+    await step("first action done -> alloy", plan(["A1"]), {("alembic", "crucible"): 1})
+    await step("all done stays alloy", plan(["A1", "A2"]), {})
+    await step("promote R to animus", lambda: triage.set_phase(state["R"], "consuming"), {("crucible", "arena"): 1})
+    await step("un-complete one -> alloy", plan(["A1"]), {("arena", "crucible"): 1})
+    await step("un-complete the last -> distillate", plan([]), {("crucible", "alembic"): 1})
+    await step("animus by hand", lambda: triage.set_phase(state["R"], "consuming"), {("alembic", "arena"): 1})
+    async with SessionLocal() as s:
+        r = await s.get(Adventure, state["R"])
+        assert r is not None and r.roadmap and sorted(r.roadmap["done"]) == ["A1", "A2"], f"by hand: done = {r and r.roadmap}"
+    print("ok  animus by hand marks every action done")
 
     async def make_sites():
         state["s1"] = uuid.UUID((await objects.create_object({"type": "site", "name": "Check site 1"}))["id"])

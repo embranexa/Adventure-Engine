@@ -2,7 +2,8 @@
 // ClassifierPanel.js is the typed boundary. Model + layout: classifierGraph.js.
 
 /**
- * ClassifierScene — the Assay: adventures as bodies in space around a central portal.
+ * ClassifierScene — the Assay: adventures as bodies in space; a sphere at the centre holds
+ * everything that passes the draft filters.
  *
  *   scene.update(model)                 // stars, galaxies, pass count (from buildModel)
  *   scene.setSelection(id, { fly })     // fly = move the camera to it
@@ -10,31 +11,58 @@
  *   scene.dispose()
  *
  * Callbacks: onSelect(itemId | null: empty space clicked), onHover(itemId | null), onStarClick(star), onStarContext(star).
- * Labels and cards are HTML overlays projected from 3D positions (any image URL works,
- * text stays crisp). Styles: frontend/styles.css under "Classifier".
+ * Labels are HTML overlays projected from 3D positions; each adventure is one 3D card (its
+ * cover image, through /api/cover, drawn into the card). Cards move only when the topology
+ * changes (stars, roles, galaxies), gliding to their new places. Styles: frontend/styles.css
+ * under "Classifier".
  */
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ROLE_COLORS, galaxyRadius, layout } from './classifierGraph.js';
+import { REGION_R, ROLE_COLORS, galaxyRadius, layout } from './classifierGraph.js';
 import { magicCircleCanvases } from './magicCircle.js';
+import { starIconCanvas, starIconKey } from './starIcons.js';
 import { stageOf } from '../lifecycle.js';
 import { deferredResize, isResizing, viewOf } from './resizing.js';
 
 const EXPAND_BASE = 170;     // a galaxy breaks apart when the camera is closer than this (+ size)
-const CARD_DISTANCE = 120;   // adventures closer than this show their card
-const MAX_CARDS = 30;
 const FLY_MS = 1100;
+const GLIDE_S = 1.4;         // bodies glide this long to new places when the topology changes
+const BURST_S = 0.55;        // a cluster bursts into its cards (or gathers them back) in this long
+const CARD_W = 8, CARD_H = 11.3;   // a card's size in the scene
+const CARD_PX = [240, 340];        // its canvas
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-/** http(s) only (cover images come from event data). */
-function safeUrl(link) {
+/** A cover image's same-origin URL (http(s) covers only; WebGL needs same-origin images). */
+function coverSrc(link) {
     if (typeof link !== 'string' || !link) return null;
     try {
         const u = new URL(link, window.location.href);
-        return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+        return u.origin === window.location.origin ? u.href : `/api/cover?url=${encodeURIComponent(u.href)}`;
     } catch {
         return null;
     }
+}
+
+/** Wrap text into at most `lines` lines that fit `width` (the last one ellipsized). */
+function wrapText(g, text, width, lines) {
+    const words = String(text || '').split(/\s+/).filter(Boolean);
+    const out = [];
+    let line = '';
+    for (const w of words) {
+        const next = line ? `${line} ${w}` : w;
+        if (g.measureText(next).width <= width || !line) { line = next; continue; }
+        out.push(line); line = w;
+        if (out.length === lines) break;
+    }
+    if (out.length < lines && line) out.push(line);
+    if (out.length === lines && words.join(' ') !== out.join(' ')) {
+        let last = out[lines - 1];
+        while (last.length > 1 && g.measureText(`${last}…`).width > width) last = last.slice(0, -1);
+        out[lines - 1] = `${last}…`;
+    }
+    return out;
 }
 
 function el(tag, cls, text) {
@@ -103,13 +131,16 @@ export class ClassifierScene {
             sphere: new THREE.SphereGeometry(1, 24, 16),
             ring: new THREE.TorusGeometry(1, 0.06, 8, 64),
             glow: this._glowTexture(),
+            placeholder: this._placeholderTexture(),
             plane: new THREE.PlaneGeometry(1, 1),
             ...this._sigilTextures(),
         };
 
-        this.stars = new Map();     // id -> { star, group, core, ring, glow, label, pos, target }
-        this.galaxies = new Map();  // id -> { galaxy, group, body, glow, label, members, pos, target, expanded, color }
-        this.cards = new Map();     // itemId -> card element
+        this.stars = new Map();     // id -> { star, group, core (icon), glow, label, pos, target, from, t }
+        this.galaxies = new Map();  // id -> { galaxy, group, body, glow, label, members, pos, target, from, t, expanded, color }
+        this.covers = new Map();    // cover URL -> { img, ready, failed, waiting: Set<member> }
+        this._iconTex = new Map();  // icon key -> texture
+        this._topoKey = '';
         this.passCount = 0;
         this.total = 0;
         this.selectedId = null;
@@ -117,7 +148,7 @@ export class ClassifierScene {
         this.time = 0;
 
         this._buildBackdrop();
-        this._buildPortal();
+        this._buildRegion();
         this._buildLinks();
         this._bindEvents();
 
@@ -224,69 +255,134 @@ export class ClassifierScene {
         this.scene.add(this.motes);
     }
 
-    /** Card face texture for a matter color (cached): foil frame, dark body, banner, art, strip. */
-    _cardTexture(color) {
-        this._cardTex ??= new Map();
-        let tex = this._cardTex.get(color);
-        if (tex) return tex;
-        const c = document.createElement('canvas');
-        c.width = 96; c.height = 136;
-        const g = c.getContext('2d');
+    /** A 1×1 dark texture for cards not drawn yet (their galaxy hasn't opened up). */
+    _placeholderTexture() {
+        const t = new THREE.DataTexture(new Uint8Array([10, 11, 14, 255]), 1, 1);
+        t.needsUpdate = true;
+        return t;
+    }
+
+    /** A star icon's texture (cached per drawing). */
+    _iconTexture(key) {
+        let t = this._iconTex.get(key);
+        if (!t) {
+            t = new THREE.CanvasTexture(starIconCanvas(key));
+            t.colorSpace = THREE.SRGBColorSpace;
+            this._iconTex.set(key, t);
+        }
+        return t;
+    }
+
+    /** What a card shows; when it changes, the card is drawn again. */
+    _cardSig(item) {
+        const stage = stageOf(item);
+        return [item.title, item.cover_url, item.color, stage?.matter].join('\u0001');
+    }
+
+    /** Draw (or redraw) a member's card: foil frame, title, cover image, matter strip. */
+    _drawCard(m) {
+        const item = m.item;
+        if (!m.canvas) {
+            m.canvas = document.createElement('canvas');
+            [m.canvas.width, m.canvas.height] = CARD_PX;
+            m.tex = new THREE.CanvasTexture(m.canvas);
+            m.tex.colorSpace = THREE.SRGBColorSpace;
+            m.tex.anisotropy = 4;
+            m.card.material.map = m.tex;
+            m.card.material.needsUpdate = true;
+        }
+        m.sig = this._cardSig(item);
+        const [W, H] = CARD_PX;
+        const g = m.canvas.getContext('2d');
+        g.clearRect(0, 0, W, H);
+        const color = item.color || '#7d838d';
         const base = new THREE.Color(color);
         const css = (col) => '#' + col.getHexString();
         const light = css(base.clone().lerp(this._white, 0.55));
         const deep = css(base.clone().multiplyScalar(0.35));
-        const foil = g.createLinearGradient(0, 0, 96, 136);
+        // the foil frame in the matter's colour, a dark body
+        const foil = g.createLinearGradient(0, 0, W, H);
         foil.addColorStop(0, light); foil.addColorStop(0.3, color); foil.addColorStop(0.6, deep); foil.addColorStop(0.85, color); foil.addColorStop(1, light);
         g.fillStyle = foil;
-        g.beginPath(); g.roundRect(0, 0, 96, 136, 10); g.fill();
+        g.beginPath(); g.roundRect(0, 0, W, H, 22); g.fill();
         g.fillStyle = '#0a0b0e';
-        g.beginPath(); g.roundRect(5, 5, 86, 126, 7); g.fill();
-        g.fillStyle = '#3a3f47';                                    // banner (pillar)
-        g.beginPath(); g.roundRect(10, 10, 76, 14, 3); g.fill();
-        const art = g.createRadialGradient(48, 62, 2, 48, 62, 40);   // art window
-        art.addColorStop(0, light); art.addColorStop(0.35, color); art.addColorStop(1, '#07080a');
-        g.fillStyle = art;
-        g.beginPath(); g.roundRect(10, 30, 76, 66, 4); g.fill();
-        g.fillStyle = '#16181c';                                    // matter strip
-        g.beginPath(); g.roundRect(10, 102, 76, 10, 2); g.fill();
+        g.beginPath(); g.roundRect(9, 9, W - 18, H - 18, 15); g.fill();
+        // the title banner
+        const bannerH = 62;
+        const banner = g.createLinearGradient(0, 18, 0, 18 + bannerH);
+        banner.addColorStop(0, css(base.clone().lerp(new THREE.Color('#4a4f58'), 0.6)));
+        banner.addColorStop(1, css(base.clone().multiplyScalar(0.25)));
+        g.fillStyle = banner;
+        g.beginPath(); g.roundRect(18, 18, W - 36, bannerH, 7); g.fill();
+        g.fillStyle = '#fff';
+        g.font = "700 22px 'Saira Condensed', 'Arial Narrow', sans-serif";
+        g.textBaseline = 'middle';
+        const lines = wrapText(g, item.title || 'Untitled', W - 56, 2);
+        lines.forEach((ln, i) => g.fillText(ln, 28, 18 + bannerH / 2 + (i - (lines.length - 1) / 2) * 24));
+        // the art window: the cover image, else a glow in the matter's colour
+        const art = { x: 18, y: 18 + bannerH + 8, w: W - 36, h: 170 };
+        g.save();
+        g.beginPath(); g.roundRect(art.x, art.y, art.w, art.h, 7); g.clip();
+        const cover = this._cover(item.cover_url, m);
+        if (cover?.ready) {
+            const iw = cover.img.naturalWidth, ih = cover.img.naturalHeight;
+            const k = Math.max(art.w / iw, art.h / ih);
+            const dw = iw * k, dh = ih * k;
+            g.drawImage(cover.img, art.x + (art.w - dw) / 2, art.y + (art.h - dh) / 2, dw, dh);
+        } else {
+            const glow = g.createRadialGradient(W / 2, art.y + art.h * 0.55, 4, W / 2, art.y + art.h * 0.55, art.w * 0.6);
+            glow.addColorStop(0, light); glow.addColorStop(0.35, color); glow.addColorStop(1, '#07080a');
+            g.fillStyle = glow;
+            g.fillRect(art.x, art.y, art.w, art.h);
+        }
+        g.restore();
+        // the matter strip
+        const stripY = art.y + art.h + 10;
+        g.fillStyle = '#16181c';
+        g.beginPath(); g.roundRect(18, stripY, W - 36, 30, 5); g.fill();
         g.fillStyle = color;
-        g.fillRect(14, 105, 40, 4);
-        for (let i = 0; i < 3; i++) { g.fillStyle = '#16181c'; g.beginPath(); g.roundRect(10 + i * 26, 116, 24, 10, 2); g.fill(); }
-        tex = new THREE.CanvasTexture(c);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        this._cardTex.set(color, tex);
-        return tex;
+        g.font = "600 17px 'Saira Condensed', 'Arial Narrow', sans-serif";
+        const stage = stageOf(item);
+        g.fillText(`★ ${(stage ? stage.matter : 'matter').toUpperCase()}`, 28, stripY + 16);
+        m.tex.needsUpdate = true;
     }
 
-    _buildPortal() {
-        const g = new THREE.Group();
-        const ring = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: 0xe6e8ec, transparent: true, opacity: 0.75 }));
-        ring.scale.setScalar(13);
-        ring.rotation.x = Math.PI / 2;
-        const ring2 = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: 0x5fe0e6, transparent: true, opacity: 0.7 }));
-        ring2.scale.setScalar(17);
-        ring2.rotation.x = Math.PI / 2;
-        const disc = new THREE.Mesh(new THREE.CircleGeometry(12, 48), new THREE.MeshBasicMaterial({
-            color: 0x06171a, transparent: true, opacity: 0.85, side: THREE.DoubleSide,
-        }));
-        disc.rotation.x = -Math.PI / 2;
-        g.add(ring, ring2, disc, this._glowSprite('#1fc2c9', 74, 0.4), this._glowSprite('#ffffff', 26, 0.45));
-
-        // swirl of motes
-        const n = 220, pos = new Float32Array(n * 3);
-        for (let i = 0; i < n; i++) {
-            const a = (i / n) * Math.PI * 14, r = 2.5 + (i / n) * 10;
-            pos.set([Math.cos(a) * r, (Math.sin(i) * 0.8), Math.sin(a) * r], i * 3);
+    /** A cover image through the app's origin (loaded once per URL); redraws waiting cards. */
+    _cover(link, m) {
+        const src = coverSrc(link);
+        if (!src) return null;
+        let c = this.covers.get(src);
+        if (!c) {
+            c = { img: new Image(), ready: false, failed: false, waiting: new Set() };
+            c.img.decoding = 'async';
+            c.img.onload = () => { c.ready = true; for (const w of c.waiting) if (w.canvas) this._drawCard(w); c.waiting.clear(); };
+            c.img.onerror = () => { c.failed = true; c.waiting.clear(); };
+            c.img.src = src;
+            this.covers.set(src, c);
         }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-        this.portalSwirl = new THREE.Points(geo, new THREE.PointsMaterial({
-            color: 0xbdf5f7, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false,
-        }));
-        g.add(this.portalSwirl);
-        this.portal = { group: g, ring, ring2 };
-        this.scene.add(g);
+        if (!c.ready && !c.failed) c.waiting.add(m);
+        return c;
+    }
+
+    /** The region: a faint sphere at the centre; every galaxy inside it passes the filters. */
+    _buildRegion() {
+        const mat = new THREE.ShaderMaterial({
+            uniforms: { uColor: { value: new THREE.Color('#1fc2c9') } },
+            vertexShader: `varying vec3 vN; varying vec3 vV;
+                void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+            fragmentShader: `uniform vec3 uColor; varying vec3 vN; varying vec3 vV;
+                void main(){ float f = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a = 0.025 + pow(f, 3.0) * 0.38; gl_FragColor = vec4(uColor * a, a); }`,
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+        });
+        const shell = new THREE.Mesh(new THREE.SphereGeometry(REGION_R, 64, 40), mat);
+        shell.raycast = () => {};
+        // an equator ring, to read the sphere's size against the floor
+        const pts = Array.from({ length: 160 }, (_, i) => { const t = (i / 160) * Math.PI * 2; return new THREE.Vector3(Math.cos(t) * REGION_R, 0, Math.sin(t) * REGION_R); });
+        const equator = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x5fe0e6, transparent: true, opacity: 0.35 }));
+        equator.raycast = () => {};
+        this.region = new THREE.Group();
+        this.region.add(shell, equator, this._glowSprite('#1fc2c9', 60, 0.18));
+        this.scene.add(this.region);
 
         this.portalLabel = el('div', 'cls-portal');
         this.labels.appendChild(this.portalLabel);
@@ -327,25 +423,34 @@ export class ClassifierScene {
             const e = this.galaxies.get(galaxy.id);
             const sig = galaxy.members.map((m) => m.id).join(',');
             if (e && e.sig === sig) { e.galaxy = galaxy; this._styleGalaxy(e); continue; }
-            if (e) this._removeGalaxy(galaxy.id, e, true);
+            if (e) this._removeGalaxy(galaxy.id, e);
             this._addGalaxy(galaxy, sig, e?.pos);
         }
 
-        // cards for items no longer in the pool
-        const itemIds = new Set(model.galaxies.flatMap((g) => g.members.map((m) => m.id)));
-        for (const [id, card] of this.cards) if (!itemIds.has(id)) { card.remove(); this.cards.delete(id); }
-
-        // layout (warm start from where things are heading)
-        const previous = new Map();
-        for (const [id, e] of this.stars) if (e.target) previous.set(id, e.target.toArray());
-        for (const [id, e] of this.galaxies) if (e.target) previous.set(id, e.target.toArray());
-        const positions = layout(model, previous, previous.size ? 120 : 260);
-        for (const [id, p] of positions) {
-            const e = this.stars.get(id) ?? this.galaxies.get(id);
-            if (!e) continue;
-            const fresh = !e.target;
-            e.target = new THREE.Vector3(...p);
-            if (fresh && !e.pos) e.pos = e.target.clone();
+        // layout, only when the topology changed (stars, roles, which galaxies, who passes):
+        // otherwise everything stays exactly where it is. Warm start from where things are.
+        const topo = [
+            ...model.stars.map((st) => `${st.id}:${st.role}:${st.collapsed ? 1 : 0}`),
+            ...shown.map((g) => `${g.id}:${g.passes ? 1 : 0}:${g.members.length}`),
+        ].join('|');
+        const missing = [...this.stars.values(), ...this.galaxies.values()].some((e) => !e.target);
+        let positions = null;
+        if (topo !== this._topoKey || missing) {
+            this._topoKey = topo;
+            const previous = new Map();
+            for (const [id, e] of this.stars) if (e.target) previous.set(id, e.target.toArray());
+            for (const [id, e] of this.galaxies) if (e.target) previous.set(id, e.target.toArray());
+            positions = layout(model, previous, previous.size ? 120 : 260);
+            for (const [id, p] of positions) {
+                const e = this.stars.get(id) ?? this.galaxies.get(id);
+                if (!e) continue;
+                const target = new THREE.Vector3(...p);
+                if (!e.pos) { e.pos = target.clone(); e.target = target; continue; }
+                if (e.target && e.target.distanceToSquared(target) < 0.01) continue;
+                e.target = target;
+                e.from = e.pos.clone(); // glide there
+                e.t = 0;
+            }
         }
 
         // links
@@ -368,7 +473,18 @@ export class ClassifierScene {
 
         this._applyHighlight();
         // fit once there's real content (the first update can arrive before the pool does)
-        if (!this._fitted && model.total > 0) this._fit(positions);
+        if (!this._fitted && model.total > 0 && positions) this._fit(positions);
+    }
+
+    /** Frame everything (the panel's ⌂ button): fly to a view that fits every body. */
+    fit() {
+        let radius = 60;
+        for (const e of [...this.stars.values(), ...this.galaxies.values()]) if (e.target) radius = Math.max(radius, e.target.length() + (e.radius ?? 10));
+        const dir = new THREE.Vector3(0, 0.95, 1).normalize();
+        const fov = (this.camera.fov * Math.PI) / 180;
+        const distance = Math.min(1400, (radius * 1.05) / Math.sin(fov / 2));
+        this._flyTo(new THREE.Vector3(0, 0, 0), distance);
+        this._fly.toPos = dir.multiplyScalar(distance); // from above, whatever the current angle
     }
 
     /** Point the camera at the whole scene from above, at a distance that fits it. */
@@ -386,13 +502,11 @@ export class ClassifierScene {
 
     _addStar(star) {
         const group = new THREE.Group();
-        const core = new THREE.Mesh(this.shared.sphere, new THREE.MeshBasicMaterial({ color: star.color }));
-        core.scale.setScalar(5);
-        const ring = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: star.color, transparent: true, opacity: 0.9 }));
-        ring.scale.setScalar(10);
+        // the star itself: a medallion showing what it is (a source, a city, a type, ...)
+        const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._iconTexture(starIconKey(star)), color: star.color, transparent: true, depthWrite: false }));
+        core.scale.setScalar(16);
+        core.renderOrder = 2;
         const glow = this._glowSprite(star.color, 46, 0.75);
-        const ring2 = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: star.color, transparent: true, opacity: 0.3 }));
-        ring2.scale.setScalar(14);
         const ping = new THREE.Mesh(this.shared.ring, new THREE.MeshBasicMaterial({ color: star.color, transparent: true, opacity: 0 }));
         ping.rotation.x = Math.PI / 2;
         const spark = this._glowSprite('#ffffff', 5, 0.9);
@@ -402,7 +516,7 @@ export class ClassifierScene {
         const sigilInner = this._sigilLayer(this.shared.sigilInner);
         sigil.add(sigilOuter, sigilInner);
         sigil.position.y = -4;
-        group.add(core, ring, ring2, ping, spark, glow, sigil);
+        group.add(glow, sigil, ping, spark, core);
         core.userData.star = star.id;
         this.scene.add(group);
 
@@ -413,7 +527,7 @@ export class ClassifierScene {
         label.addEventListener('contextmenu', (ev) => { ev.preventDefault(); this.onStarContext(this.stars.get(star.id)?.star); });
         this.labels.appendChild(label);
 
-        const e = { star, group, core, ring, ring2, ping, spark, glow, sigil, sigilOuter, sigilInner, label, pos: null, target: null, phase: Math.random() * Math.PI * 2 };
+        const e = { star, group, core, ping, spark, glow, sigil, sigilOuter, sigilInner, label, pos: null, target: null, from: null, t: 1, phase: Math.random() * Math.PI * 2 };
         this.stars.set(star.id, e);
         return e;
     }
@@ -422,8 +536,8 @@ export class ClassifierScene {
         e.star = star;
         const color = new THREE.Color(star.color);
         e.core.material.color.copy(color);
-        e.ring.material.color.copy(color);
-        e.ring2.material.color.copy(color);
+        const iconTex = this._iconTexture(starIconKey(star));
+        if (e.core.material.map !== iconTex) { e.core.material.map = iconTex; e.core.material.needsUpdate = true; }
         e.glow.material.color.copy(color);
         const active = star.role !== 'off';
         // the role, never the colour: a sigil and a ping in the role's colour
@@ -434,8 +548,7 @@ export class ClassifierScene {
             e.sigilInner.material.color.set(roleColor);
             e.ping.material.color.set(roleColor);
         }
-        e.ring.material.opacity = active ? 0.85 : 0.35;
-        e.ring2.visible = star.role !== 'exclude';
+        e.core.material.opacity = active ? 1 : 0.7;
         e.spark.visible = star.role !== 'exclude';
         e.ping.visible = star.role === 'include' || star.role === 'seal';
         e.glow.scale.setScalar(star.collapsed ? 80 : active ? 58 : 40);
@@ -448,7 +561,7 @@ export class ClassifierScene {
 
     _removeStar(id, e) {
         this.scene.remove(e.group);
-        for (const o of [e.core, e.ring, e.ring2, e.ping, e.spark, e.glow, e.sigilOuter, e.sigilInner]) o.material.dispose();
+        for (const o of [e.core, e.ping, e.spark, e.glow, e.sigilOuter, e.sigilInner]) o.material.dispose();
         e.label.remove();
         this.stars.delete(id);
     }
@@ -468,17 +581,20 @@ export class ClassifierScene {
         group.add(body, glow);
 
         const members = new Map();
-        const offsets = spherePoints(galaxy.members.length, r * 2.4 + 12);
+        const offsets = spherePoints(galaxy.members.length, r * 2.4 + 16);
         galaxy.members.forEach((item, i) => {
-            // a small trading card in the item's matter color, always facing the camera
-            const card = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._cardTexture(item.color), transparent: true }));
-            card.scale.set(5.6, 7.9, 1);
+            // the adventure's card (cover image and all), always facing the camera; drawn
+            // the first time its galaxy opens up
+            const card = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.shared.placeholder, transparent: true }));
+            card.scale.set(CARD_W, CARD_H, 1);
+            card.position.copy(offsets[i]);
             card.userData.item = item.id;
             card.visible = false;
-            const halo = this._glowSprite(item.color, 16, 0.45);
+            const halo = this._glowSprite(item.color, 20, 0.45);
+            halo.position.copy(offsets[i]);
             halo.visible = false;
             group.add(halo, card);
-            members.set(item.id, { item, card, halo, offset: offsets[i] });
+            members.set(item.id, { item, card, halo, offset: offsets[i], canvas: null, tex: null, sig: '', k: 1 });
         });
         this.scene.add(group);
 
@@ -487,7 +603,7 @@ export class ClassifierScene {
         label.addEventListener('click', () => this._flyToGalaxy(galaxy.id));
         this.labels.appendChild(label);
 
-        const e = { galaxy, sig, group, body, glow, label, members, pos: pos ? pos.clone() : null, target: null, expanded: false, color, radius: r };
+        const e = { galaxy, sig, group, body, glow, label, members, pos: pos ? pos.clone() : null, target: null, from: null, t: 1, expanded: false, wind: 0, open: 0, color, radius: r };
         this.galaxies.set(galaxy.id, e);
         this._styleGalaxy(e);
         return e;
@@ -499,6 +615,7 @@ export class ClassifierScene {
         e.glow.material.opacity = g.passes ? 0.7 : 0.18;
         for (const m of e.members.values()) {
             m.item = g.members.find((x) => x.id === m.item.id) ?? m.item;
+            if (m.canvas && this._cardSig(m.item) !== m.sig) this._drawCard(m); // edited: show it now
             m.card.material.opacity = g.passes ? 1 : 0.35;
             m.card.material.color.setScalar(g.passes ? 1 : 0.55);
             m.halo.material.opacity = g.passes ? 0.45 : 0.08;
@@ -509,42 +626,15 @@ export class ClassifierScene {
         e.label.title = `${g.members.length} adventure${g.members.length === 1 ? '' : 's'}${names.length ? ': ' + names.join(' ∩ ') : ' (no visible links)'}${g.passes ? '' : ' (filtered out)'}\nClick to fly in`;
     }
 
-    _removeGalaxy(id, e, keepCards = false) {
+    _removeGalaxy(id, e) {
         this.scene.remove(e.group);
         e.body.material.dispose(); e.glow.material.dispose();
         for (const m of e.members.values()) {
-            m.card.material.dispose(); m.halo.material.dispose();
-            if (!keepCards) { this.cards.get(m.item.id)?.remove(); this.cards.delete(m.item.id); }
+            m.card.material.dispose(); m.halo.material.dispose(); m.tex?.dispose();
+            for (const c of this.covers.values()) c.waiting.delete(m);
         }
         e.label.remove();
         this.galaxies.delete(id);
-    }
-
-    _card(item) {
-        let card = this.cards.get(item.id);
-        if (card) return card;
-        card = el('div', 'cls-card');
-        card.style.setProperty('--c', item.color);
-        const inner = el('div', 'cls-card-inner');
-        const img = el('div', 'cls-card-img');
-        const src = safeUrl(item.cover_url);
-        if (src) {
-            const i = document.createElement('img');
-            i.alt = ''; i.loading = 'lazy'; i.decoding = 'async'; i.referrerPolicy = 'no-referrer';
-            i.onerror = () => i.remove();
-            i.src = src;
-            img.appendChild(i);
-        }
-        const stage = stageOf(item);
-        inner.append(el('div', 'cls-card-banner', item.title), img, el('div', 'cls-card-strip', `★ ${stage ? stage.matter : 'matter'}`));
-        card.append(inner);
-        card.addEventListener('click', (ev) => { ev.stopPropagation(); this.onSelect(item.id); });
-        card.addEventListener('mouseenter', () => this.onHover(item.id));
-        card.addEventListener('mouseleave', () => this.onHover(null));
-        card.style.display = 'none';
-        this.labels.appendChild(card);
-        this.cards.set(item.id, card);
-        return card;
     }
 
     /* ------------------------------------------------------------------ */
@@ -579,10 +669,9 @@ export class ClassifierScene {
             for (const [id, m] of e.members) {
                 const sel = id === this.selectedId, hov = id === this.hoveredId;
                 const k = sel ? 1.55 : hov ? 1.28 : 1;
-                m.card.scale.set(5.6 * k, 7.9 * k, 1);
-                m.halo.scale.setScalar(sel ? 34 : hov ? 24 : 16);
-                const card = this.cards.get(id);
-                if (card) { card.classList.toggle('selected', sel); card.classList.toggle('hover', hov); }
+                m.k = k; // applied each frame, with the cluster's burst (_frame)
+                m.card.renderOrder = sel ? 3 : hov ? 2 : 0;
+                m.haloSize = sel ? 40 : hov ? 30 : 20;
             }
         }
     }
@@ -663,6 +752,14 @@ export class ClassifierScene {
     /*  Frame                                                              */
     /* ------------------------------------------------------------------ */
 
+    /** Move a body along its glide to its target (eased), or keep it there. */
+    _glide(e, dt) {
+        if (!e.from) { if (e.target) e.pos.copy(e.target); return; }
+        e.t = Math.min(1, e.t + dt / GLIDE_S);
+        e.pos.lerpVectors(e.from, e.target, easeInOut(e.t));
+        if (e.t >= 1) e.from = null;
+    }
+
     /** Project a world point to panel pixels; null when behind the camera. */
     _screen(p) {
         this._v.copy(p).project(this.camera);
@@ -683,8 +780,6 @@ export class ClassifierScene {
         const dt = Math.min((now - this._last) / 1000, 0.1);
         this._last = now;
         this.time += dt;
-        const k = Math.min(1, dt * 3);
-
         if (this._fly) {
             const t = Math.min(1, (now - this._fly.t0) / FLY_MS);
             const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -700,22 +795,15 @@ export class ClassifierScene {
         this.motes.geometry.attributes.position.needsUpdate = true;
         this.floor.rotation.y += dt * 0.01;
 
-        // portal
-        this.portal.ring.rotation.z += dt * 0.6;
-        this.portal.ring2.rotation.z -= dt * 0.35;
-        this.portalSwirl.rotation.y += dt * 0.9;
-        this._place(this.portalLabel, new THREE.Vector3(0, 22, 0));
+        // the region's count, over the top of the sphere
+        this._place(this.portalLabel, new THREE.Vector3(0, REGION_R + 12, 0));
         this.portalLabel.textContent = `${this.passCount} / ${this.total} pass`;
 
         // stars
         for (const e of this.stars.values()) {
             if (!e.pos) continue;
-            e.pos.lerp(e.target, k);
+            this._glide(e, dt);
             e.group.position.copy(e.pos);
-            e.ring.rotation.x = this.time * 0.8;
-            e.ring.rotation.y = this.time * 0.5;
-            e.ring2.rotation.x = -this.time * 0.5 + 1;
-            e.ring2.rotation.z = this.time * 0.3;
             const sa = this.time * 1.6 + e.phase;
             e.spark.position.set(Math.cos(sa) * 12, Math.sin(sa * 0.7) * 4, Math.sin(sa) * 12);
             const pf = ((this.time * 0.4 + e.phase) % 1);
@@ -726,54 +814,40 @@ export class ClassifierScene {
             this._place(e.label, e.pos.clone().add(new THREE.Vector3(0, 14, 0)));
         }
 
-        // galaxies + level of detail
+        // galaxies + level of detail (cards hold still: they move only with the topology)
         const cam = this.camera.position;
-        const cardCandidates = [];
         for (const e of this.galaxies.values()) {
             if (!e.pos) continue;
-            e.pos.lerp(e.target, k);
-            const bob = Math.sin(this.time * 0.7 + e.radius) * 1.5;
-            e.group.position.set(e.pos.x, e.pos.y + bob, e.pos.z);
+            this._glide(e, dt);
+            e.group.position.copy(e.pos);
             const dist = cam.distanceTo(e.group.position);
             const hasSelected = this.selectedId != null && e.members.has(this.selectedId);
-            const expanded = e.members.size === 1 || hasSelected || dist < EXPAND_BASE + e.radius * 8;
-            e.expanded = expanded;
+            const want = e.members.size === 1 || hasSelected || dist < EXPAND_BASE + e.radius * 8;
+            // burst: the cards fly out of the cluster (or gather back into it), eased
+            e.wind = want ? Math.min(1, e.wind + dt / BURST_S) : Math.max(0, e.wind - dt / BURST_S);
+            const open = e.wind * e.wind * (3 - 2 * e.wind);
+            e.open = open;
+            e.expanded = open > 0.5; // what clicks hit: the cards once they're mostly out
 
-            e.body.visible = !expanded;
-            e.glow.material.opacity = (expanded ? 0.15 : 0.9) * (e.galaxy.passes ? 1 : 0.3);
-            const spin = this.time * 0.15;
-            const cos = Math.cos(spin), sin = Math.sin(spin);
+            const passes = e.galaxy.passes ? 1 : 0.3;
+            e.body.visible = open < 0.99;
+            e.body.scale.setScalar(e.radius * (1 - 0.85 * open));
+            e.body.material.opacity = (e.galaxy.passes ? 0.85 : 0.22) * (1 - open);
+            e.glow.material.opacity = (0.9 - 0.75 * open) * passes;
             for (const m of e.members.values()) {
-                m.card.visible = expanded;
-                m.halo.visible = expanded;
-                if (!expanded) continue;
-                const o = m.offset;
-                m.card.position.set(o.x * cos - o.z * sin, o.y, o.x * sin + o.z * cos);
+                const shown = open > 0.01;
+                m.card.visible = m.halo.visible = shown;
+                if (!shown) continue;
+                if (!m.canvas) this._drawCard(m);
+                m.card.position.copy(m.offset).multiplyScalar(open);
                 m.halo.position.copy(m.card.position);
-                const world = m.card.position.clone().add(e.group.position);
-                const d = cam.distanceTo(world);
-                if (m.item.id === this.selectedId || d < CARD_DISTANCE) cardCandidates.push({ m, world, d, passes: e.galaxy.passes });
+                const s = 0.2 + 0.8 * open;
+                m.card.scale.set(CARD_W * m.k * s, CARD_H * m.k * s, 1);
+                m.halo.scale.setScalar((m.haloSize ?? 20) * s);
             }
-            const showCount = !expanded && e.members.size > 1;
+            const showCount = open < 0.5 && e.members.size > 1;
             this._place(e.label, e.group.position.clone().add(new THREE.Vector3(0, -e.radius - 4, 0)), showCount);
         }
-
-        // cards: nearest first, capped; the selected one always shows
-        cardCandidates.sort((a, b) => (b.m.item.id === this.selectedId) - (a.m.item.id === this.selectedId) || a.d - b.d);
-        const shown = new Set();
-        cardCandidates.slice(0, MAX_CARDS).forEach(({ m, world, d, passes }, i) => {
-            const card = this._card(m.item);
-            const s = this._place(card, world.clone().add(new THREE.Vector3(0, 6, 0)));
-            if (!s) return;
-            const scale = Math.max(0.45, Math.min(1.1, 70 / d));
-            card.style.transform += ` scale(${scale.toFixed(3)}) translateY(-60%)`;
-            card.style.zIndex = String(1000 - i);
-            card.classList.toggle('dim', !passes);
-            card.classList.toggle('selected', m.item.id === this.selectedId);
-            card.classList.toggle('hover', m.item.id === this.hoveredId);
-            shown.add(m.item.id);
-        });
-        for (const [id, card] of this.cards) if (!shown.has(id)) card.style.display = 'none';
 
         // links follow their ends
         const attr = this.linkGeo.getAttribute('position');
@@ -808,7 +882,8 @@ export class ClassifierScene {
             if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
         });
         for (const v of Object.values(this.shared)) v.dispose?.();
-        for (const t of this._cardTex?.values() ?? []) t.dispose();
+        for (const t of this._iconTex.values()) t.dispose();
+        this.covers.clear();
         this.renderer.dispose();
         this.container.remove();
     }

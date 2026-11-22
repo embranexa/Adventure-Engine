@@ -3,31 +3,151 @@ import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { ADVENTURE_TYPES } from '../../lifecycle.js';
 import { confirmHere } from '../../lib/windows.js';
+import { weekday } from '../../lib/occurrences.js';
+import { PLACE_PLACEHOLDER, coordsText, readPlace } from '../../lib/places.js';
 
-/** ISO time -> value for <input type="datetime-local"> (local time). @param {string | null} iso */
-function toLocalInput(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    const p = (/** @type {number} */ n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+const pad2 = (/** @type {number} */ n) => String(n).padStart(2, '0');
+/** Date -> "2026-11-20" (local). @param {Date} d */
+const dayText = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+/** "2026-11-20" + minutes since midnight (local) -> ISO. @param {string} day @param {number} minutes */
+function isoAt(day, minutes) {
+    const [y, m, d] = day.split('-').map(Number);
+    return new Date(y, m - 1, d, 0, minutes).toISOString();
+}
+/** Minutes since local midnight, snapped to a quarter hour. @param {Date} d */
+const quarter = (d) => Math.round((d.getHours() * 60 + d.getMinutes()) / 15) * 15;
+const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
+/**
+ * A 24-hour time: hour and quarter-hour selects. `allowMidnightEnd` adds 24:00 (an end at
+ * midnight). Value and onChange are minutes since midnight.
+ * @param {{ value: number, onChange: (minutes: number) => void, allowMidnightEnd?: boolean, label: string }} props
+ */
+function TimeInput({ value, onChange, allowMidnightEnd = false, label }) {
+    const h = Math.floor(value / 60), m = value % 60;
+    const hours = Array.from({ length: allowMidnightEnd ? 25 : 24 }, (_, i) => i);
+    return html`
+        <span className="ae-time" aria-label=${label}>
+            <select value=${h} onChange=${(/** @type {any} */ e) => { const nh = Number(e.target.value); onChange(nh * 60 + (nh === 24 ? 0 : m)); }}>
+                ${hours.map((x) => html`<option key=${x} value=${x}>${pad2(x)}</option>`)}
+            </select>
+            <b>:</b>
+            <select value=${m} disabled=${h === 24} onChange=${(/** @type {any} */ e) => onChange(h * 60 + Number(e.target.value))}>
+                ${[0, 15, 30, 45].map((x) => html`<option key=${x} value=${x}>${pad2(x)}</option>`)}
+            </select>
+        </span>
+    `;
 }
 
-/** <input type="datetime-local"> value (local time) -> ISO with offset, or null. @param {string} value */
-function fromLocalInput(value) {
-    if (!value) return null;
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
+/**
+ * When an event happens: one-off or weekly; timed (24-hour clock, quarter hours) or whole
+ * days. Every change saves at once.
+ * @param {{ adventure: PoolItem & { kind: 'adventure' }, crawled: boolean, save: (changes: AdventureChanges) => Promise<string | null> }} props
+ */
+function WhenEditor({ adventure, crawled, save }) {
+    const own = adventure.own;
+    const start = adventure.start ? new Date(adventure.start) : null;
+    const end = adventure.end ? new Date(adventure.end) : null;
+    const allDay = Boolean(adventure.all_day);
+    const rule = adventure.recurrence;
+    const weeklyOn = Boolean(rule);
+    const today = new Date();
+    const startDay = start ? dayText(start) : '';
+    const endDay = end ? dayText(end) : startDay;
+    const startMin = start ? quarter(start) : 18 * 60;
+    let endMin = end ? quarter(end) : startMin + 60;
+    if (end && start && dayText(end) !== dayText(start) && quarter(end) === 0) endMin = 24 * 60; // ends at midnight
+    const overridden = own.start != null || own.end != null || own.all_day != null || own.recurrence != null;
 
-/** @param {number | null} lat @param {number | null} lon */
-const coordsText = (lat, lon) => (lat != null && lon != null ? `${lat}, ${lon}` : '');
+    /** Save a full description of the when (so every part agrees). */
+    const commit = (/** @type {{ day?: string, endDay?: string, startMin?: number, endMin?: number, allDay?: boolean, days?: number[] | null, until?: string | null }} */ next) => {
+        const v = { day: startDay || dayText(today), endDay, startMin, endMin, allDay, days: rule?.days ?? null, until: rule?.until ?? null, ...next };
+        /** @type {AdventureChanges} */
+        const changes = { all_day: v.allDay };
+        if (v.allDay) {
+            const last = v.endDay && v.endDay >= v.day ? v.endDay : v.day;
+            changes.start_time = isoAt(v.day, 0);
+            changes.end_time = isoAt(last, 0);
+        } else {
+            changes.start_time = isoAt(v.day, v.startMin);
+            // timed: the end is on the start's day (or the next, when it's earlier or 24:00)
+            const endDate = v.days || !v.endDay || v.endDay < v.day ? v.day : v.endDay;
+            let endIso = isoAt(endDate, v.endMin);
+            if (new Date(endIso) <= new Date(changes.start_time)) endIso = isoAt(v.day, v.endMin + (v.endMin <= v.startMin ? 24 * 60 : 0));
+            changes.end_time = endIso;
+        }
+        changes.recurrence = v.days && v.days.length ? { days: v.days, until: v.until || null } : null;
+        if (!own.timezone) changes.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        return save(changes);
+    };
 
-/** "34.05, -118.25" -> [lat, lon]; '' -> [null, null]; null if unreadable. @param {string} text */
-function parseCoords(text) {
-    if (!text.trim()) return [null, null];
-    const m = text.trim().match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
-    return m ? [Number(m[1]), Number(m[2])] : null;
+    const setWeekly = (/** @type {boolean} */ on) => {
+        if (on === weeklyOn) return;
+        const first = startDay ? new Date(startDay + 'T00:00') : today;
+        commit({ days: on ? [weekday(first)] : null, until: null });
+    };
+    const toggleDay = (/** @type {number} */ d) => {
+        const days = new Set(rule?.days ?? []);
+        if (days.has(d)) days.delete(d); else days.add(d);
+        if (!days.size) return; // at least one day
+        commit({ days: [...days].sort((a, b) => a - b) });
+    };
+
+    return html`
+        <div className="ae-when">
+            <div className="ae-label">
+                When
+                ${crawled && overridden && html`<em title="Set by hand; the source says otherwise">edited</em>`}
+                ${crawled && overridden && html`<button type="button" className="ae-reset" title="Back to the source's time"
+                    onClick=${() => save({ start_time: null, end_time: null, all_day: null, recurrence: null })}>↺</button>`}
+            </div>
+            <div className="ae-when-modes">
+                <div className="ae-seg" role="radiogroup" aria-label="Repeats">
+                    <button type="button" className=${!weeklyOn ? 'on' : ''} onClick=${() => setWeekly(false)}>One-off</button>
+                    <button type="button" className=${weeklyOn ? 'on' : ''} onClick=${() => setWeekly(true)} disabled=${crawled}
+                        title=${crawled ? 'Crawled events happen once' : 'Repeats every week'}>Weekly</button>
+                </div>
+                <div className="ae-seg" role="radiogroup" aria-label="Timed or whole days">
+                    <button type="button" className=${!allDay ? 'on' : ''} onClick=${() => allDay && commit({ allDay: false })}>Timed</button>
+                    <button type="button" className=${allDay ? 'on' : ''} onClick=${() => !allDay && commit({ allDay: true })}>All day</button>
+                </div>
+            </div>
+            ${weeklyOn && html`
+                <div className="ae-days" role="group" aria-label="Weekdays">
+                    ${WEEKDAYS.map((name, d) => html`
+                        <button key=${d} type="button" className=${rule?.days.includes(d) ? 'on' : ''} onClick=${() => toggleDay(d)}>${name}</button>
+                    `)}
+                </div>
+            `}
+            <div className="ae-when-grid">
+                <span>${weeklyOn ? 'From' : allDay ? 'First day' : 'Starts'}</span>
+                <span className="ae-when-row">
+                    <input type="date" value=${startDay} onChange=${(/** @type {any} */ e) => e.target.value && commit({ day: e.target.value })} />
+                    ${!allDay && html`<${TimeInput} label="Start time" value=${startMin} onChange=${(/** @type {number} */ v) => commit({ startMin: v })} />`}
+                </span>
+                ${!weeklyOn && html`
+                    <span>${allDay ? 'Last day' : 'Ends'}</span>
+                    <span className="ae-when-row">
+                        <input type="date" value=${endDay} min=${startDay} onChange=${(/** @type {any} */ e) => e.target.value && commit({ endDay: e.target.value })} />
+                        ${!allDay && html`<${TimeInput} label="End time" allowMidnightEnd=${true} value=${endMin} onChange=${(/** @type {number} */ v) => commit({ endMin: v })} />`}
+                    </span>
+                `}
+                ${weeklyOn && !allDay && html`
+                    <span>Ends</span>
+                    <span className="ae-when-row"><${TimeInput} label="End time" allowMidnightEnd=${true} value=${endMin} onChange=${(/** @type {number} */ v) => commit({ endMin: v })} /></span>
+                `}
+                ${weeklyOn && html`
+                    <span>Until</span>
+                    <span className="ae-when-row">
+                        <input type="date" value=${rule?.until ?? ''} min=${startDay} onChange=${(/** @type {any} */ e) => commit({ until: e.target.value || null })} />
+                        ${rule?.until && html`<button type="button" className="ae-reset" title="Repeat forever" onClick=${() => commit({ until: null })}>∞</button>`}
+                    </span>
+                `}
+            </div>
+            ${!start && html`<span className="ae-hint">No time yet · pick a date to set one</span>`}
+            ${start && html`<button type="button" className="ae-clear" onClick=${() => save({ start_time: null, end_time: null, all_day: null, recurrence: null })}>Clear time</button>`}
+        </div>
+    `;
 }
 
 /**
@@ -118,30 +238,22 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
         save({ type });
     };
 
-    /** @param {'start_time' | 'end_time'} field @param {string} value */
-    const saveTime = (field, value) => {
-        const iso = fromLocalInput(value);
-        /** @type {AdventureChanges} */
-        const changes = { [field]: iso };
-        if (iso && !own.timezone) changes.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        return save(changes);
+    const [placeNote, setPlaceNote] = useState(/** @type {string | null} */ (null));
+    useEffect(() => setPlaceNote(null), [adventure.id]);
+
+    /** Coordinates as "lat, lon", or a Plus Code (full, or short with a town). @param {string} text */
+    const saveCoords = async (text) => {
+        setSaving(true);
+        const place = await readPlace(text);
+        if ('error' in place) { setSaving(false); setError(place.error); return place.error; }
+        setPlaceNote(place.note);
+        return save({ lat: place.lat, lon: place.lon });
     };
 
-    /** @param {string} text */
-    const saveCoords = (text) => {
-        const coords = parseCoords(text);
-        if (!coords) {
-            const err = 'Write coordinates as "lat, lon", e.g. 34.05, -118.25';
-            setError(err);
-            return Promise.resolve(err);
-        }
-        return save({ lat: coords[0], lon: coords[1] });
-    };
-
-    /** Shared props for a plain text field. @param {'title' | 'description' | 'venue' | 'address' | 'city' | 'url' | 'cover_url'} key */
+    /** Shared props for a plain text field. @param {'title' | 'description' | 'venue' | 'address' | 'city' | 'url' | 'cover_url' | 'costs' | 'rewards'} key */
     const text = (key) => ({
         value: /** @type {string | null} */ (adventure[key]) ?? '',
-        overridden: own[key] != null,
+        overridden: key === 'costs' || key === 'rewards' ? false : own[key] != null,
         crawled,
         onCommit: (/** @type {string} */ v) => save({ [key]: v.trim() || null }),
         onReset: () => save({ [key]: null }),
@@ -170,15 +282,13 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
             <${Field} label="Title" ...${text('title')} autoFocus=${focusTitle} />
             <${Field} label="Description" kind="textarea" placeholder="What is it? Why does it matter?" ...${text('description')} />
 
+            <div className="ae-pair">
+                <${Field} label="Costs" placeholder="What it takes (money, time, gear…)" ...${text('costs')} />
+                <${Field} label="Rewards" placeholder="What you get out of it" ...${text('rewards')} />
+            </div>
+
             ${isEvent && html`
-                <div className="ae-pair">
-                    <${Field} label="Starts" kind="datetime-local" value=${toLocalInput(adventure.start)}
-                        overridden=${own.start != null} crawled=${crawled}
-                        onCommit=${(/** @type {string} */ v) => saveTime('start_time', v)} onReset=${() => save({ start_time: null })} />
-                    <${Field} label="Ends" kind="datetime-local" value=${toLocalInput(adventure.end)}
-                        overridden=${own.end != null} crawled=${crawled}
-                        onCommit=${(/** @type {string} */ v) => saveTime('end_time', v)} onReset=${() => save({ end_time: null })} />
-                </div>
+                <${WhenEditor} adventure=${adventure} crawled=${crawled} save=${save} />
                 ${site
                     ? html`
                         <div className="ae-field">
@@ -195,10 +305,11 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
                         <${Field} label="Address" ...${text('address')} />
                         <div className="ae-pair">
                             <${Field} label="City" ...${text('city')} />
-                            <${Field} label="Coordinates" placeholder="lat, lon" value=${coordsText(adventure.lat, adventure.lon)}
+                            <${Field} label="Coordinates or Plus Code" placeholder=${PLACE_PLACEHOLDER} value=${coordsText(adventure.lat, adventure.lon)}
                                 overridden=${own.lat != null} crawled=${crawled}
-                                onCommit=${saveCoords} onReset=${() => save({ lat: null, lon: null })} />
+                                onCommit=${saveCoords} onReset=${() => { setPlaceNote(null); save({ lat: null, lon: null }); }} />
                         </div>
+                        ${placeNote && html`<span className="ae-hint">⌖ ${placeNote}</span>`}
                     `}
             `}
 

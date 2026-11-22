@@ -19,6 +19,7 @@ purge), see services/transitions.py.
 import asyncio
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -229,6 +230,9 @@ async def set_phase(adventure_id: uuid.UUID, phase: str) -> None:
         if phase not in MANUAL_PHASES and phase != "decommissioned":
             raise InvalidTransition(f"can't move to {phase} by hand")
         _set_phase(adventure, phase)
+        # animus or later by hand: the roadmap counts as finished (services/roadmap.py)
+        if phase in ("consuming", "completed", "decommissioned") and adventure.roadmap and adventure.roadmap.get("actions"):
+            adventure.roadmap = {**adventure.roadmap, "done": [a["id"] for a in adventure.roadmap["actions"]]}
         await session.commit()
     await broadcast_pools()
 
@@ -242,21 +246,26 @@ async def sweep_missed() -> int:
     time, else start time, the adventure's own (set by hand) over its raw event's. Only adventures whose phase was last set
     *before* the event ended count as missed: reviving one afterwards, or passing an
     event that is already over, is a deliberate choice and isn't undone.
+    An all-day event ends after its last day; a weekly one after its `until` day, or never.
     Returns how many moved; broadcasts if any did.
     """
     now = utcnow()
     async with SessionLocal() as session:
         ended_at = func.coalesce(Adventure.end_time, Adventure.start_time, Event.end_time, Event.start_time)
-        missed = (await session.scalars(
-            select(Adventure)
+        candidates = (await session.execute(
+            select(Adventure, ended_at)
             .outerjoin(Event, Adventure.event_id == Event.id)
             .where(
                 Adventure.type.in_(WHEN_WHERE_TYPES),
                 Adventure.phase.in_(PRE_ARENA_PHASES),
-                ended_at < now,
-                Adventure.phase_changed_at < ended_at,
+                ended_at < now,  # the first occurrence is over; refined below
             )
         )).all()
+        missed = []
+        for adventure, first_end in candidates:
+            end = _really_ended(adventure, first_end)
+            if end is not None and end < now and adventure.phase_changed_at < end:
+                missed.append(adventure)
         for adventure in missed:
             adventure.phase_before_kill = adventure.phase
             _set_phase(adventure, "killed")
@@ -268,6 +277,23 @@ async def sweep_missed() -> int:
         log.info("moved %d missed adventure(s) to the Necropolis", len(missed))
         await broadcast_pools()
     return len(missed)
+
+
+def _really_ended(adventure: Adventure, first_end: datetime) -> datetime | None:
+    """When the adventure's event is over (None: never, a weekly event without an end)."""
+    end = first_end
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    if adventure.all_day:
+        end += timedelta(days=1)  # the last day counts
+    rec = adventure.recurrence
+    if rec:
+        until = rec.get("until")
+        if not until:
+            return None
+        # the end of the until day, generously (a day past it in UTC covers every zone)
+        end = max(end, datetime.fromisoformat(until).replace(tzinfo=timezone.utc) + timedelta(days=2))
+    return end
 
 
 async def run_sweeper() -> None:

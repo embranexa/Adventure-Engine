@@ -21,7 +21,7 @@ async def get_objects(session: AsyncSession = Depends(get_session)):
 
 @router.post("/objects")
 async def create_object(payload: ObjectCreate):
-    """A new pillar, site or contact. 422 if a field is invalid."""
+    """A new pillar, site, contact, organization or skill. 422 if a field is invalid."""
     try:
         return await objects.create_object(payload.model_dump(exclude_unset=True) | {"type": payload.type})
     except objects.InvalidObject as e:

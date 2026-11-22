@@ -4,7 +4,7 @@
     events         raw harvested events, unique per (source, api_id), each with a review state
     adventures     the events you kept and hand-made ones, each with a lifecycle phase
                    and an optional action roadmap
-    objects        virtual objects (pillars, sites, contacts) that adventures link to (the Codex)
+    objects        virtual objects (pillars, sites, contacts, organizations, skills) that adventures link to (the Codex)
     adventure_objects  links between adventures and objects
     app_state      small JSON settings that must survive restarts (filters)
     transitions    log of every move between nodes of the signal chain (the twin's packets)
@@ -131,6 +131,11 @@ class Adventure(Base):
     start_time: Mapped[datetime | None] = mapped_column(UTCDateTime)
     end_time: Mapped[datetime | None] = mapped_column(UTCDateTime)
     timezone: Mapped[str | None] = mapped_column(String(64))
+    # whole days: start/end are the first and last day's local midnights (the last day counts)
+    all_day: Mapped[bool | None] = mapped_column(Boolean)
+    # repeats: {"freq": "weekly", "days": [0..6] (Monday = 0), "until": "YYYY-MM-DD" | null};
+    # start/end give the first occurrence (its time of day and length)
+    recurrence: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     venue: Mapped[str | None] = mapped_column(String(500))  # free text for now (venue objects later)
     address: Mapped[str | None] = mapped_column(String(500))
     city: Mapped[str | None] = mapped_column(String(200))
@@ -138,6 +143,8 @@ class Adventure(Base):
     lon: Mapped[float | None] = mapped_column(Float)
     url: Mapped[str | None] = mapped_column(Text)
     cover_url: Mapped[str | None] = mapped_column(Text)
+    costs: Mapped[str | None] = mapped_column(Text)    # free text for now (the Entropy Market later)
+    rewards: Mapped[str | None] = mapped_column(Text)
     phase: Mapped[str] = mapped_column(String(20), default="queued")
     phase_before_kill: Mapped[str | None] = mapped_column(String(20))  # restored on revive
     stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # set by hand (HP, ATK, ...)
@@ -148,12 +155,12 @@ class Adventure(Base):
 
 
 # Virtual objects (the Codex): things adventures link to. Only sites have a location.
-OBJECT_TYPES = ("pillar", "site", "contact")
+OBJECT_TYPES = ("pillar", "site", "contact", "organization", "skill")
 GEO_OBJECT_TYPES = ("site",)
 
 
 class VirtualObject(Base):
-    """A pillar, site or contact that adventures link to (see services/objects.py)."""
+    """A pillar, site, contact, organization or skill that adventures link to (see services/objects.py)."""
 
     __tablename__ = "objects"
 

@@ -45,7 +45,7 @@ before committing (leave the user's own files out: see Gotchas).
 **Gotchas met so far:**
 - The headless screenshot copies the WebGL canvas over the page, which hides HTML labels;
   take a second shot without it if labels matter.
-- The twin's canvas is opaque now (bloom needs it); don't go back to a transparent clear.
+- The twin's canvas was opaque for bloom; with bloom removed it's transparent again (the panel's glass shows through), and the ground plane is gone.
 - `git add` by name; never `git add -A` (the user's `resources/19hz.ipynb`,
   `resources/upgrades.md` stay out).
 - The user's server auto-reloads on backend changes only; frontend edits need a hard

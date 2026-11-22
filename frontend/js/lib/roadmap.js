@@ -8,7 +8,7 @@
 //     A1 --> A4[Ask Sam]             (a bare id reuses the title given elsewhere)
 //     A5[Something on its own]
 
-import { MAIN_ROUTE } from '../lifecycle.js';
+import { MAIN_ROUTE, PHASE_STAGES } from '../lifecycle.js';
 
 /** @type {Roadmap} */
 export const EMPTY_ROADMAP = { actions: [], edges: [], done: [] };
@@ -297,6 +297,21 @@ export function isValidId(id) {
 }
 
 // --- lifecycle ---
+
+/**
+ * The colours of a roadmap's actions, from its adventure's matter (the user's rule):
+ * distillate (still distilling actions): everything yellow; alloy (building): incomplete
+ * actions orange, complete ones red; animus, artifact, relic (and the rest): every action
+ * in that matter's colour. The server moves the phase as actions are completed
+ * (backend/services/roadmap.py), so the colours follow.
+ * @param {Phase} phase @returns {{ todo: string, done: string }}
+ */
+export function roadmapColors(phase) {
+    if (phase === 'constructing') return { todo: PHASE_STAGES.constructing.color, done: PHASE_STAGES.consuming.color };
+    if (phase === 'consuming' || phase === 'completed') return { todo: PHASE_STAGES[phase].color, done: PHASE_STAGES[phase].color };
+    if (phase === 'decommissioned' || phase === 'killed') return { todo: PHASE_STAGES[phase].light, done: PHASE_STAGES[phase].light };
+    return { todo: PHASE_STAGES.decomposing.color, done: PHASE_STAGES.decomposing.color };
+}
 
 /**
  * The phase a completed roadmap promotes its adventure to (next on the main route),

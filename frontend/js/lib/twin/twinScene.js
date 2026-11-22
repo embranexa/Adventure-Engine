@@ -47,7 +47,6 @@ import { makeSelection } from './selection.js';
 const NET_Y = 0;
 const CORE_Y = 0;
 const GALLERY_Y = 0;
-const GROUND = 0x07080b;  // the twin's own dark floor (an opaque canvas)
 const MACHINE_SCALE = 1.5;
 /** Rows that fill a heart: each zone has its own scale (raw events are bulk, adventures refined). */
 const CAP = { net: 120, core: 12 };
@@ -108,9 +107,9 @@ export class TwinScene {
         this.container = el('div', 'twin-root');
         parent.appendChild(this.container);
 
-        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         this.renderer.setPixelRatio(Math.min(this.view.devicePixelRatio || 1, 2));
-        this.renderer.setClearColor(GROUND, 1);
+        this.renderer.setClearColor(0x000000, 0); // transparent: the panel's glass shows through, like the other scenes
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.05;
         this.container.appendChild(this.renderer.domElement);
@@ -152,7 +151,6 @@ export class TwinScene {
         /** reduced motion: mechanisms and turning circles stand still (slugs still run) */
         this.calm = this.view.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null;
         this.zones = null;   // built with the machines (they need the layout)
-        this.scene.add(this._buildStage());
 
         this.machineGroup = new THREE.Group();
         this.scene.add(this.machineGroup);
@@ -196,25 +194,6 @@ export class TwinScene {
     /* ------------------------------------------------------------------ */
     /*  Assets and the stage                                               */
     /* ------------------------------------------------------------------ */
-
-    /** The ground: a dark floor, lighter under the machines. Zones are built with the machines. */
-    _buildStage() {
-        const c = document.createElement('canvas');
-        c.width = c.height = 512;
-        const g = c.getContext('2d');
-        const grad = g.createRadialGradient(256, 256, 0, 256, 256, 256);
-        grad.addColorStop(0, '#13151a');
-        grad.addColorStop(1, '#07080b');
-        g.fillStyle = grad;
-        g.fillRect(0, 0, 512, 512);
-        const tex = new THREE.CanvasTexture(c);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(1800, 1800), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, metalness: 0.25, envMapIntensity: 0.35 }));
-        ground.rotation.x = -Math.PI / 2;
-        ground.position.set(-40, -0.05, -30);
-        ground.raycast = () => {};
-        return ground;
-    }
 
     /** The zones' walls, corners, floors and plaques, around where the machines stand. */
     _buildZones(nodes) {

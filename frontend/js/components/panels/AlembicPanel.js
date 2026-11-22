@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import {
-    addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, toggleDone, toggleLink,
+    addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, roadmapColors, toggleDone, toggleLink,
 } from '../../lib/roadmap.js';
 import { PromoteButton } from '../PromoteButton.js';
 import { focusedWindow } from '../../lib/windows.js';
@@ -129,7 +129,7 @@ export function AlembicPanel() {
         // ?v= forces one fresh download past a copy cached before the server sent
         // Cache-Control: no-cache (a hard reload doesn't bypass the cache for lazy imports).
         // @ts-ignore -- the query string hides the module's path from the type checker
-        import('../../lib/alembicScene.js?v=2')
+        import('../../lib/alembicScene.js?v=3')
             .then(({ AlembicScene }) => {
                 if (disposed || !hostRef.current) return;
                 sceneRef.current = new AlembicScene(hostRef.current, {
@@ -149,11 +149,14 @@ export function AlembicPanel() {
         };
     }, []);
 
+    // the actions' colours follow the adventure's matter (roadmapColors)
+    const colors = roadmapColors(adventure?.phase ?? 'decomposing');
     useEffect(() => {
         if (!sceneRef.current) return;
+        sceneRef.current.setColors(colors.todo, colors.done);
         sceneRef.current.update(analysis, { selectedId: selected, linkFromId: linkFrom, refit });
         shownId.current = adventure?.id ?? null;
-    }, [analysis, selected, linkFrom, status, adventure?.id]);
+    }, [analysis, selected, linkFrom, status, adventure?.id, colors.todo, colors.done]);
 
     // finishing the last action makes every still flare
     const wasComplete = useRef({ id: /** @type {string | null} */ (null), complete: false });
@@ -187,8 +190,11 @@ export function AlembicPanel() {
     const pct = analysis.total ? Math.round((analysis.doneCount / analysis.total) * 100) : 0;
 
     return html`
-        <div className="panel-body alembic">
+        <div className="panel-body alembic" style=${{ '--todo': colors.todo, '--done': colors.done }}>
             <div className="alm-host" ref=${hostRef}></div>
+            ${status === 'ready' && analysis.actions.length > 0 && html`
+                <button className="btn view-home" title="Frame everything" onClick=${() => sceneRef.current?.fit(analysis)}>⌂</button>
+            `}
 
             ${status !== 'ready' && html`
                 <div className="map-status">${status === 'loading' ? 'Heating the Alembic…' : 'Alembic failed to load (see console)'}</div>

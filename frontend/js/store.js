@@ -163,6 +163,9 @@ export function panelInUse(s) {
     return leaf.tabs.includes(leaf.activeTab) ? leaf.activeTab : leaf.tabs[0] ?? null;
 }
 
+/** Selections made by clicking an item's card in a panel: they bring up the Refinery. */
+const CARD_CLICK_SOURCES = new Set(['classifier', 'calendar', 'map', 'quests', 'codex']);
+
 /** Set by components/Popout.js (the store can't import it: it imports the store). */
 export const popoutHooks = { focus: (/** @type {PanelId} */ _panelId) => {} };
 
@@ -445,6 +448,7 @@ const workspaceStore = (set, get) => ({
         } catch (err) {
             console.error('[state] could not load saved filters', err);
         }
+        get().loadLayoutPresets();
         // items become past (and fall behind the Hermetic Seal) as time passes
         setInterval(() => set((state) => withVisible(state, {})), 60_000);
         startFeed(get);
@@ -699,8 +703,9 @@ const workspaceStore = (set, get) => ({
     },
 
     selectItem: (id, source) => {
-        if (id === get().selectedItemId) return;
-        set({ selectedItemId: id, selectionSource: id == null ? null : source, actionError: null });
+        if (id !== get().selectedItemId) set({ selectedItemId: id, selectionSource: id == null ? null : source, actionError: null });
+        // clicking a card in a panel brings the Refinery up (reopened if it was closed)
+        if (id != null && CARD_CLICK_SOURCES.has(source)) get().showPanel('node');
     },
 
     hoverItem: (id) => {
@@ -940,6 +945,45 @@ const workspaceStore = (set, get) => ({
         // the panel just shown is the one in use
         const shown = findLeafWithPanel(get().tree, panelId);
         if (shown) get().focusGroup(shown);
+    },
+
+    // --- layout presets (the Layouts menu): saved on the server, survive restarts ---
+    layoutPresets: [],
+    loadLayoutPresets: async () => {
+        const data = await getJson('/api/state/layout_presets');
+        if (data && Array.isArray(data.presets)) set({ layoutPresets: data.presets });
+    },
+    /** @param {LayoutPreset[]} presets */
+    _storeLayoutPresets: async (presets) => {
+        set({ layoutPresets: presets });
+        try {
+            await fetch('/api/state/layout_presets', {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ presets }),
+            });
+        } catch (err) {
+            console.error('[layouts] not saved', err);
+        }
+    },
+    saveLayoutPreset: (name) => {
+        const clean = name.trim().slice(0, 60);
+        const { tree, layoutPresets } = get();
+        if (!clean || !tree) return;
+        const preset = { name: clean, tree: clone(tree) };
+        const rest = layoutPresets.filter((p) => p.name !== clean); // same name: replaced
+        get()._storeLayoutPresets([...rest, preset]);
+    },
+    deleteLayoutPreset: (name) => {
+        get()._storeLayoutPresets(get().layoutPresets.filter((p) => p.name !== name));
+    },
+    applyLayoutPreset: (name) => {
+        const preset = get().layoutPresets.find((p) => p.name === name);
+        if (!preset) return;
+        // panels that no longer exist are left out; windows come back into the dock
+        /** @type {LayoutNode | null} */
+        let tree = clone(preset.tree);
+        for (const id of collectMountedPanels(tree)) if (!get().panels[id]) tree = removePanelFromTree(tree, id);
+        set({ poppedOut: [] });
+        get().persistLayout(tree);
     },
 
     resetWorkspace: async () => {

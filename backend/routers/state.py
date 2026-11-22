@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.base import get_session
 from backend.db.models import AppState
-from backend.schemas.state import FilterState
+from backend.schemas.state import FilterState, LayoutPresets
 
 router = APIRouter(prefix="/state", tags=["state"])
 
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/state", tags=["state"])
 SCHEMAS: dict[str, type[BaseModel]] = {
     "filters": FilterState,        # applied: what the calendar and map show
     "filters_draft": FilterState,  # the Nexus's pending edits, until "pass through"
+    "layout_presets": LayoutPresets,  # the user's saved dock arrangements (Layouts menu)
 }
 
 

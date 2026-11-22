@@ -42,13 +42,15 @@ def event_to_dict(e: Event, source_name: str) -> dict[str, Any]:
         "cover_url": e.cover_url,
         "details": e.details,
         "review": e.review,
+        "all_day": False,       # crawled events are one-off and timed
+        "recurrence": None,
     }
 
 
 # Fields an adventure can set itself, over its event's (see Adventure). "When/where" ones
 # are blanked for types that have none.
 OWN_FIELDS = ("title", "description", "url", "cover_url")
-WHEN_WHERE_FIELDS = ("start", "end", "timezone", "venue", "address", "city", "lat", "lon")
+WHEN_WHERE_FIELDS = ("start", "end", "timezone", "all_day", "recurrence", "venue", "address", "city", "lat", "lon")
 
 
 def _own(a: Adventure) -> dict[str, Any]:
@@ -56,6 +58,7 @@ def _own(a: Adventure) -> dict[str, Any]:
     return {
         "title": a.title, "description": a.description, "url": a.url, "cover_url": a.cover_url,
         "start": _iso(a.start_time), "end": _iso(a.end_time), "timezone": a.timezone,
+        "all_day": a.all_day, "recurrence": a.recurrence,
         "venue": a.venue, "address": a.address, "city": a.city, "lat": a.lat, "lon": a.lon,
     }
 
@@ -88,6 +91,7 @@ def adventure_to_dict(
         "start": None, "end": None, "timezone": None, "url": None, "venue": None,
         "address": None, "city": None, "lat": None, "lon": None,
         "location_approximate": False, "cover_url": None, "details": {}, "review": None,
+        "all_day": False, "recurrence": None,
     }
     base.setdefault("description", None)
     own = _own(a)
@@ -113,6 +117,8 @@ def adventure_to_dict(
         "phase_before_kill": a.phase_before_kill,
         "stats": a.stats,
         "roadmap": a.roadmap,
+        "costs": a.costs,
+        "rewards": a.rewards,
     }
 
 

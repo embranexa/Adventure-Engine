@@ -52,6 +52,8 @@ export const OBJECT_TYPES = {
     pillar: { label: 'Pillar', plural: 'Pillars', glyph: '⟁', hint: 'A theme or project adventures serve' },
     site: { label: 'Site', plural: 'Sites', glyph: '⌖', hint: 'A place: shows on the Atlas, anchors the proximity ring' },
     contact: { label: 'Contact', plural: 'Contacts', glyph: '☉', hint: 'A person' },
+    organization: { label: 'Organization', plural: 'Organizations', glyph: '⎔', hint: 'An organization or a network' },
+    skill: { label: 'Skill', plural: 'Skills', glyph: '✧', hint: 'A skill an adventure uses or builds' },
 };
 
 /** True if this item can have a when/where (a raw event, or an event-type adventure). @param {PoolItem} item */

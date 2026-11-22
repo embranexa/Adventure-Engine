@@ -223,6 +223,7 @@ export function MapPanel() {
         <div className="panel-body map-panel">
             <div className="map-host" ref=${hostRef} onPointerDown=${() => setSiteMenu(null)} />
             ${status === 'ready' && html`<${RingControl} mapRef=${mapRef} placing=${placing} setPlacing=${setPlacing} />`}
+            ${status === 'ready' && html`<button className="btn view-home" title="Frame everything" onClick=${() => mapRef.current?.fitAll()}>⌂</button>`}
             ${menuSite && siteMenu && html`<${SiteMenu} site=${menuSite} x=${siteMenu.x} y=${siteMenu.y} onClose=${() => setSiteMenu(null)} />`}
             ${status !== 'ready' && html`
                 <div className="map-status">

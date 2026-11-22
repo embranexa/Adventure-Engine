@@ -19,9 +19,10 @@ from backend.db.queries import list_adventures
 from backend.services.hub import hub
 from backend.services.triage import _get_adventure
 
-TEXT_LIMITS = {"title": 500, "venue": 500, "address": 500, "city": 200, "timezone": 64, "description": 20_000}
+TEXT_LIMITS = {"title": 500, "venue": 500, "address": 500, "city": 200, "timezone": 64, "description": 20_000,
+               "costs": 5_000, "rewards": 5_000}
 URL_FIELDS = ("url", "cover_url")
-WHEN_WHERE = ("start_time", "end_time", "timezone", "venue", "address", "city", "lat", "lon")
+WHEN_WHERE = ("start_time", "end_time", "timezone", "all_day", "recurrence", "venue", "address", "city", "lat", "lon")
 
 
 class InvalidAdventure(Exception):
@@ -68,7 +69,7 @@ def _apply(adventure: Adventure, changes: dict[str, Any]) -> None:
         for field in WHEN_WHERE:  # e.g. a hand-made event turned into an item
             setattr(adventure, field, None)
 
-    for field in ("title", "description", "venue", "address", "city", "timezone"):
+    for field in ("title", "description", "venue", "address", "city", "timezone", "costs", "rewards"):
         if field in changes:
             setattr(adventure, field, _text(field, changes[field]))
     for field in URL_FIELDS:
@@ -77,6 +78,10 @@ def _apply(adventure: Adventure, changes: dict[str, Any]) -> None:
     for field in ("start_time", "end_time"):
         if field in changes:
             setattr(adventure, field, changes[field])
+    if "all_day" in changes:
+        adventure.all_day = bool(changes["all_day"]) or None
+    if "recurrence" in changes:
+        adventure.recurrence = _recurrence(changes["recurrence"])
     if "lat" in changes or "lon" in changes:
         lat, lon = changes.get("lat", adventure.lat), changes.get("lon", adventure.lon)
         if (lat is None) != (lon is None):
@@ -90,6 +95,24 @@ def _apply(adventure: Adventure, changes: dict[str, Any]) -> None:
         raise InvalidAdventure("the end is before the start")
     if end and not start and adventure.event_id is None:
         raise InvalidAdventure("an end needs a start")
+    if adventure.recurrence:
+        if not start and adventure.event_id is None:
+            raise InvalidAdventure("a weekly event needs a first date")
+        until = adventure.recurrence.get("until")
+        if until and start and until < start.date().isoformat():
+            raise InvalidAdventure("a weekly event can't end before it starts")
+
+
+def _recurrence(value: Any) -> dict[str, Any] | None:
+    """A clean weekly recurrence, or None (null clears it). Pydantic already checked the shape."""
+    if not value:
+        return None
+    raw = value if isinstance(value, dict) else value.model_dump()
+    days = sorted({int(d) for d in raw.get("days") or []})
+    if not days or any(d < 0 or d > 6 for d in days):
+        raise InvalidAdventure("weekly days are 0 (Monday) to 6 (Sunday)")
+    until = raw.get("until")
+    return {"freq": "weekly", "days": days, "until": until.isoformat() if hasattr(until, "isoformat") else until}
 
 
 async def _broadcast(adventure_id: uuid.UUID) -> dict[str, Any]:

@@ -92,7 +92,7 @@ export function ObjectLinks({ adventure }) {
                     ref=${inputRef}
                     className="ol-input"
                     value=${query}
-                    placeholder=${'+ Link a pillar, site or contact…'}
+                    placeholder=${'+ Link a pillar, site, contact, organization or skill…'}
                     aria-label="Link an object"
                     onInput=${(/** @type {any} */ e) => { setQuery(e.target.value); setOpen(true); setActive(0); }}
                     onFocus=${() => setOpen(true)}

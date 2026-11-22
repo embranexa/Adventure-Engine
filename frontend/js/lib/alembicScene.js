@@ -29,23 +29,28 @@ const BASE_H = 3;
 const FRUSTUM = 240;      // world units shown vertically at zoom 1
 const VIEW_DIR = new THREE.Vector3(1, 0.95, 1.05).normalize();
 
-// incomplete actions burn in the Crucible's alloy, completed ones in the Arena's animus
-// (matter colors: js/lifecycle.js)
+// Action colours follow the adventure's matter (roadmapColors in roadmap.js, set through
+// setColors): incomplete actions burn in `todo`, complete ones in `done`. Default: alloy
+// and animus.
 const ALLOY = 0xf28a2e;
-const ALLOY_DEEP = 0x7a3a0c;
 const ANIMUS = 0xef3e4a;
-const ANIMUS_BRIGHT = 0xff7a84;
-const ANIMUS_DEEP = 0x7a1a20;
 const SHADE = 0x5d6070;
 const STEEL = 0x23262b;
 const STEEL_EDGE = 0x7a808a;
 
-const LOOK = {
-    // liquid: the dark body color; light: the energy it glows with (carries the hue)
-    locked: { fill: 0.05, liquid: 0x2a1406, light: ALLOY_DEEP, emissive: 0.5, ring: 0x5a3a22, ringOpacity: 0.55, glow: 0 },
-    ready: { fill: 0.45, liquid: ALLOY_DEEP, light: ALLOY, emissive: 0.85, ring: ALLOY, ringOpacity: 0.9, glow: 0.38 },
-    done: { fill: 1, liquid: ANIMUS_DEEP, light: ANIMUS, emissive: 1, ring: ANIMUS_BRIGHT, ringOpacity: 1, glow: 0.5 },
-};
+/**
+ * The three looks of a still from the two colours. liquid: the dark body colour; light:
+ * the energy it glows with (carries the hue); locked stills are a dim, nearly empty todo.
+ */
+function looks(todo, done) {
+    const t = new THREE.Color(todo), d = new THREE.Color(done), white = new THREE.Color(0xffffff);
+    const hex = (c) => c.getHex();
+    return {
+        locked: { fill: 0.05, liquid: hex(t.clone().multiplyScalar(0.16)), light: hex(t.clone().multiplyScalar(0.5)), emissive: 0.5, ring: hex(t.clone().multiplyScalar(0.38)), ringOpacity: 0.55, glow: 0 },
+        ready: { fill: 0.45, liquid: hex(t.clone().multiplyScalar(0.5)), light: hex(t), emissive: 0.85, ring: hex(t), ringOpacity: 0.9, glow: 0.38 },
+        done: { fill: 1, liquid: hex(d.clone().multiplyScalar(0.5)), light: hex(d), emissive: 1, ring: hex(d.clone().lerp(white, 0.35)), ringOpacity: 1, glow: 0.5 },
+    };
+}
 
 function el(tag, cls, text) {
     const n = document.createElement(tag);
@@ -171,10 +176,10 @@ export class AlembicScene {
             cone,
             steel: new THREE.MeshStandardMaterial({ color: STEEL, metalness: 0.75, roughness: 0.42 }),
             pipeIdle: new THREE.MeshStandardMaterial({ color: 0x3a3e45, metalness: 0.7, roughness: 0.45 }),
-            pipeLit: new THREE.MeshStandardMaterial({ color: 0x6b1a20, emissive: ANIMUS, emissiveIntensity: 0.55, metalness: 0.4, roughness: 0.4 }),
+            pipeLit: new THREE.MeshStandardMaterial({ color: 0x6b1a20, emissive: ANIMUS, emissiveIntensity: 0.55, metalness: 0.4, roughness: 0.4 }),  // recoloured by setColors
             edgeLine: new THREE.LineBasicMaterial({ color: STEEL_EDGE, transparent: true, opacity: 0.4 }),
-            packet: new THREE.SpriteMaterial({ map: glow, color: ANIMUS_BRIGHT, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
-            spark: new THREE.SpriteMaterial({ map: glow, color: ANIMUS_BRIGHT, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }),
+            packet: new THREE.SpriteMaterial({ map: glow, color: 0xff7a84, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
+            spark: new THREE.SpriteMaterial({ map: glow, color: 0xff7a84, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }),
         };
     }
 
@@ -321,11 +326,30 @@ export class AlembicScene {
         if (this.hoverId === id) this._setHover(null);
     }
 
-    _setState(node, state) {
+    /** The colours of incomplete and complete actions (the adventure's matter); restyles every still. */
+    setColors(todo, done) {
+        const key = `${todo}|${done}`;
+        if (key === this._colorKey) return;
+        this._colorKey = key;
+        this.looks = looks(todo, done);
+        const d = new THREE.Color(done);
+        this.shared.pipeLit.color.copy(d).multiplyScalar(0.45);
+        this.shared.pipeLit.emissive.copy(d);
+        this.shared.packet.color.copy(d).lerp(new THREE.Color(0xffffff), 0.3);
+        this.shared.spark.color.copy(this.shared.packet.color);
+        for (const node of this.nodes.values()) {
+            const state = node.state;
+            node.state = null;
+            this._setState(node, state, true);
+        }
+    }
+
+    _setState(node, state, quiet = false) {
         if (node.state === state) return;
         const wasDone = node.state === 'done';
         node.state = state;
-        const look = LOOK[state];
+        this.looks ??= looks(ALLOY, ANIMUS);
+        const look = this.looks[state];
         node.look = look;
         node.liquid.material.color.setHex(look.liquid);
         node.liquid.material.emissive.setHex(look.light);
@@ -333,7 +357,7 @@ export class AlembicScene {
         node.ring.material.color.setHex(look.ring);
         node.glass.material.opacity = state === 'locked' ? 0.07 : 0.12;
         node.label.dataset.state = state;
-        if (state === 'done' && !wasDone && node.fill > 0) node.flare = 1; // just completed: flare
+        if (state === 'done' && !wasDone && !quiet && node.fill > 0) node.flare = 1; // just completed: flare
     }
 
     _rebuildEdges(analysis) {
@@ -454,7 +478,7 @@ export class AlembicScene {
         this.controls.update();
 
         for (const node of this.nodes.values()) {
-            const look = node.look ?? LOOK.locked;
+            const look = node.look ?? (this.looks ??= looks(ALLOY, ANIMUS)).locked;
             node.group.position.lerp(node.target, k);
             const s = node.group.scale.x + (1 - node.group.scale.x) * k;
             node.group.scale.setScalar(s);

@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
-import { addDays, hourOf, layoutWeek, sameDay, startOfWeek } from './calendarLayout.js';
+import { addDays, hourOf, layoutMonth, layoutWeek, sameDay, startOfWeek } from './calendarLayout.js';
 import { dayKey, parseDay } from '../../filters.js';
 import { stageOf } from '../../lifecycle.js';
 import { itemLensColor, lensLabel, lensValues } from '../../lib/lens.js';
@@ -11,8 +11,16 @@ const FIRST_HOUR = 6;   // visible range: 06:00 ...
 const LAST_HOUR = 24;   // ... to midnight
 const HOUR_PX = 28;
 const DEFAULT_SCROLL_HOUR = 9;
+const BANNER_PX = 20;
+const MONTH_SHOWN = 4;   // entries listed per day in the month view (then "+N more")
+const VIEW_KEY = 'calendar-view';
 
-const fmtTime = (/** @type {Date} */ d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+/** @returns {'week' | 'month'} */
+function savedView() {
+    try { return localStorage.getItem(VIEW_KEY) === 'month' ? 'month' : 'week'; } catch { return 'week'; }
+}
+
+const fmtTime = (/** @type {Date} */ d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 const fmtDay = (/** @type {Date} */ d) => d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
 /** Re-renders the caller every `ms` so the "now" line moves. @param {number} ms */
@@ -62,7 +70,27 @@ function CalendarBlockImpl({ block, selected, hovered, lens, selectItem, hoverIt
 }
 const CalendarBlock = memo(CalendarBlockImpl);
 
-/** Week view of crawled events (Mon–Sun, viewer's local time). */
+/**
+ * An all-day item: a banner across the days it covers, at the top of the week.
+ * @param {{ banner: import('./calendarLayout.js').CalendarBanner, selected: boolean, hovered: boolean, lens: LensKey,
+ *           selectItem: WorkspaceState['selectItem'], hoverItem: WorkspaceState['hoverItem'] }} props
+ */
+function CalendarBannerImpl({ banner, selected, hovered, lens, selectItem, hoverItem }) {
+    const { event } = banner;
+    const className = ['cal-banner', selected && 'sel', hovered && 'hov', banner.clipStart && 'clip-start', banner.clipEnd && 'clip-end'].filter(Boolean).join(' ');
+    return html`
+        <div className=${className} data-id=${event.id} title=${`${event.title}\nAll day`}
+            style=${{ '--c': itemLensColor(event, lens), gridColumn: `${banner.from + 2} / ${banner.to + 3}`, gridRow: banner.row + 1 }}
+            onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); selectItem(event.id, 'calendar'); }}
+            onPointerEnter=${() => hoverItem(event.id)} onPointerLeave=${() => hoverItem(null)}>
+            ${event.title}
+        </div>
+    `;
+}
+const CalendarBanner = memo(CalendarBannerImpl);
+
+/** The calendar: a week (Mon–Sun) or a month, in the viewer's local time. Weekly items
+ *  show on every occurrence; all-day items as banners at the top of their days. */
 export function CalendarPanel() {
     const events = useWorkspaceStore((s) => s.visibleItems); // the filtered subset
     const dateRange = useWorkspaceStore((s) => s.filters.date_range);
@@ -78,11 +106,21 @@ export function CalendarPanel() {
 
     const now = useNow(60_000);
     const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+    const [view, setViewState] = useState(savedView);
+    const [monthAnchor, setMonthAnchor] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+    const setView = (/** @type {'week' | 'month'} */ v) => {
+        setViewState(v);
+        try { localStorage.setItem(VIEW_KEY, v); } catch { /* still switches for this session */ }
+        if (v === 'month') setMonthAnchor(new Date(weekStart.getFullYear(), weekStart.getMonth(), 1));
+    };
     const scrollRef = useRef(/** @type {HTMLDivElement | null} */ (null));
     const revealRef = useRef(/** @type {string | null} */ (null));
 
-    const days = useMemo(() => layoutWeek(events, weekStart, FIRST_HOUR, LAST_HOUR), [events, weekStart]);
-    const weekCount = days.reduce((n, d) => n + d.blocks.length, 0);
+    const week = useMemo(() => layoutWeek(events, weekStart, FIRST_HOUR, LAST_HOUR), [events, weekStart]);
+    const days = week.days;
+    const weekCount = days.reduce((n, d) => n + d.blocks.length, 0) + week.banners.length;
+    const month = useMemo(() => (view === 'month' ? layoutMonth(events, monthAnchor) : null), [view, events, monthAnchor]);
+    const monthCount = month ? new Set(month.flat().filter((d) => d.inMonth).flatMap((d) => d.entries.map((e) => e.key))).size : 0;
 
     // A selection made in another view: jump to that event's week, then scroll to it.
     useEffect(() => {
@@ -91,6 +129,8 @@ export function CalendarPanel() {
         if (!event?.start) return;
         const target = startOfWeek(new Date(event.start));
         if (target.getTime() !== weekStart.getTime()) setWeekStart(target);
+        const first = new Date(event.start);
+        setMonthAnchor(new Date(first.getFullYear(), first.getMonth(), 1));
         revealRef.current = selectedId;
     }, [selectedId, selectionSource]);
 
@@ -172,13 +212,26 @@ export function CalendarPanel() {
     return html`
         <div className="panel-body calendar" style=${{ '--hour': `${HOUR_PX}px` }}>
             <div className="cal-bar">
-                <button className="btn cal-btn" title="Previous week" onClick=${() => setWeekStart(addDays(weekStart, -7))}>‹</button>
-                <div className="cal-range">
-                    ${fmtDay(weekStart)} – ${fmtDay(addDays(weekStart, 6))}
-                    <small>${weekCount} event${weekCount === 1 ? '' : 's'}</small>
+                <div className="sc-views" role="group" aria-label="View">
+                    <button className=${`sc-view ${view === 'week' ? 'active' : ''}`} onClick=${() => setView('week')}>Week</button>
+                    <button className=${`sc-view ${view === 'month' ? 'active' : ''}`} onClick=${() => setView('month')}>Month</button>
                 </div>
-                <button className="btn cal-btn" title="Next week" onClick=${() => setWeekStart(addDays(weekStart, 7))}>›</button>
-                <button className="btn cal-btn" onClick=${() => setWeekStart(startOfWeek(new Date()))}>Today</button>
+                ${view === 'week' ? html`
+                    <button className="btn cal-btn" title="Previous week" onClick=${() => setWeekStart(addDays(weekStart, -7))}>‹</button>
+                    <div className="cal-range">
+                        ${fmtDay(weekStart)} – ${fmtDay(addDays(weekStart, 6))}
+                        <small>${weekCount} event${weekCount === 1 ? '' : 's'}</small>
+                    </div>
+                    <button className="btn cal-btn" title="Next week" onClick=${() => setWeekStart(addDays(weekStart, 7))}>›</button>
+                ` : html`
+                    <button className="btn cal-btn" title="Previous month" onClick=${() => setMonthAnchor(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() - 1, 1))}>‹</button>
+                    <div className="cal-range">
+                        ${monthAnchor.toLocaleDateString([], { month: 'long', year: 'numeric' })}
+                        <small>${monthCount} event${monthCount === 1 ? '' : 's'}</small>
+                    </div>
+                    <button className="btn cal-btn" title="Next month" onClick=${() => setMonthAnchor(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1))}>›</button>
+                `}
+                <button className="btn cal-btn" onClick=${() => { setWeekStart(startOfWeek(new Date())); setMonthAnchor(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); }}>Today</button>
                 ${rangeLabel && html`
                     <span className=${`cal-filter ${dateRange?.mode}`} title="Date filter (drag across day headers to change)">
                         ${dateRange?.mode === 'exclude' ? '⊘' : '◷'} ${rangeLabel}
@@ -187,6 +240,39 @@ export function CalendarPanel() {
                 `}
             </div>
 
+            ${view === 'month' && month && html`
+                <div className="cal-month" onClick=${() => selectItem(null, 'calendar')}>
+                    <div className="cal-month-head">
+                        ${['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d) => html`<div key=${d}>${d}</div>`)}
+                    </div>
+                    ${month.map((weekDays, w) => html`
+                        <div key=${w} className="cal-month-week">
+                            ${weekDays.map((cell) => html`
+                                <div key=${cell.date.toDateString()}
+                                    className=${['cal-mday', !cell.inMonth && 'out', sameDay(cell.date, now) && 'today', inShown(cell.date) && `in-range ${dateRange?.mode}`].filter(Boolean).join(' ')}>
+                                    <button className="cal-mday-num" title="Open this week"
+                                        onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); setWeekStart(startOfWeek(cell.date)); setView('week'); }}>
+                                        ${cell.date.getDate()}
+                                    </button>
+                                    ${cell.entries.slice(0, MONTH_SHOWN).map((entry) => html`
+                                        <div key=${entry.key}
+                                            className=${['cal-mentry', entry.allDay && 'all-day', entry.event.id === selectedId && 'sel', entry.event.id === hoveredId && 'hov'].filter(Boolean).join(' ')}
+                                            style=${{ '--c': itemLensColor(entry.event, lens) }}
+                                            title=${`${entry.event.title}\n${entry.allDay ? 'All day' : `${fmtTime(entry.start)} – ${fmtTime(entry.end)}`}`}
+                                            onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); selectItem(entry.event.id, 'calendar'); }}
+                                            onPointerEnter=${() => hoverItem(entry.event.id)} onPointerLeave=${() => hoverItem(null)}>
+                                            ${!entry.allDay && html`<i>${fmtTime(entry.start)}</i>`}${entry.event.title}
+                                        </div>
+                                    `)}
+                                    ${cell.entries.length > MONTH_SHOWN && html`<span className="cal-more">+${cell.entries.length - MONTH_SHOWN} more</span>`}
+                                </div>
+                            `)}
+                        </div>
+                    `)}
+                </div>
+            `}
+
+            ${view === 'week' && html`
             <div className="cal-head" title="Drag across days to filter by date · click a day for one day · shift+click to extend">
                 <div />
                 ${days.map((d) => html`
@@ -201,6 +287,16 @@ export function CalendarPanel() {
                 `)}
             </div>
 
+            ${week.bannerRows > 0 && html`
+                <div className="cal-allday" style=${{ gridTemplateRows: `repeat(${week.bannerRows}, ${BANNER_PX}px)` }}>
+                    <span className="cal-allday-label" style=${{ gridRow: `1 / ${week.bannerRows + 1}` }}>all day</span>
+                    ${week.banners.map((b) => html`
+                        <${CalendarBanner} key=${b.key} banner=${b} selected=${b.event.id === selectedId} hovered=${b.event.id === hoveredId}
+                            lens=${lens} selectItem=${selectItem} hoverItem=${hoverItem} />
+                    `)}
+                </div>
+            `}
+
             <div className="cal-scroll" ref=${scrollRef} onClick=${() => selectItem(null, 'calendar')}>
                 <div className="cal-grid" style=${{ height: `${(LAST_HOUR - FIRST_HOUR) * HOUR_PX}px` }}>
                     <div className="cal-gutter">
@@ -212,7 +308,7 @@ export function CalendarPanel() {
                         <div key=${d.date.toDateString()} className=${`cal-col ${inShown(d.date) ? 'in-range' : ''}`}>
                             ${d.blocks.map((b) => html`
                                 <${CalendarBlock}
-                                    key=${b.event.id}
+                                    key=${b.key}
                                     block=${b}
                                     selected=${b.event.id === selectedId}
                                     hovered=${b.event.id === hoveredId}
@@ -228,6 +324,7 @@ export function CalendarPanel() {
                     `)}
                 </div>
             </div>
+            `}
         </div>
     `;
 }

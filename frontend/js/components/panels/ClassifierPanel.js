@@ -205,6 +205,7 @@ export function ClassifierPanel() {
                         </button>
                     `)}
                 </div>
+                <button className="btn view-home" title="Frame everything" onClick=${() => sceneRef.current?.fit()}>⌂</button>
                 <div className="cls-hint">
                     Click a parent: include → exclude → off · right-click: collapse · click a cluster to fly in
                 </div>

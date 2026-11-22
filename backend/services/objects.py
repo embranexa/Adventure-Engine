@@ -1,4 +1,4 @@
-"""Virtual objects (the Codex): pillars, sites and contacts that adventures link to.
+"""Virtual objects (the Codex): pillars, sites, contacts, organizations and skills that adventures link to.
 
     create / update / delete   an object (deleting also removes its links)
     link / unlink              attach an object to an adventure, or detach it

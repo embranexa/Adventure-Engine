@@ -3,7 +3,8 @@
 //   stars     parents: facet values (from the visible layers, plus every value with an
 //             active filter), the date range, the proximity ring, the Hermetic Seal
 //   galaxies  Venn regions: pool items grouped by exactly which visible stars they link to
-//   portal    the centre; galaxies whose items pass every filter are drawn into its orbit
+//   region    a sphere at the centre: galaxies whose items pass every filter sit inside
+//             it, the rest (and every star) outside
 //
 // Whether an item passes is decided by filters.js. Every active filter is always a
 // visible star, so all items in a galaxy share the same answer.
@@ -101,7 +102,8 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
     let passCount = 0;
     for (const item of items) {
         const starIds = stars.filter((s) => membership.get(s.id)?.(item)).map((s) => s.id);
-        const id = starIds.length ? starIds.join('|') : '(unlinked)';
+        // its own namespace: a galaxy linked to one star must not share that star's id
+        const id = `galaxy:${starIds.length ? starIds.join('|') : '(unlinked)'}`;
         let g = galaxies.get(id);
         if (!g) {
             g = { id, starIds, members: [], passes: passes(item, filters, mode, now), hidden: false };
@@ -139,9 +141,12 @@ export function galaxyRadius(count) {
     return 5 + Math.sqrt(count) * 4;
 }
 
-const STAR_SHELL = { off: 125, include: 80, exclude: 190, seal: 190 };
-const OUTER_SHELL = 165; // failing galaxies are pushed out to at least this distance
-const PORTAL_ORBIT = 50; // passing galaxies settle on a ring this far from the portal
+/** The region's radius: everything inside passes the filters. */
+export const REGION_R = 110;
+const STAR_SHELL = { off: 170, include: 145, exclude: 220, seal: 220 };
+const OUTER_GAP = 14;    // failing galaxies keep at least this far outside the region
+const INNER_GAP = 6;     // passing galaxies keep at least this far inside it
+const CORE_ORBIT = 50;   // passing galaxies drift toward this distance from the centre
 
 /**
  * Place stars and galaxies with a small force simulation. Starts from `previous`
@@ -163,7 +168,7 @@ export function layout(model, previous = new Map(), iterations = 260) {
         let p = previous.get(g.id);
         if (!p) { // start between its stars, or near the portal / outer shell
             const linked = g.starIds.map((id) => nodes[starIndex.get(id) ?? -1]).filter(Boolean);
-            const seed = seedPoint(g.id, g.passes ? 40 : OUTER_SHELL);
+            const seed = seedPoint(g.id, g.passes ? 40 : REGION_R + 60);
             p = linked.length
                 ? [0, 1, 2].map((k) => linked.reduce((a, n) => a + n.p[k], 0) / linked.length * 0.7 + seed[k] * 0.3)
                 : seed;
@@ -207,8 +212,14 @@ export function layout(model, previous = new Map(), iterations = 260) {
                     const rest = 30 + n.r;
                     add(n.v, d, ((dl - rest) / dl) * 0.03);
                 }
-                if (g.passes) add(n.v, n.p, ((PORTAL_ORBIT - dist) / dist) * 0.06);  // into the portal's orbit
-                else if (dist < OUTER_SHELL) add(n.v, n.p, ((OUTER_SHELL - dist) / dist) * 0.06); // out to the shell
+                if (g.passes) {
+                    add(n.v, n.p, ((CORE_ORBIT - dist) / dist) * 0.06);  // toward the centre
+                    const limit = REGION_R - INNER_GAP - n.r;          // and never out of the region
+                    if (dist > limit) add(n.v, n.p, ((limit - dist) / dist) * 0.4);
+                } else {
+                    const limit = REGION_R + OUTER_GAP + n.r;          // failing: outside the region
+                    if (dist < limit) add(n.v, n.p, ((limit - dist) / dist) * 0.4);
+                }
                 n.v[1] -= n.p[1] * 0.015;
             }
         }
@@ -222,5 +233,13 @@ export function layout(model, previous = new Map(), iterations = 260) {
         }
     }
 
+    // the region is a promise: clamp anything the forces left on the wrong side
+    for (const n of nodes) {
+        if (n.type !== 'galaxy') continue;
+        const g = /** @type {Galaxy} */ (n.ref);
+        const dist = len(n.p);
+        const want = g.passes ? Math.min(dist, Math.max(0, REGION_R - INNER_GAP - n.r)) : Math.max(dist, REGION_R + OUTER_GAP + n.r);
+        if (want !== dist) { const k = want / dist; n.p = n.p.map((c) => c * k); }
+    }
     return new Map(nodes.map((n) => [n.id, n.p]));
 }

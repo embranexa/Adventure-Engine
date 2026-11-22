@@ -9,6 +9,7 @@
 // included, and fails if any is excluded. An item with none counts as UNKNOWN.
 
 import { ADVENTURE_TYPES, OBJECT_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
+import { occursIn, span } from './lib/occurrences.js';
 
 /** @type {FilterState} */
 export const DEFAULT_FILTERS = { facets: {}, date_range: null, ring: null, seal: true, units: 'mi', lens: 'stage' };
@@ -70,6 +71,8 @@ export const FACETS = [
     objectFacet('pillar'),
     objectFacet('site'),
     objectFacet('contact'),
+    objectFacet('organization'),
+    objectFacet('skill'),
 ];
 
 /** Phases the Hermetic Seal hides (on top of anything already past). */
@@ -121,23 +124,16 @@ export function dayKey(date) {
     return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
 }
 
-/** @param {PoolItem} item @returns {[number, number] | null} start/end in ms */
-function timeSpan(item) {
-    if (!item.start) return null;
-    const start = new Date(item.start).getTime();
-    if (Number.isNaN(start)) return null;
-    const end = item.end ? new Date(item.end).getTime() : NaN;
-    return [start, Number.isNaN(end) || end < start ? start : end];
-}
-
-/** True if the item overlaps the range's days (local time). @param {PoolItem} item @param {DateRange} range */
+/**
+ * True if the item happens within the range's days (local time): any occurrence of a
+ * weekly item counts, and an all-day item covers its whole days (lib/occurrences.js).
+ * @param {PoolItem} item @param {DateRange} range
+ */
 export function inDateRange(item, range) {
-    const span = timeSpan(item);
-    if (!span) return false;
-    const from = parseDay(range.start).getTime();
+    const from = parseDay(range.start);
     const to = parseDay(range.end);
     to.setDate(to.getDate() + 1); // end day is inclusive
-    return span[0] < to.getTime() && span[1] >= from;
+    return occursIn(item, from, to);
 }
 
 /** True if the item lies within the ring. @param {PoolItem} item @param {Ring} ring */
@@ -149,8 +145,8 @@ export function inRing(item, ring) {
 /** True if the Hermetic Seal hides this item: past, or an artifact, vestige or relic. @param {PoolItem} item @param {number} now */
 export function isSealed(item, now) {
     if (item.kind === 'adventure' && SEALED_PHASES.has(item.phase)) return true;
-    const span = timeSpan(item);
-    return span != null && span[1] < now;
+    const s = span(item); // a weekly item without an end date is never past
+    return s != null && s[1] < now;
 }
 
 // --- applying ---

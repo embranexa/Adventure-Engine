@@ -15,11 +15,11 @@ PANELS_METADATA = {
     },
     "classifier": {
         "id": "classifier", "kind": "classifier", "icon": "flask",
-        "name": "Nexus", "question": "which", "flow": ["matter", "light"],
+        "name": "Nexus", "question": "which", "flow": ["matter", "topology"],
     },
     "map": {
         "id": "map", "kind": "map", "icon": "compass",
-        "name": "Atlas", "question": "where", "flow": ["matter", "where"],
+        "name": "Atlas", "question": "where", "flow": ["matter", "space"],
     },
     "calendar": {
         "id": "calendar", "kind": "calendar", "icon": "clock",

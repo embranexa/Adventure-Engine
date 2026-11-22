@@ -2,14 +2,14 @@
 frontend/types/global.d.ts; the filtering itself happens in the browser (frontend/js/filters.js)."""
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 FilterMode = Literal["include", "exclude"]
-FacetKey = Literal["source", "city", "registration", "type", "phase", "review", "pillar", "site", "contact"]
+FacetKey = Literal["source", "city", "registration", "type", "phase", "review", "pillar", "site", "contact", "organization", "skill"]
 # what colors the matter: "stage" (Matter) or a facet (frontend/js/lib/lens.js)
-LensKey = Literal["stage", "source", "city", "registration", "type", "pillar", "site", "contact"]
+LensKey = Literal["stage", "source", "city", "registration", "type", "pillar", "site", "contact", "organization", "skill"]
 
 
 class DateRange(BaseModel):
@@ -46,3 +46,14 @@ class FilterState(BaseModel):
     units: Literal["mi", "km"] = "mi"
     lens: LensKey = "stage"  # applies at once (never pending): it changes colors, not the subset
 
+
+
+class LayoutPreset(BaseModel):
+    """A saved dock arrangement (the Layouts menu): a name and the layout tree."""
+
+    name: str = Field(min_length=1, max_length=60)
+    tree: dict[str, Any]
+
+
+class LayoutPresets(BaseModel):
+    presets: list[LayoutPreset] = Field(default_factory=list, max_length=40)

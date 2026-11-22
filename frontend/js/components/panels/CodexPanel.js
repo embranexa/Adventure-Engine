@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { OBJECT_TYPES, PHASE_STAGES } from '../../lifecycle.js';
+import { PLACE_PLACEHOLDER, coordsText, readPlace } from '../../lib/places.js';
 import { PALETTE, objectColor } from '../../lib/lens.js';
 import { Field } from './AdventureEditor.js';
 import { confirmHere } from '../../lib/windows.js';
@@ -31,16 +32,6 @@ function ColorPicker({ obj, onChange }) {
 
 const TYPE_KEYS = /** @type {ObjectType[]} */ (Object.keys(OBJECT_TYPES));
 
-/** @param {number | null} lat @param {number | null} lon */
-const coordsText = (lat, lon) => (lat != null && lon != null ? `${lat}, ${lon}` : '');
-
-/** "34.05, -118.25" -> [lat, lon]; '' -> [null, null]; null if unreadable. @param {string} text */
-function parseCoords(text) {
-    if (!text.trim()) return [null, null];
-    const m = text.trim().match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
-    return m ? [Number(m[1]), Number(m[2])] : null;
-}
-
 /** One line under an object's name in the list. @param {VObject} o */
 function subtitle(o) {
     if (o.type === 'site') return [o.address, o.city].filter(Boolean).join(', ') || (o.lat != null ? 'Pinned' : 'No location');
@@ -63,6 +54,8 @@ function ObjectDetail({ obj, onBack }) {
     const focusOnAtlas = useWorkspaceStore((s) => s.focusOnAtlas);
     const anchoredId = useWorkspaceStore((s) => s.filters.ring?.center.site_id ?? null);
     const [error, setError] = useState(/** @type {string | null} */ (null));
+    const [placeNote, setPlaceNote] = useState(/** @type {string | null} */ (null));
+    useEffect(() => setPlaceNote(null), [obj.id]);
 
     const t = OBJECT_TYPES[obj.type];
     const linked = adventures.filter((a) => a.objects.some((o) => o.id === obj.id));
@@ -113,13 +106,15 @@ function ObjectDetail({ obj, onBack }) {
                 <${Field} label="Address" ...${text('address')} />
                 <div className="ae-pair">
                     <${Field} label="City" ...${text('city')} />
-                    <${Field} label="Coordinates" placeholder="lat, lon" value=${coordsText(obj.lat, obj.lon)}
-                        onCommit=${(/** @type {string} */ v) => {
-                            const c = parseCoords(v);
-                            if (!c) { const err = 'Write coordinates as "lat, lon", e.g. 34.05, -118.25'; setError(err); return Promise.resolve(err); }
-                            return save({ lat: c[0], lon: c[1] });
+                    <${Field} label="Coordinates or Plus Code" placeholder=${PLACE_PLACEHOLDER} value=${coordsText(obj.lat, obj.lon)}
+                        onCommit=${async (/** @type {string} */ v) => {
+                            const place = await readPlace(v);
+                            if ('error' in place) { setError(place.error); return place.error; }
+                            setPlaceNote(place.note);
+                            return save({ lat: place.lat, lon: place.lon });
                         }} />
                 </div>
+                ${placeNote && html`<span className="ae-hint">⌖ ${placeNote}</span>`}
                 <div className="cx-actions">
                     <button className="btn" disabled=${!located} onClick=${() => located && focusOnAtlas(/** @type {number} */ (obj.lat), /** @type {number} */ (obj.lon))}
                         title=${located ? 'Fly there on the Atlas' : 'Give it coordinates first'}>⌖ Show on Atlas</button>
@@ -157,7 +152,7 @@ function ObjectDetail({ obj, onBack }) {
 }
 
 /**
- * The Codex: virtual objects (pillars, sites, contacts) that adventures link to. Browse
+ * The Codex: virtual objects (pillars, sites, contacts, organizations, skills) that adventures link to. Browse
  * by type, search, create; open one to edit it and see its adventures. Linking happens
  * in the Refinery; objects show as stars in the Nexus (in their colour), sites as pins on the Atlas.
  */
@@ -227,7 +222,7 @@ export function CodexPanel() {
                 ${shown.length === 0 && html`
                     <div className="nc-empty cx-none">
                         ${objects.length ? 'Nothing matches' : 'The Codex is empty'}
-                        <small>${objects.length ? 'Try another search, or create it above' : 'Pillars, sites and contacts you make here can be linked to adventures'}</small>
+                        <small>${objects.length ? 'Try another search, or create it above' : 'Pillars, sites, contacts, organizations and skills you make here can be linked to adventures'}</small>
                     </div>
                 `}
                 ${shown.map((o) => html`

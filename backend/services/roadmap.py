@@ -11,6 +11,13 @@ An action is locked until every action pointing to it is done. Its "bottlenecks"
 the frontend works those out (frontend/js/lib/roadmap.js), the server only keeps the
 graph valid: known ids, no self-links, no cycles, and nothing done behind an
 unfinished prerequisite.
+
+The roadmap also moves its adventure (the user's rule, resources/UPGRADES_PLAN.md U3), for
+adventures in the Alembic or later (never queued, classifying or killed): no action done
+-> distillate (decomposing); some done -> alloy (constructing); all done -> stays where it
+is (promotion to animus is the Promote button), except a distillate becomes alloy. So
+un-completing an action on an animus, artifact or relic sends it back to alloy. Moving an
+adventure by hand to animus or later marks every action done (triage.set_phase).
 """
 
 import re
@@ -20,9 +27,12 @@ from typing import Any
 from backend.db.base import SessionLocal
 from backend.db.queries import list_adventures
 from backend.services.hub import hub
-from backend.services.triage import NotFound, _get_adventure
+from backend.services.triage import NotFound, _get_adventure, _set_phase
 
 MAX_ACTIONS = 200
+# phases whose adventure the roadmap moves (see phase_for)
+ROADMAP_PHASES = ("decomposing", "constructing", "consuming", "completed", "decommissioned")
+
 MAX_TITLE = 200
 ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 
@@ -112,18 +122,34 @@ def normalize(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def phase_for(phase: str, roadmap: dict[str, Any] | None) -> str:
+    """The phase an adventure belongs in given its roadmap (see the module docstring)."""
+    if phase not in ROADMAP_PHASES or not roadmap or not roadmap.get("actions"):
+        return phase
+    total, done = len(roadmap["actions"]), len(roadmap.get("done") or [])
+    if done == 0:
+        return "decomposing"
+    if done < total:
+        return "constructing"
+    return "constructing" if phase == "decomposing" else phase
+
+
 async def save_roadmap(adventure_id: uuid.UUID, raw: dict[str, Any] | None) -> dict[str, Any] | None:
-    """Replace an adventure's roadmap (None or no actions clears it), then broadcast."""
+    """Replace an adventure's roadmap (None or no actions clears it), move the adventure
+    if the roadmap says so (phase_for), then broadcast."""
     roadmap = normalize(raw) if raw else None
     if roadmap is not None and not roadmap["actions"]:
         roadmap = None
     async with SessionLocal() as session:
         adventure = await _get_adventure(session, adventure_id)
         adventure.roadmap = roadmap
+        target = phase_for(adventure.phase, roadmap)
+        if target != adventure.phase:
+            _set_phase(adventure, target)  # logged as a transition like any phase change
         await session.commit()
         adventures = await list_adventures(session)
     await hub.broadcast("adventures", adventures=adventures)
     return roadmap
 
 
-__all__ = ["InvalidRoadmap", "NotFound", "find_cycle", "normalize", "save_roadmap"]
+__all__ = ["InvalidRoadmap", "NotFound", "find_cycle", "normalize", "phase_for", "save_roadmap"]

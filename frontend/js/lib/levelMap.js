@@ -79,7 +79,6 @@ export class LevelMap {
             orbRadius: 36,        // meters
             orbHover: 70,         // meters between tower top and orb centre
             minTowerHeight: 60,   // tower height for an event with no guests
-            arcLift: 90,          // meters the connection arcs rise above the orbs
             flyToOnSelect: true,
             fitOnFirstData: true, // frame all events the first time any arrive
             ...config,
@@ -90,7 +89,6 @@ export class LevelMap {
         this.nodes = [];
         this.entries = [];
         this.pickables = [];
-        this.arcs = [];
         this.selectedId = null;
         this.time = 0;
         this._hasFrame = false;
@@ -521,48 +519,8 @@ export class LevelMap {
             this.entries.push(entry);
         });
 
-        this._buildArcs();
 
         this.nodeCount.textContent = String(this.nodes.length);
-    }
-
-    /** Curved data links from the first orb to every other orb, with travelling packets. */
-    _buildArcs() {
-        const anchor = this.entries[0];
-        if (!anchor) return;
-
-        const orbWorld = (e) => new THREE.Vector3(e.group.position.x, e.group.position.y, e.orbZ * e.m);
-
-        for (const e of this.entries.slice(1)) {
-            const a = orbWorld(anchor);
-            const b = orbWorld(e);
-            const control = a.clone().add(b).multiplyScalar(0.5);
-            control.z = Math.max(a.z, b.z) + this.config.arcLift * 2 * anchor.m;
-
-            const curve = new THREE.QuadraticBezierCurve3(a, control, b);
-            const line = new THREE.Line(
-                new THREE.BufferGeometry().setFromPoints(curve.getPoints(48)),
-                new THREE.LineBasicMaterial({
-                    color: e.node.color, transparent: true, opacity: 0.6,
-                    blending: THREE.AdditiveBlending, depthWrite: false,
-                }),
-            );
-            line.frustumCulled = false;
-            this.scene.add(line);
-
-            const packets = [0, 0.5].map((off) => {
-                const mesh = new THREE.Mesh(
-                    this.shared.sphere,
-                    new THREE.MeshBasicMaterial({ color: e.node.color.clone().lerp(this._white, 0.6) }),
-                );
-                mesh.scale.setScalar(9 * e.m);
-                mesh.frustumCulled = false;
-                this.scene.add(mesh);
-                return { mesh, off, speed: 0.12 + (e.phase * 0.08) };
-            });
-
-            this.arcs.push({ curve, line, packets });
-        }
     }
 
     _clearNodes() {
@@ -576,19 +534,8 @@ export class LevelMap {
             e.card.remove();
         }
 
-        for (const a of this.arcs) {
-            this.scene.remove(a.line);
-            a.line.geometry.dispose();
-            a.line.material.dispose();
-            for (const p of a.packets) {
-                this.scene.remove(p.mesh);
-                p.mesh.material.dispose();
-            }
-        }
-
         this.entries = [];
         this.pickables = [];
-        this.arcs = [];
     }
 
     /* ------------------------------------------------------------------ */
@@ -785,12 +732,6 @@ export class LevelMap {
             p.beam.material.opacity = 0.45 + 0.2 * Math.sin(t * 9 + ph * 3);
             p.edges.material.opacity = 0.6 + e.sel * 0.4 + e.hov * 0.2;
         }
-
-        for (const a of this.arcs) {
-            for (const pk of a.packets) {
-                a.curve.getPoint((t * pk.speed + pk.off) % 1, pk.mesh.position);
-            }
-        }
     }
 
     /* ------------------------------------------------------------------ */
@@ -877,6 +818,14 @@ export class LevelMap {
         }
 
         this.map.triggerRepaint();
+    }
+
+    /** Frame every event (the panel's ⌂ button). */
+    fitAll() {
+        if (!this.nodes.length || !this._styleReady) return;
+        const bounds = new maplibregl.LngLatBounds();
+        for (const n of this.nodes) bounds.extend([n.lng, n.lat]);
+        this.map.fitBounds(bounds, { padding: 80, maxZoom: 15, pitch: 62, duration: 900 });
     }
 
     /** Frame all events once, the first time there are any (after the style loads). */

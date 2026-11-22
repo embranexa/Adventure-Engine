@@ -3,6 +3,7 @@ import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { PHASE_STAGES } from '../../lifecycle.js';
 import { analyze, promotionTarget, toggleDone } from '../../lib/roadmap.js';
+import { safeHttpUrl } from '../../events.js';
 import { PromoteButton } from '../PromoteButton.js';
 
 const DAY_MS = 86_400_000;
@@ -22,6 +23,22 @@ function dueLabel(iso) {
     if (days === 1) return 'tomorrow';
     if (days === -1) return 'yesterday';
     return days > 0 ? `in ${days} days` : `${-days} days ago`;
+}
+
+/**
+ * An adventure's cover image, down the left side of its card (nothing when it has no
+ * cover, or the image won't load).
+ * @param {{ adventure: AdventureRecord }} props
+ */
+function QuestCover({ adventure }) {
+    const src = safeHttpUrl(adventure.cover_url);
+    const [failed, setFailed] = useState(false);
+    if (!src || failed) return null;
+    return html`
+        <div className="ql-cover">
+            <img src=${src} alt="" loading="lazy" referrerPolicy="no-referrer" onError=${() => setFailed(true)} />
+        </div>
+    `;
 }
 
 /**
@@ -99,6 +116,8 @@ export function QuestsPanel() {
                             onPointerEnter=${() => pooled && hoverItem(adventure.id)}
                             onPointerLeave=${() => pooled && hoverItem(null)}
                         >
+                            <${QuestCover} key=${`${adventure.id}:${adventure.cover_url ?? ''}`} adventure=${adventure} />
+                            <div className="ql-body">
                             <div className="ql-adventure">
                                 <span className="ql-title">${adventure.title}</span>
                                 ${due && html`<span className="ql-due">${due}</span>`}
@@ -126,6 +145,7 @@ export function QuestsPanel() {
                                     </div>
                                 `;
                             })}
+                            </div>
                         </section>
                     `;
                 })}

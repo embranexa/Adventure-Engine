@@ -7,6 +7,7 @@ import { ModeSwitch } from './components/ModeSwitch.js';
 import { MatterGauge } from './components/MatterGauge.js';
 import { Abyss } from './components/Abyss.js';
 import { Sigil } from './components/PanelTitle.js';
+import { LayoutMenu } from './components/LayoutMenu.js';
 import { ADVENTURE_TYPES } from './lifecycle.js';
 
 /** Status light for the live connection. @param {FeedStatus} status */
@@ -85,6 +86,7 @@ function App() {
                         `)}
                     </select>
                 `}
+                <${LayoutMenu} />
                 <button className="btn ghost" onClick=${resetWorkspace}>Reset layout</button>
             </header>
             <${MatterGauge} />

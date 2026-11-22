@@ -65,6 +65,20 @@ interface EventRecord {
     /** Source-specific extras (price, hosts, guest count, ...). */
     details: Record<string, unknown>;
     review: ReviewState;
+    /** Whole days: start/end are the first and last day's local midnights (lib/occurrences.js). */
+    all_day: boolean | null;
+    /** Repeats weekly; start/end are the first occurrence. Crawled events never do. */
+    recurrence: Recurrence | null;
+}
+
+/** A saved dock arrangement. */
+interface LayoutPreset { name: string; tree: LayoutNode }
+
+/** A weekly rule: weekdays (Monday = 0 ... Sunday = 6), until a day (inclusive) or forever. */
+interface Recurrence {
+    freq: 'weekly';
+    days: number[];
+    until: string | null;
 }
 
 // --- the refinery (stored values; display names in js/lifecycle.js) ---
@@ -106,6 +120,9 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     objects: { id: string; type: ObjectType; name: string }[];
     /** Its linked site, if any; a hand-made event takes its where from it. */
     site_id: string | null;
+    /** Free text for now (the Entropy Market later). */
+    costs: string | null;
+    rewards: string | null;
 }
 
 /** event | item | song; only events have a when/where (js/lifecycle.js ADVENTURE_TYPES). */
@@ -120,6 +137,8 @@ interface AdventureOwnFields {
     start: string | null;
     end: string | null;
     timezone: string | null;
+    all_day: boolean | null;
+    recurrence: Recurrence | null;
     venue: string | null;
     address: string | null;
     city: string | null;
@@ -132,6 +151,8 @@ type AdventureChanges = Partial<{
     type: AdventureType; title: string | null; description: string | null; url: string | null;
     cover_url: string | null; start_time: string | null; end_time: string | null; timezone: string | null;
     venue: string | null; address: string | null; city: string | null; lat: number | null; lon: number | null;
+    all_day: boolean | null; recurrence: { days: number[]; until: string | null } | null;
+    costs: string | null; rewards: string | null;
 }>;
 
 /** An adventure's action roadmap: a dependency graph (backend/services/roadmap.py). */
@@ -182,7 +203,7 @@ interface FilterState {
 }
 
 /** "stage" (Matter) or a facet that can color rows. */
-type LensKey = 'stage' | 'source' | 'city' | 'registration' | 'type' | 'pillar' | 'site' | 'contact';
+type LensKey = 'stage' | 'source' | 'city' | 'registration' | 'type' | 'pillar' | 'site' | 'contact' | 'organization' | 'skill';
 
 /** One move between signal chain nodes (backend/services/transitions.py). */
 interface TransitionRecord {
@@ -203,8 +224,8 @@ interface FlowRecord {
     count: number;
 }
 
-/** pillar | site | contact (js/lifecycle.js OBJECT_TYPES); only sites have a location. */
-type ObjectType = 'pillar' | 'site' | 'contact';
+/** pillar | site | contact | organization | skill (js/lifecycle.js OBJECT_TYPES); only sites have a location. */
+type ObjectType = 'pillar' | 'site' | 'contact' | 'organization' | 'skill';
 
 /** A virtual object (the Codex): something adventures link to (backend/services/objects.py). */
 interface VObject {
@@ -268,6 +289,14 @@ interface WorkspaceState {
     draggingPanelId: PanelId | null;
     /** Panels shown in their own window; they stay in `tree`, hidden from the main dock. */
     poppedOut: PanelId[];
+    /** Saved dock arrangements (the Layouts menu), persisted on the server. */
+    layoutPresets: LayoutPreset[];
+    loadLayoutPresets(): Promise<void>;
+    _storeLayoutPresets(presets: LayoutPreset[]): Promise<void>;
+    /** Save the current layout under a name (an existing one with that name is replaced). */
+    saveLayoutPreset(name: string): void;
+    deleteLayoutPreset(name: string): void;
+    applyLayoutPreset(name: string): void;
     /** The dock group (leaf id) the user last clicked or focused; see panelInUse in store.js. */
     focusedGroup: string | null;
     /** The popped-out panel whose window has focus. */
