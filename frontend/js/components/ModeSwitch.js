@@ -90,6 +90,7 @@ function HarvesterBar() {
 export function ModeSwitch() {
     const mode = useWorkspaceStore((s) => s.mode);
     const setMode = useWorkspaceStore((s) => s.setMode);
+    const selectFirstPrima = useWorkspaceStore((s) => s.selectFirstPrima);
     const showShades = useWorkspaceStore((s) => s.showShades);
     const toggleShades = useWorkspaceStore((s) => s.toggleShades);
     const spinning = useWorkspaceStore((s) => s.rawEvents.reduce((n, e) => n + (e.review === 'new' ? 1 : 0), 0));
@@ -116,7 +117,7 @@ export function ModeSwitch() {
             >Adventures <b>${adventureCount}</b></button>
             <button
                 className=${`mode-btn discovery ${mode === 'discovery' ? 'active' : ''}`}
-                onClick=${() => setMode('discovery')}
+                onClick=${() => { setMode('discovery'); selectFirstPrima(); }}
                 title=${`Review the prima materia in the Centrifuge (last harvest ${ago(lastSync, now)})`}
             >
                 Discovery

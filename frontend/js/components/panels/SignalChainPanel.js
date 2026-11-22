@@ -12,7 +12,7 @@ const ZONE_LABELS = { net: 'Net · events', core: 'Core · adventures', viewer: 
 
 /** The machines that work while a panel is in use (PHASE7_PLAN.md, stage 7d). @type {Partial<Record<PanelId, string[]>>} */
 const PANEL_MACHINES = {
-    classifier: ['nexus'],   // plus the Centrifuge and Sump in Discovery (see below)
+    classifier: ['nexus'],   // plus the Sump in Discovery; the Centrifuge spins all through Discovery (see below)
     node: [PHASE_NODES.classifying],
     alembic: [PHASE_NODES.decomposing],
     quests: [PHASE_NODES.constructing],
@@ -58,6 +58,7 @@ function runAction(action) {
     const s = useWorkspaceStore.getState();
     if (action.mode) s.setMode(action.mode);
     if (action.shades && !useWorkspaceStore.getState().showShades) s.toggleShades();
+    if (action.firstPrima) s.selectFirstPrima();
     if (action.create) {
         s.setMode('adventures');
         s.selectItem(null, 'twin'); // the Refinery shows the create buttons when nothing is selected
@@ -371,7 +372,8 @@ export function SignalChainPanel() {
         if (status !== 'ready') return;
         const ids = [...(inUsePanel ? PANEL_MACHINES[inUsePanel] ?? [] : [])];
         if (inUsePanel === 'node' && creating) ids.push(FORGE);
-        if (inUsePanel === 'classifier' && poolMode === 'discovery') ids.push(CENTRIFUGE, SUMP);   // events are reviewed only in Discovery
+        if (poolMode === 'discovery') ids.push(CENTRIFUGE);   // the Centrifuge spins all through Discovery, whatever panel is in use
+        if (inUsePanel === 'classifier' && poolMode === 'discovery') ids.push(SUMP);   // events are reviewed only in Discovery
         sceneRef.current?.setInUse(ids);
     }, [status, inUsePanel, creating, poolMode]);
 

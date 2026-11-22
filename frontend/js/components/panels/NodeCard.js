@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
-import { useWorkspaceStore } from '../../store.js';
+import { centrifugeOrder, useWorkspaceStore } from '../../store.js';
 import { formatEventWhen, formatPrice, safeHttpUrl } from '../../events.js';
 import { ADVENTURE_TYPES, MAIN_ROUTE, PHASE_STAGES, hasWhenWhere, stageOf } from '../../lifecycle.js';
 import { AdventureEditor } from './AdventureEditor.js';
@@ -139,27 +139,22 @@ function EventRows({ event }) {
 
 /**
  * Comb through the Centrifuge: the previous and next prima materia in time order (the
- * earliest first; undated ones last). ◀ is off on the first, ▶ on the last.
+ * earliest first; undated ones last). ◀ on the first wraps to the last, ▶ on the last to the first.
  * @param {{ item: PoolItem }} props
  */
 function CentrifugeComb({ item }) {
     const rawEvents = useWorkspaceStore((s) => s.rawEvents);
     const itemsById = useWorkspaceStore((s) => s.itemsById);
     const selectItem = useWorkspaceStore((s) => s.selectItem);
-    const order = useMemo(() => {
-        const time = (/** @type {EventRecord} */ e) => { const t = e.start ? new Date(e.start).getTime() : NaN; return Number.isNaN(t) ? Infinity : t; };
-        return rawEvents.filter((e) => e.review === 'new' && itemsById[e.id])
-            .sort((a, b) => time(a) - time(b) || a.id.localeCompare(b.id))
-            .map((e) => e.id);
-    }, [rawEvents, itemsById]);
+    const order = useMemo(() => centrifugeOrder(rawEvents, itemsById), [rawEvents, itemsById]);
     const i = order.indexOf(item.id);
     if (i < 0 || order.length < 2) return null;
-    const go = (/** @type {number} */ step) => { const id = order[i + step]; if (id) selectItem(id, 'triage'); };
+    const go = (/** @type {number} */ step) => { selectItem(order[(i + step + order.length) % order.length], 'triage'); };
     return html`
         <div className="nc-comb" role="group" aria-label="Prima materia in the Centrifuge">
-            <button className="btn" disabled=${i === 0} onClick=${() => go(-1)} title="The earlier prima materia" aria-label="Earlier">◀</button>
+            <button className="btn" onClick=${() => go(-1)} title="The earlier prima materia" aria-label="Earlier">◀</button>
             <span>${i + 1} <small>of ${order.length} in the Centrifuge</small></span>
-            <button className="btn" disabled=${i === order.length - 1} onClick=${() => go(1)} title="The later prima materia" aria-label="Later">▶</button>
+            <button className="btn" onClick=${() => go(1)} title="The later prima materia" aria-label="Later">▶</button>
         </div>
     `;
 }

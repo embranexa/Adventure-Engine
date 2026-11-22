@@ -166,6 +166,17 @@ export function panelInUse(s) {
 /** Selections made by clicking an item's card in a panel: they bring up the Refinery. */
 const CARD_CLICK_SOURCES = new Set(['classifier', 'calendar', 'map', 'quests', 'codex']);
 
+/**
+ * The prima materia in the Centrifuge in comb order: earliest first, undated ones last.
+ * @param {EventRecord[]} rawEvents @param {Record<string, PoolItem>} itemsById @returns {string[]}
+ */
+export function centrifugeOrder(rawEvents, itemsById) {
+    const time = (/** @type {EventRecord} */ e) => { const t = e.start ? new Date(e.start).getTime() : NaN; return Number.isNaN(t) ? Infinity : t; };
+    return rawEvents.filter((e) => e.review === 'new' && itemsById[e.id])
+        .sort((a, b) => time(a) - time(b) || a.id.localeCompare(b.id))
+        .map((e) => e.id);
+}
+
 /** Set by components/Popout.js (the store can't import it: it imports the store). */
 export const popoutHooks = { focus: (/** @type {PanelId} */ _panelId) => {} };
 
@@ -503,6 +514,12 @@ const workspaceStore = (set, get) => ({
         set((state) => (state.mode === mode
             ? {}
             : withVisible(state, { mode, actionError: null, ...poolUpdate({ ...state, mode }) }))),
+
+    selectFirstPrima: () => {
+        const { rawEvents, itemsById } = get();
+        const first = centrifugeOrder(rawEvents, itemsById)[0];
+        if (first) get().selectItem(first, 'triage');
+    },
 
     toggleShades: () =>
         set((state) => {

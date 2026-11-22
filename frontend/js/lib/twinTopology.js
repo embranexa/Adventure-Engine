@@ -24,8 +24,8 @@ import { MAIN_ROUTE, PHASE_NODES, PHASE_STAGES } from '../lifecycle.js';
  */
 /**
  * What clicking a machine does: open a panel, maybe after switching mode or opening the
- * create dialog. `label` (the panel's name) is filled in by the panel.
- * @typedef {{ panel: PanelId, mode?: PoolMode, shades?: boolean, create?: boolean, label?: string }} TwinAction
+ * create dialog, or selecting the first prima materia. `label` (the panel's name) is filled in by the panel.
+ * @typedef {{ panel: PanelId, mode?: PoolMode, shades?: boolean, create?: boolean, firstPrima?: boolean, label?: string }} TwinAction
  */
 /**
  * A pipe. `pipe` carries adventures and events; `conveyor` carries Codex objects; `market`
@@ -76,7 +76,7 @@ export function twinNodes(sourceNames) {
     return [
         ...harvesters,
         node({ id: CENTRIFUGE, label: 'Centrifuge', zone: 'net', kind: 'processor', holds: 'events', matter: 'prima materia',
-            action: { panel: 'classifier', mode: 'discovery' } }),
+            action: { panel: 'classifier', mode: 'discovery', firstPrima: true } }),
         node({ id: SUMP, label: 'Sump', zone: 'net', kind: 'vessel', holds: 'events', matter: 'dross',
             action: { panel: 'classifier', mode: 'discovery', shades: true } }),
         node({ id: FORGE, label: 'Forge', zone: 'net', kind: 'dynamo', action: { panel: 'node', create: true } }),

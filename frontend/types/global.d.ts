@@ -370,6 +370,8 @@ interface WorkspaceState {
     /** From an `adventures` message. */
     setAdventures(records: AdventureRecord[]): void;
     setMode(mode: PoolMode): void;
+    /** Select the first prima materia in the Centrifuge (comb order), if any. */
+    selectFirstPrima(): void;
     toggleShades(): void;
     selectItem(id: string | null, source: SelectionSource): void;
     hoverItem(id: string | null): void;
