@@ -43,7 +43,7 @@ DELAY = float(os.environ.get("DELAY", 7))
 CAPTURE_S = float(os.environ.get("CAPTURE_S", 5.5))
 W, H = os.environ.get("W", "1500"), os.environ.get("H", "900")
 # optional JS run in the app page EVAL_S seconds after it starts, e.g. to select a row:
-#   EVAL="import('/js/store.js').then(m => m.useWorkspaceStore.getState().selectItem('<id>', 'twin'))"
+#   EVAL="import('/frontend/js/store.js').then(m => m.useWorkspaceStore.getState().selectItem('<id>', 'twin'))"
 EVAL = os.environ.get("EVAL", "")
 EVAL_S = float(os.environ.get("EVAL_S", 2.5))
 

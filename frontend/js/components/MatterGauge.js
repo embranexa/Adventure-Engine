@@ -6,7 +6,7 @@ import { MAIN_ROUTE, PHASE_STAGES, REVIEW_STAGES } from '../lifecycle.js';
 /**
  * The analytics strip under the top bar: one vial per stage, filled by how many
  * items are there, named by matter. Adventures mode counts phases; Discovery counts flux,
- * prima materia and shades.
+ * prima materia and dross.
  */
 export function MatterGauge() {
     const mode = useWorkspaceStore((s) => s.mode);

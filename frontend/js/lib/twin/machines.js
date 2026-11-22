@@ -10,7 +10,8 @@
 // lens bands, ghosts on top); dynamos have none. Every machine stands on a dark plinth:
 // the base. Base meshes carry userData.ring (click: filter); body meshes carry userData.id
 // only when the machine opens a panel (click: open it). Locked machines stand dark.
-// Mechanisms run only while ctx.working() is true (its panel is in use; stage 7d).
+// Mechanisms run only while ctx.working() is true (its panel is in use; stage 7d); they
+// ease in and out over PACE_S (pace: 0 still .. 1 working) so focus changes don't flicker.
 
 import * as THREE from 'three';
 import { magicCircleCanvases } from '../magicCircle.js';
@@ -21,6 +22,7 @@ export const PLINTH_H = 3.4;
 const Y = PLINTH_H;
 const FRONT = Math.PI / 4;   // the side facing the camera
 const RIM_COLORS = { include: '#e6ebf2', exclude: '#ff4a3d' };
+const PACE_S = 0.5;          // a mechanism winds up or down in this long
 
 /** Plinth radius per body: the base is sized to the machine. */
 export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, market: 9, nexus: 8, atlas: 7, calendar: 8 };
@@ -65,13 +67,14 @@ export function makeShop(K) {
 }
 
 /** A lighter tint of a colour, for glows that must read on dark matter. */
-const lighter = (c) => '#' + new THREE.Color(c).lerp(new THREE.Color('#ffffff'), 0.35).getHexString();
+export const lighter = (c) => '#' + new THREE.Color(c).lerp(new THREE.Color('#ffffff'), 0.35).getHexString();
 
 /**
  * Build one machine.
  * @param {ReturnType<typeof makeShop>} S
  * @param {{ id: string, kind: string, zone: string, locked: boolean, holds: string | null, action: object | null }} node
- * @param {{ color: string, working: () => boolean, spin: () => number, objects: () => number, pending: () => boolean }} ctx
+ * @param {{ color: string, working: () => boolean, spin: () => number, objects: () => number, pending: () => boolean, ports?: number[] }} ctx
+ *   ports: the angles (radians, world frame) where pipes meet the base
  */
 export function buildMachine(S, node, ctx) {
     const { M, glow, cyl, torus, ball, tube, lathe, curl, finial, gem, CIRCLE, RUNES, DOT, liquidMat, additive } = S;
@@ -79,8 +82,11 @@ export function buildMachine(S, node, ctx) {
     const anims = [];
     const a = anims;
     const color = ctx.color, light = lighter(ctx.color), accent = color;
-    const working = () => !node.locked && ctx.working();
-    const busy = () => (working() ? 3 : 0);
+    // pace eases toward 1 while the panel is in use, back to 0 after (smoothstepped)
+    let wind = 0, pace = 0;
+    const working = () => pace > 0;
+    const busy = () => 3 * pace;
+    const paceOf = () => pace;
     const owned = [];   // per-machine materials (not shared) to dispose with it
     const mine = (m) => { owned.push(m); return m; };
     const box = (w, h, d, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y + h / 2, z); return m; };
@@ -159,11 +165,18 @@ export function buildMachine(S, node, ctx) {
     if (node.action && !node.locked) {
         const ring = new THREE.Mesh(new THREE.RingGeometry(Math.max(2, r - 3), r + 0.5, 64), mine(additive(CIRCLE.outer, light, 0.6)));
         ring.rotation.x = -Math.PI / 2; ring.position.y = PLINTH_H + 0.06; base.add(ring);
-        a.push((dt) => { ring.rotation.z += dt * 0.25 * (busy() || 1); ring.material.opacity = working() ? 0.85 : 0.6; });
+        a.push((dt) => { ring.rotation.z += dt * 0.25 * (1 + 2 * pace); ring.material.opacity = 0.6 + 0.25 * pace; });
+    }
+    // a flanged socket for each pipe (angles from pipes.js, in the base's own frame)
+    for (const ang of ctx.ports ?? []) {
+        const p = G(); p.position.set(Math.cos(ang) * (r + 0.9), 1.6, Math.sin(ang) * (r + 0.9)); p.rotation.y = -ang;
+        const sk = cyl(1.05, 1.05, 1.8, M.iron, 0, 16); sk.rotation.z = Math.PI / 2; sk.position.set(0.9, 0, 0); p.add(sk);
+        const fl = cyl(1.5, 1.5, 0.4, M.brass, 0, 16); fl.rotation.z = Math.PI / 2; fl.position.set(1.8, 0, 0); p.add(fl);
+        base.add(p);
     }
 
     /* the body */
-    const body = BODIES[bodyOf(node)]({ node, a, color, light, accent, working, busy, ctx, heart, G, M, glow, cyl, torus, ball, tube, lathe, curl, finial, gem, box, rivets, band, runeBand, curls, gear, ownGlow, mine, CIRCLE, RUNES, DOT, liquidMat, additive, S, getHeart: () => heartRec });
+    const body = BODIES[bodyOf(node)]({ node, a, color, light, accent, working, busy, pace: paceOf, ctx, heart, G, M, glow, cyl, torus, ball, tube, lathe, curl, finial, gem, box, rivets, band, runeBand, curls, gear, ownGlow, mine, CIRCLE, RUNES, DOT, liquidMat, additive, S, getHeart: () => heartRec });
 
     const group = G();
     group.add(base, body.group);
@@ -186,6 +199,9 @@ export function buildMachine(S, node, ctx) {
             for (const ring of rim.rings) { ring.visible = Boolean(mode); ring.material.emissive.set(c); ring.material.emissiveIntensity = mode === 'include' ? 1.3 : 4; }
         },
         frame(dt, t, ease) {
+            const want = !node.locked && ctx.working();
+            wind = want ? Math.min(1, wind + dt / PACE_S) : Math.max(0, wind - dt / PACE_S);
+            pace = wind * wind * (3 - 2 * wind);
             heartRec?.frame(ease);
             for (const f of anims) f(dt, t);
         },
@@ -263,7 +279,7 @@ const BODIES = {
         return { group: g, height: Y + 24 };
     },
     sump(c) {
-        const { G, M, light, heart, lathe, torus, box, cyl, curl, ball, tube, ownGlow, working, a } = c;
+        const { G, M, light, heart, lathe, torus, box, cyl, curl, ball, tube, ownGlow, pace, a } = c;
         const g = G();
         g.add(heart(11.4, 6, Y - 1.4));
         g.add(lathe([[12.4, Y + 4.4], [12.4, Y + 5.2], [11.6, Y + 5.6]], M.stone, 64), torus(12.1, 0.3, M.brass, Y + 5.4));
@@ -282,11 +298,11 @@ const BODIES = {
         const rimMesh = new THREE.Mesh(new THREE.TorusGeometry(6.2, 0.3, 8, 40), M.brass); rimMesh.rotation.y = Math.PI / 2; wheel.add(rimMesh);
         for (let i = 0; i < 10; i++) { const sp = G(); sp.rotation.x = (i / 10) * TAU; sp.add(box(0.25, 6.2, 0.25, M.iron), box(4, 0.2, 1.6, M.brass, 0, 5.6, 0)); wheel.add(sp); }
         g.add(wheel);
-        a.push((dt, t) => { const on = working(); wheel.rotation.x += dt * (on ? 1.6 : 0); lamps.forEach((l, i) => { l.material.emissiveIntensity = on ? 1.2 + 0.8 * Math.abs(Math.sin(t * 7 + i * 1.7)) : 1.6; }); });
+        a.push((dt, t) => { const k = pace(); wheel.rotation.x += dt * 1.6 * k; lamps.forEach((l, i) => { l.material.emissiveIntensity = 1.6 + (1.2 + 0.8 * Math.abs(Math.sin(t * 7 + i * 1.7)) - 1.6) * k; }); });
         return { group: g, height: Y + 16 };
     },
     forge(c) {
-        const { G, M, color, light, cyl, torus, lathe, box, tube, mine, DOT, working, a } = c;
+        const { G, M, color, light, cyl, torus, lathe, box, tube, mine, DOT, working, pace, a } = c;
         const g = G();
         g.add(cyl(8, 8.6, 6, M.stone, Y, 10), torus(8.2, 0.35, M.brass, Y + 6));
         const mouthMat = mine(std({ color: 0x050505, emissive: new THREE.Color(color), emissiveIntensity: 2.2 }));
@@ -316,7 +332,7 @@ const BODIES = {
             if (on) {
                 for (let i = 0; i < N; i++) { life[i] += dt * (0.25 + (i % 7) * 0.04) * 2; if (life[i] > 1) life[i] -= 1; const k = life[i]; pos.set([Math.sin(i + k * 3) * (1 + k * 2), Y + 18 + k * 14, Math.cos(i * 1.7 + k * 2) * (1 + k * 2)], i * 3); }
                 geo.attributes.position.needsUpdate = true;
-                hp = (hp + dt * 1.6) % 1; arm.rotation.z = hp < 0.18 ? 0.45 - (hp / 0.18) * 0.68 : -0.23 + ((hp - 0.18) / 0.82) * 0.68;
+                hp = (hp + dt * 1.6 * pace()) % 1; const swing = hp < 0.18 ? 0.45 - (hp / 0.18) * 0.68 : -0.23 + ((hp - 0.18) / 0.82) * 0.68; arm.rotation.z = 0.45 + (swing - 0.45) * pace();
             } else arm.rotation.z = 0.45;
             const pump = on ? 0.5 + 0.5 * Math.sin(t * 5) : 1;
             leather.scale.y = 0.35 + 0.65 * pump; leather.position.y = 1.0 + leather.scale.y * 0.8; lid.position.y = 1.0 + leather.scale.y * 1.6;
@@ -335,7 +351,7 @@ const BODIES = {
         return { group: g, height: Y + 23 };
     },
     refinery(c) {
-        const { G, M, color, light, cyl, heart, getHeart, band, box, curls, lathe, runeBand, gem, finial, torus, ball, mine, working, busy, a } = c;
+        const { G, M, color, light, cyl, heart, getHeart, band, box, curls, lathe, runeBand, gem, finial, torus, ball, mine, busy, pace, a } = c;
         const g = G(), H = 26;
         g.add(cyl(6.2, 6.8, 1.6, M.iron, Y, 24), heart(5.2, H, Y + 1.6));
         const trays = [];
@@ -364,18 +380,18 @@ const BODIES = {
         fw.add(cyl(1.1, 1.1, 4, M.glass, 4.6, 16, true));
         let w = 0, ang = 0;
         a.push((dt) => {
-            const on = working(), level = getHeart().level();
-            w += dt * 2 * busy(); ang += dt * (on ? 4 : 0); wheel.rotation.z = ang;
+            const k = pace(), level = getHeart().level();
+            w += dt * 2 * busy(); ang += dt * 4 * k; wheel.rotation.z = ang;
             const px = Math.cos(ang) * 2.4, py = Math.sin(ang) * 2.4, top = 5.2 + py * 0.5 + 1.2;
             piston.position.set(0, top, 0.6);
             const dx = 0 - px, dy = top - py, L = Math.hypot(dx, dy); rod.position.set(px / 2, (py + top) / 2, 0.9); rod.scale.y = L; rod.rotation.z = Math.atan2(-dx, dy);
-            trays.forEach((tr, i) => { const lit = tr.userData.y < level; tr.material.emissiveIntensity = lit ? 1.2 + 0.6 * Math.max(0, Math.sin(w - i * 0.9)) : 0.12; tr.position.y = tr.userData.y + (on ? Math.sin(w * 2 + i) * 0.15 : 0); });
+            trays.forEach((tr, i) => { const lit = tr.userData.y < level; tr.material.emissiveIntensity = lit ? 1.2 + 0.6 * Math.max(0, Math.sin(w - i * 0.9)) : 0.12; tr.position.y = tr.userData.y + Math.sin(w * 2 + i) * 0.15 * k; });
             crown.rotation.y += dt * busy();
         });
         return { group: g, height: Y + 37 };
     },
     alembic(c) {
-        const { G, M, accent, light, heart, tube, band, torus, lathe, box, ball, glow, ownGlow, mine, DOT, busy, a } = c;
+        const { G, M, accent, light, heart, tube, band, torus, lathe, box, ball, glow, ownGlow, mine, DOT, busy, pace, a } = c;
         const g = G();
         g.add(heart(6.6, 12, Y));
         for (let i = 0; i < 6; i++) { const t = (i / 6) * TAU + 0.2; g.add(tube([V(Math.cos(t) * 6.9, Y, Math.sin(t) * 6.9), V(Math.cos(t) * 6.9, Y + 12, Math.sin(t) * 6.9), V(Math.cos(t) * 5.8, Y + 13.4, Math.sin(t) * 5.8)], 0.3, M.copper, 12)); }
@@ -404,14 +420,15 @@ const BODIES = {
         a.push((dt, t) => {
             const k = busy(), on = k > 0; ph += dt * 0.7 * k; const p = ph % 1;
             drip.position.y = Y + 5.4 - p * (Y + 3.4); drip.visible = on && p < 0.92;
-            coilMat.emissiveIntensity = on ? 0.8 + 0.4 * Math.sin(t * 6) : 0.2;
-            needle.rotation.z = on ? -0.6 + Math.sin(t * 2.3) * 0.5 + Math.sin(t * 17) * 0.06 : 1.1;
-            steam.material.opacity = on ? 0.3 + 0.15 * Math.sin(t * 3) : 0; steam.position.y = Y + 22 + ((t * 5) % 7);
+            const e = pace();
+            coilMat.emissiveIntensity = 0.2 + (0.6 + 0.4 * Math.sin(t * 6)) * e;
+            needle.rotation.z = 1.1 + (-1.7 + Math.sin(t * 2.3) * 0.5 + Math.sin(t * 17) * 0.06) * e;
+            steam.material.opacity = (0.3 + 0.15 * Math.sin(t * 3)) * e; steam.position.y = Y + 22 + ((t * 5) % 7);
         });
         return { group: g, height: Y + 25 };
     },
     crucible(c) {
-        const { G, M, color, accent, heart, lathe, tube, ball, torus, rivets, box, glow, gear, mine, working, a } = c;
+        const { G, M, color, accent, heart, lathe, tube, ball, torus, rivets, box, glow, gear, mine, pace, a } = c;
         const g = G();
         g.add(heart(6.6, 9, Y + 2.4), lathe([[0, Y + 2], [6.4, Y + 2], [6.9, Y + 2.6]], M.iron, 40));
         for (let i = 0; i < 3; i++) {
@@ -433,9 +450,9 @@ const BODIES = {
         const g2 = gear(1.2, 8, M.gilt); g2.rotation.x = -Math.PI / 2; g2.position.set(2.9, Y + 19.8, 0); g.add(g2);
         let cp = 0;
         a.push((dt) => {
-            const on = working(); cp += dt * (on ? 0.9 : 0);
-            climb.forEach((m, i) => { const f = (cp - i * 0.14) % 1.8; m.material.emissiveIntensity = on && f > 0 && f < 0.35 ? Math.sin((f / 0.35) * Math.PI) * 1.2 : 0; });
-            stir.rotation.y += dt * (on ? 2.4 : 0); g2.rotation.z -= dt * (on ? 3.6 : 0);
+            const k = pace(); cp += dt * 0.9 * k;
+            climb.forEach((m, i) => { const f = (cp - i * 0.14) % 1.8; m.material.emissiveIntensity = f > 0 && f < 0.35 ? Math.sin((f / 0.35) * Math.PI) * 1.2 * k : 0; });
+            stir.rotation.y += dt * 2.4 * k; g2.rotation.z -= dt * 3.6 * k;
         });
         return { group: g, height: Y + 22 };
     },
@@ -486,7 +503,7 @@ const BODIES = {
         return { group: g, height: Y + 25 };
     },
     codex(c) {
-        const { G, M, box, cyl, gear, curl, liquidMat, mine, working, ctx, a } = c;
+        const { G, M, box, cyl, gear, curl, liquidMat, mine, working, pace, ctx, a } = c;
         const g = G();
         g.add(box(12, 18, 6, M.wood, 0, Y, -0.4), box(11, 16, 0.2, M.glass, 0, Y + 1, 2.75));
         for (let s = 0; s < 3; s++) g.add(box(11, 0.4, 5, M.brass, 0, Y + 1.2 + s * 5.4, 0));
@@ -505,7 +522,7 @@ const BODIES = {
         cg[0].position.set(-1.2, Y + 22.4, 0.6); cg[1].position.set(2.25, Y + 22.4, 0.6); cg[2].position.set(2.25, Y + 24.8, 0.6);
         for (const x of cg) g.add(x);
         a.push((dt, t) => {
-            const on = working(), sp = on ? 1.2 : 0, shown = Math.min(9, ctx.objects());
+            const on = working(), sp = 1.2 * pace(), shown = Math.min(9, ctx.objects());
             cg[0].rotation.z += dt * sp; cg[1].rotation.z -= dt * sp * (2.2 / 1.4); cg[2].rotation.z += dt * sp * 2.2;
             jars.forEach(({ jar, lid }, i) => {
                 jar.visible = i < shown;
@@ -550,7 +567,7 @@ const BODIES = {
         return { group: g, height: Y + 26 };
     },
     atlas(c) {
-        const { G, M, light, lathe, tube, curl, torus, box, gem, finial, cyl, additive, RUNES, mine, S, working, a } = c;
+        const { G, M, light, lathe, tube, curl, torus, box, gem, finial, cyl, additive, RUNES, mine, S, pace, a } = c;
         const g = G(), R = 7, cy = Y + 15;
         g.add(lathe([[5.4, Y], [5, Y + 0.8], [2.2, Y + 1.6], [1.4, Y + 3.4], [2, Y + 4]], M.brass, 40));
         for (let i = 0; i < 4; i++) { const t = (i / 4) * TAU + Math.PI / 4; g.add(tube([V(Math.cos(t) * 1.6, Y + 3.6, Math.sin(t) * 1.6), V(Math.cos(t) * 5, Y + 6, Math.sin(t) * 5), V(Math.cos(t) * 8.4, Y + 10, Math.sin(t) * 8.4), V(Math.cos(t) * 8.8, cy - 0.2, Math.sin(t) * 8.8)], 0.32, M.brass, 20)); const cu = curl(1.4); cu.position.set(Math.cos(t) * 6.4, Y + 6.6, Math.sin(t) * 6.4); cu.rotation.y = -t + Math.PI / 2; g.add(cu); }
@@ -568,16 +585,16 @@ const BODIES = {
         const f = finial(0.45); f.position.y = R + 0.9; tilt.add(f);
         g.add(cyl(0.9, 0.9, cy - R - 2 - (Y + 4), M.brass, Y + 4, 12));
         a.push((dt, t) => {
-            const on = working();
-            globe.rotation.y += dt * (on ? 0.9 : 0);
-            merid.rotation.y = FRONT + (on ? Math.sin(t * 0.6) * 0.45 : 0);
-            hFace.rotation.z -= dt * (on ? 0.3 : 0);
-            sun.rotation.y += dt * (on ? 1.5 : 0);
+            const k = pace();
+            globe.rotation.y += dt * 0.9 * k;
+            merid.rotation.y = FRONT + Math.sin(t * 0.6) * 0.45 * k;
+            hFace.rotation.z -= dt * 0.3 * k;
+            sun.rotation.y += dt * 1.5 * k;
         });
         return { group: g, height: Y + 25 };
     },
     calendar(c) {
-        const { G, M, color, light, lathe, ball, glow, additive, RUNES, mine, busy, working, a } = c;
+        const { G, M, color, light, lathe, ball, glow, additive, RUNES, mine, busy, pace, a } = c;
         const g = G();
         g.add(lathe([[5.4, Y], [1.4, Y + 1.2], [1.1, Y + 4.5], [1.8, Y + 5.2]], M.brass, 40));
         const sphere = G(); sphere.position.y = Y + 13;
@@ -591,9 +608,9 @@ const BODIES = {
         const planets = [3.2, 4.6, 5.8].map((r, i) => { const p = ball(0.45 + i * 0.1, [M.silver, M.copper, M.gilt][i]); sphere.add(p); return { p, r, w: 1.6 - i * 0.4, ph: i * 2 }; });
         for (const pl of planets) pl.p.position.set(Math.cos(pl.ph) * pl.r, Math.sin(pl.ph) * pl.r * 0.4, Math.sin(pl.ph) * pl.r);
         a.push((dt) => {
-            const on = working(); inner.rotation.y += dt * 0.35 * busy();
-            sphere.rotation.y += dt * (on ? 0.6 : 0);
-            for (const pl of planets) { if (!on) continue; pl.ph += dt * pl.w * 3; pl.p.position.set(Math.cos(pl.ph) * pl.r, Math.sin(pl.ph) * pl.r * 0.4, Math.sin(pl.ph) * pl.r); }
+            const k = pace(); inner.rotation.y += dt * 0.35 * busy();
+            sphere.rotation.y += dt * 0.6 * k;
+            for (const pl of planets) { if (!k) continue; pl.ph += dt * pl.w * 3 * k; pl.p.position.set(Math.cos(pl.ph) * pl.r, Math.sin(pl.ph) * pl.r * 0.4, Math.sin(pl.ph) * pl.r); }
         });
         return { group: g, height: Y + 24 };
     },

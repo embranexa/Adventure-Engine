@@ -25,7 +25,7 @@ from backend.db.base import Base, UTCDateTime, utcnow
 
 # Raw event review states:
 #   harvested (flux, in its Harvester) | new (prima materia, in the Centrifuge: Discovery shows these)
-#   passed (became an adventure)       | ignored (shade, in the Sump)
+#   passed (became an adventure)       | ignored (dross, in the Sump)
 REVIEW_STATES = ("harvested", "new", "passed", "ignored")
 
 # Adventure phases, in lifecycle order (display names in frontend/js/lifecycle.js)

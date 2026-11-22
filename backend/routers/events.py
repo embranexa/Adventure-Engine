@@ -48,7 +48,7 @@ async def pass_event(event_id: uuid.UUID):
 
 @router.post("/{event_id}/ignore")
 async def ignore_event(event_id: uuid.UUID):
-    """Prima materia -> shade (Sump)."""
+    """Prima materia -> dross (Sump)."""
     with triage_errors():
         await triage.ignore_event(event_id)
     return {"status": "ignored"}
@@ -56,6 +56,6 @@ async def ignore_event(event_id: uuid.UUID):
 
 @router.post("/{event_id}/revive")
 async def revive_event(event_id: uuid.UUID):
-    """Shade -> passed: restores its adventure from the Necropolis, or creates one."""
+    """Dross -> passed: restores its adventure from the Necropolis, or creates one."""
     with triage_errors():
         return {"adventure_id": await triage.revive_event(event_id)}

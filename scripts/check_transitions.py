@@ -125,9 +125,12 @@ async def main():
     await step("harvest again (+1 new)", lambda: harvest(6), {("outside", h): 1})
     async with SessionLocal() as s:
         ids = {e.api_id: e.id for e in (await s.scalars(select(Event).where(Event.api_id.like("check-%")))).all()}
-    await step("feed", lambda: triage.feed_source("luma"), {(h, "centrifuge"): 6})
-    await step("siphon", lambda: triage.siphon_source("luma"), {("centrifuge", h): 6})
-    await step("feed again", lambda: triage.feed_source("luma"), {(h, "centrifuge"): 6})
+    # the harvester may already hold real events from the copied database: they move too
+    held = (await node_counts())[h]
+    assert held >= 6, f"harvester holds {held}, expected at least the 6 fake events"
+    await step("feed", lambda: triage.feed_source("luma"), {(h, "centrifuge"): held})
+    await step("siphon", lambda: triage.siphon_source("luma"), {("centrifuge", h): held})
+    await step("feed again", lambda: triage.feed_source("luma"), {(h, "centrifuge"): held})
 
     state = {}
 
@@ -144,7 +147,7 @@ async def main():
         assert await triage.sweep_missed() == 1
     await step("sweeper kills P", age_p, {("hopper", "necropolis"): 1})
     await step("ignore B", lambda: triage.ignore_event(ids["check-2"]), {("centrifuge", "sump"): 1})
-    await step("purge", triage.purge_centrifuge, {("centrifuge", "sump"): 3})
+    await step("purge", triage.purge_centrifuge, {("centrifuge", "sump"): held - 3})  # all but A, P and B
     await step("revive C from the sump", lambda: triage.revive_event(ids["check-3"]), {("sump", "hopper"): 1})
     await step("A -> classifying", lambda: triage.set_phase(state["A"], "classifying"), {("hopper", "refinery"): 1})
     await step("A -> decomposing", lambda: triage.set_phase(state["A"], "decomposing"), {("refinery", "alembic"): 1})

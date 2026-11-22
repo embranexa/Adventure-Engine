@@ -8,23 +8,20 @@
  *   NET     foundry floor: harvesters -> centrifuge -> sump; the forge
  *   CORE    raised bench:  hopper -> refinery -> alembic -> crucible -> arena -> treasury
  *           -> archive; necropolis in front (kill manifold), codex cabinet behind
- *   GALLERY back, raised:  nexus (the lantern), atlas, calendar, copper wires between them
+ *   GALLERY back, raised:  nexus, atlas, calendar (the viewers)
  *
- * Liquid height = rows held (each zone on its own scale); pipe bore = sqrt(packets over
- * the flows window); packets = logged transitions, travelling the pipes.
+ * Liquid height = rows held (each zone on its own scale). Pipes lie on the floor, dark
+ * until a logged transition sends a slug of light along its route (pipes.js).
  *
- * Light (phase 4): lit liquid in lens bands with ghost liquid above it; packets in their
- * row's lens colour, dim if the row fails the filter; the lantern's hood closes and its
- * lamp blinks amber while the Nexus draft is pending; a relight (filter or lens change)
- * sweeps the beam across the machines, each relighting as it passes, after a pulse down
- * the wire when the calendar or atlas caused it; a magic circle under the selected row's
- * machine, in the row's colour. Each vessel's base is a button (a rune collar) that
- * cycles its stage in the filter.
+ * Light: lit liquid in lens bands with ghost liquid above it (a filter or lens change
+ * shows at once); slugs in their row's lens colour, dim if the row fails the filter; a
+ * magic circle on the floor around the selected row's machine, in the row's matter colour
+ * (selection.js). Each vessel's base is a button that cycles its stage in the filter.
  *
  *   scene.update({ nodes, pipes, levels, codex, flows, colors, sources, io,
  *                  centrifugeBySource, stageFilter, light, packetStyle, fresh })
- *   scene.relight({ from })               // from: 'calendar' | 'atlas' | null
- *   scene.setSelection(nodeId, color)     // a magic circle at the base of the row's machine
+ *   scene.setSelection(nodeId, color)     // the old circle closes, the new one opens
+ *   scene.setInUse(nodeIds)               // machines whose panel is in use work
  *   scene.play(transitions, { replay })   // replay: compress into a few seconds
  *   scene.fit()                           // frame everything
  *   scene.dispose()
@@ -38,46 +35,31 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { magicCircleCanvases } from '../magicCircle.js';
 import { deferredResize, isResizing, viewOf } from '../resizing.js';
 import { CENTRIFUGE, CODEX, ENTROPY_MARKET, FORGE, MAIN_CHAIN, MANIFOLD, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from '../twinTopology.js';
 import { makeMaterials } from './materials.js';
 import { buildZones, zoneRects } from './zones.js';
-import { FOOT, bodyOf, buildMachine, makeShop } from './machines.js';
+import { FOOT, bodyOf, buildMachine, lighter, makeShop } from './machines.js';
+import { buildPipes } from './pipes.js';
+import { makeSelection } from './selection.js';
 
 // Phase 7: every zone stands on the floor, cordoned by walls of light (twin/zones.js).
 const NET_Y = 0;
 const CORE_Y = 0;
 const GALLERY_Y = 0;
-const GROUND = 0x07080b;  // the twin's own dark floor (bloom needs an opaque canvas)
+const GROUND = 0x07080b;  // the twin's own dark floor (an opaque canvas)
 const MACHINE_SCALE = 1.5;
 /** Rows that fill a heart: each zone has its own scale (raw events are bulk, adventures refined). */
 const CAP = { net: 120, core: 12 };
 /** Dynamos name what they work with on their label. */
 const SUB = { forge: 'prima materia', atlas: 'space', calendar: 'time', nexus: 'topology' };
-const PIPE_H = 5;         // pipes run this far above a machine's floor
 const FRUSTUM = 300;
 const VIEW_DIR = new THREE.Vector3(0.55, 0.85, 1.15).normalize();
 
-const PACKET_SPEED = 55;                 // world units per second
-const MIN_TRIP_S = 1.2;                  // even a short hop stays visible this long
-const MAX_PACKETS = 400;
 const REPLAY_MAX = 40;
 const REPLAY_SECONDS = 5;
-const BURST_MAX = 8;                     // packets drawn per (from, to) in one batch
-
-const SWEEP_S = 1.6;                     // the beam crosses the machines in this long
-const PULSE_S = 0.7;                     // a pulse runs down a copper wire in this long
-const AMBER = 0xf2a33a;
-const COPPER = 0xb87333;
-
-const STEEL = 0x23262b;
-const STEEL_EDGE = 0x7a808a;
-const BRASS = 0xc8a46a;
+const BURST_MAX = 8;                     // slugs drawn per (from, to) in one batch
+const BURST_GAP_S = 0.12;                // between the slugs of one burst
 
 /** A count for a label: whole numbers as they are, shared rows (object lenses) to one decimal. */
 const fmtCount = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
@@ -111,36 +93,6 @@ function layout(nodes) {
     MAIN_CHAIN.forEach((id, i) => { fixed[id] = [chainX[i] ?? -110 + i * 70, CORE_Y, 0]; });
     for (const id of [...nodes.map((n) => n.id), MANIFOLD]) if (fixed[id]) pos.set(id, new THREE.Vector3(...fixed[id]));
     return pos;
-}
-
-/** The polyline a pipe follows, from `a` to `b` (right angles, like real plumbing). */
-function pipePath(pipe, pos) {
-    const A = pos.get(pipe.a), B = pos.get(pipe.b);
-    if (!A || !B) return null;
-    const a = A.clone().setY(A.y + PIPE_H), b = B.clone().setY(B.y + PIPE_H);
-    if (Math.abs(a.x - b.x) < 1e-6 || Math.abs(a.z - b.z) < 1e-6) {
-        if (Math.abs(a.y - b.y) < 1e-6) return [a, b];
-    }
-    const mx = (a.x + b.x) / 2;
-    return [a, new THREE.Vector3(mx, a.y, a.z), new THREE.Vector3(mx, b.y, a.z), new THREE.Vector3(mx, b.y, b.z), b]
-        .filter((p, i, arr) => i === 0 || p.distanceTo(arr[i - 1]) > 1e-6);
-}
-
-/** Total length of a polyline. */
-function pathLength(points) {
-    let n = 0;
-    for (let i = 1; i < points.length; i++) n += points[i].distanceTo(points[i - 1]);
-    return n;
-}
-
-/** The point `d` units along a polyline. */
-function pointAt(points, d, out) {
-    for (let i = 1; i < points.length; i++) {
-        const seg = points[i].distanceTo(points[i - 1]);
-        if (d <= seg) return out.lerpVectors(points[i - 1], points[i], seg ? d / seg : 0);
-        d -= seg;
-    }
-    return out.copy(points[points.length - 1]);
 }
 
 export class TwinScene {
@@ -192,49 +144,30 @@ export class TwinScene {
         rim.position.set(-200, 120, -220);
         this.scene.add(rim);
 
-        // bloom: the soft halo around bright parts (a switch on the panel; on by default)
-        this.bloomOn = true;
-        this.composer = new EffectComposer(this.renderer);
-        this.composer.setPixelRatio(this.renderer.getPixelRatio());
-        this.composer.addPass(new RenderPass(this.scene, this.camera));
-        this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.5, 0.85);
-        this.composer.addPass(this.bloom);
-        this.composer.addPass(new OutputPass());
 
         this.kit = makeMaterials();
         this.shop = makeShop(this.kit);
-        /** node ids whose panel is in use (stage 7d fills this) */
+        /** node ids whose panel is in use (setInUse, from the panel) */
         this.inUse = new Set();
+        /** reduced motion: mechanisms and turning circles stand still (slugs still run) */
+        this.calm = this.view.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null;
         this.zones = null;   // built with the machines (they need the layout)
-        this.shared = this._sharedAssets();
         this.scene.add(this._buildStage());
 
         this.machineGroup = new THREE.Group();
-        this.pipeGroup = new THREE.Group();
-        this.scene.add(this.machineGroup, this.pipeGroup);
+        this.scene.add(this.machineGroup);
 
-        this.packetMesh = new THREE.InstancedMesh(this.shared.packetGeo, this.shared.packetMat, MAX_PACKETS);
-        this.packetMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        this.packetMesh.count = 0;
-        this.packetMesh.frustumCulled = false;
-        this.scene.add(this.packetMesh);
-
-        this.lightGroup = new THREE.Group(); // wires, beam, the selection's magic circle
-        this.scene.add(this.lightGroup);
-        this._buildLight();
+        this.sel = makeSelection(this.shop, this.scene);
 
         /** id -> machine record (see _addMachine) */
         this.machines = new Map();
-        /** id -> pipe record { pipe, points, meshes, joints, bore, color } */
-        this.pipes = new Map();
+        /** the floor pipes, slugs, conveyor and Temper (pipes.js); built with the machines */
+        this.pipes = null;
         this.pipesByEnds = new Map();
-        this.packets = [];      // { points, length, d, delay, color, scale, to }
+        this.temperLabel = null;
         this.positions = new Map();
         this.hoverId = null;
         this.hoverRing = false;
-        this.wires = new Map();  // 'atlas' | 'calendar' -> { curve, mesh }
-        this.pulses = [];        // { curve, t, dur, sprite }
-        this.sweepT = -1;        // time the current beam sweep started (-1: none)
         this.selection = { nodeId: null, color: '#ffffff' };
         this.data = null;
         this.lastPlayedId = 0;
@@ -245,10 +178,6 @@ export class TwinScene {
         this.raycaster = new THREE.Raycaster();
         this._ndc = new THREE.Vector2();
         this._v = new THREE.Vector3();
-        this._m = new THREE.Matrix4();
-        this._q = new THREE.Quaternion();
-        this._s = new THREE.Vector3();
-        this._c = new THREE.Color();
         this._bindEvents();
 
         this._ro = new this.view.ResizeObserver(deferredResize(() => this._resize(), this.view));
@@ -268,48 +197,6 @@ export class TwinScene {
     /*  Assets and the stage                                               */
     /* ------------------------------------------------------------------ */
 
-    _sharedAssets() {
-        const c = document.createElement('canvas');
-        c.width = c.height = 128;
-        const g = c.getContext('2d');
-        const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-        grad.addColorStop(0, 'rgba(255,255,255,1)');
-        grad.addColorStop(0.25, 'rgba(255,255,255,.45)');
-        grad.addColorStop(0.65, 'rgba(255,255,255,.05)');
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
-        g.fillStyle = grad;
-        g.fillRect(0, 0, 128, 128);
-        const glow = new THREE.CanvasTexture(c);
-        glow.colorSpace = THREE.SRGBColorSpace;
-
-        const segment = new THREE.CylinderGeometry(1, 1, 1, 10, 1, false);
-        segment.rotateX(Math.PI / 2); // along +Z, scaled to length
-        const liquid = new THREE.CylinderGeometry(1, 1, 1, 16);
-        liquid.translate(0, 0.5, 0); // grows upward from its base
-
-        return {
-            glow,
-            segment,
-            joint: new THREE.SphereGeometry(1, 10, 8),
-            liquid,
-            packetGeo: new THREE.SphereGeometry(1, 10, 8),
-            packetMat: new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
-            steel: new THREE.MeshStandardMaterial({ color: STEEL, metalness: 0.75, roughness: 0.42 }),
-            steelDim: new THREE.MeshStandardMaterial({ color: STEEL, metalness: 0.6, roughness: 0.6, transparent: true, opacity: 0.45 }),
-            brass: new THREE.MeshStandardMaterial({ color: BRASS, metalness: 0.85, roughness: 0.35 }),
-            edgeLine: new THREE.LineBasicMaterial({ color: STEEL_EDGE, transparent: true, opacity: 0.35 }),
-        };
-    }
-
-    _glow(color, scale, opacity) {
-        const s = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: this.shared.glow, color: new THREE.Color(color), transparent: true, opacity,
-            blending: THREE.AdditiveBlending, depthWrite: false,
-        }));
-        s.scale.setScalar(scale);
-        return s;
-    }
-
     /** The ground: a dark floor, lighter under the machines. Zones are built with the machines. */
     _buildStage() {
         const c = document.createElement('canvas');
@@ -326,7 +213,6 @@ export class TwinScene {
         ground.rotation.x = -Math.PI / 2;
         ground.position.set(-40, -0.05, -30);
         ground.raycast = () => {};
-        this.zoneLabels = [];   // the zones name themselves with floor plaques
         return ground;
     }
 
@@ -340,53 +226,9 @@ export class TwinScene {
         this.scene.add(this.zones.group);
     }
 
-    /** Turn the bloom pass on or off (the panel's Glow switch). */
-    setBloom(on) {
-        this.bloomOn = Boolean(on);
-    }
-
-    /** A cone with its apex at the origin, opening along +Z (scale: radius, radius, length). */
-    _coneGeo() {
-        const g = new THREE.ConeGeometry(1, 1, 28, 1, true);
-        g.translate(0, -0.5, 0);
-        g.rotateX(-Math.PI / 2);
-        return g;
-    }
-
-    /** The lantern's beam and the selection's magic circle (wires come with the machines). */
-    _buildLight() {
-        const beamMat = (color) => new THREE.MeshBasicMaterial({
-            color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
-            depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
-        });
-        this.beam = new THREE.Mesh(this._coneGeo(), beamMat(0xfff1d0));
-        this.beam.visible = false;
-        this.beamSpot = this._glow(0xfff1d0, 90, 0);
-        this.beamSpot.visible = false;
-
-        // the selection: a magic circle of two counter-rotating layers on the floor
-        const { outer, inner } = magicCircleCanvases(512);
-        const layer = (cv) => {
-            const tex = new THREE.CanvasTexture(cv);
-            tex.colorSpace = THREE.SRGBColorSpace;
-            const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({
-                map: tex, color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
-                depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
-            }));
-            m.rotation.x = -Math.PI / 2;
-            return m;
-        };
-        this.circle = new THREE.Group();
-        this.circleOuter = layer(outer);
-        this.circleInner = layer(inner);
-        this.circleGlow = this._glow(0xffffff, 1, 0);
-        this.circleGlow.position.y = 3;
-        this.circle.add(this.circleOuter, this.circleInner, this.circleGlow);
-        this.circle.visible = false;
-        this.circleOn = 0;          // fades in and out
-        this.circleSize = 30;
-        this.circleTextures = [this.circleOuter.material.map, this.circleInner.material.map];
-        this.lightGroup.add(this.beam, this.beamSpot, this.circle);
+    /** The machines whose panel is in use: their mechanisms work (easing in and out). @param {string[]} ids */
+    setInUse(ids) {
+        this.inUse = new Set(ids);
     }
 
     /* ------------------------------------------------------------------ */
@@ -395,17 +237,18 @@ export class TwinScene {
 
     /** One machine (twin/machines.js), standing at `position`. */
     _addMachine(node, position, color) {
-        const rec = { id: node.id, node, color, spin: 0, syncing: false, pendingBands: null, relightAt: 0 };
+        const rec = { id: node.id, node, color, spin: 0, syncing: false };
         const machine = buildMachine(this.shop, node, {
             color,
             working: () => this.inUse.has(node.id),
             spin: () => rec.spin,
             objects: () => this.data?.codex?.total ?? 0,
             pending: () => (this.data?.light?.pending ?? 0) > 0,
+            ports: this.pipes?.ports.get(node.id) ?? [],
         });
         machine.group.position.copy(position);
         machine.group.scale.setScalar(MACHINE_SCALE);
-        Object.assign(rec, { machine, group: machine.group, height: machine.height * MACHINE_SCALE, liquidMax: Boolean(machine.heart) });
+        Object.assign(rec, { machine, group: machine.group, height: machine.height * MACHINE_SCALE });
         this.machineGroup.add(machine.group);
         rec.label = this._makeLabel(node);
         this.machines.set(node.id, rec);
@@ -465,6 +308,15 @@ export class TwinScene {
         return label;
     }
 
+    /** The Temper names itself and its step: a Net heart's scale to a Core heart's. */
+    _temperLabel() {
+        const label = el('div', 'twin-label kind-temper');
+        label.style.setProperty('--c', '#cfd6e0');
+        label.append(el('span', 'twin-label-name', 'Temper'), el('b', 'twin-label-count', `${CAP.net} : ${CAP.core} scale`));
+        this.labels.appendChild(label);
+        return label;
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Data                                                               */
     /* ------------------------------------------------------------------ */
@@ -488,21 +340,13 @@ export class TwinScene {
                     ? [...level.bands, { color: data.colors[n.id] ?? '#888', count: level.total - level.lit, ghost: true }]
                     : level.bands;
                 const cap = CAP[n.zone] ?? CAP.core;
-                if (this.time < (rec.relightAt ?? 0)) rec.pendingBands = { bands, total: level.total, cap }; // the beam hasn't reached it yet
-                else { rec.machine.heart.setBands(bands, level.total, cap); rec.pendingBands = null; }
+                rec.machine.heart.setBands(bands, level.total, cap);
             }
             rec.machine.setRim(data.stageFilter?.[n.id] ?? null);
             if (n.id === 'nexus' && rec.label._lens && data.light) rec.label._lens.textContent = data.light.lensLabel;
             const syncing = n.kind === 'harvester' && data.sources[n.label]?.status === 'syncing';
             rec.syncing = syncing;
             this._updateLabel(rec, level, syncing);
-        }
-
-        for (const p of this.pipes.values()) {
-            const f = data.flows[p.pipe.id] ?? { forward: 0, backward: 0 };
-            const count = f.forward + f.backward;
-            p.targetBore = count ? 0.9 + 0.55 * Math.sqrt(count) : 0.55;
-            p.active = count > 0;
         }
         if (!this._fitted) { this.fit(); this._fitted = true; }
     }
@@ -533,148 +377,58 @@ export class TwinScene {
             this.machineGroup.remove(rec.group);
             rec.machine.dispose();
         }
-        for (const p of this.pipes.values()) {
-            for (const m of [...p.meshes, ...p.joints]) { this.pipeGroup.remove(m); m.material.dispose(); }
-        }
-        for (const w of this.wires.values()) { this.lightGroup.remove(w.mesh); w.mesh.geometry.dispose(); w.mesh.material.dispose(); }
-        for (const pl of this.pulses) { this.lightGroup.remove(pl.sprite); pl.sprite.material.dispose(); }
+        if (this.pipes) { this.scene.remove(this.pipes.group); this.pipes.dispose(); }
+        this.temperLabel?.el.remove();
         this.machines.clear();
-        this.pipes.clear();
-        this.wires.clear();
-        this.pulses = [];
-        this.packets = [];
 
         this.positions = layout(data.nodes);
         this._buildZones(data.nodes);
+        // pipes first: they decide where each base needs a port
+        this.pipesByEnds = pipeIndex(data.pipes);
+        this.pipes = buildPipes(this.shop, { pipes: data.pipes, positions: this.positions, nodes: data.nodes, colors: data.colors });
+        this.scene.add(this.pipes.group);
         for (const n of data.nodes) {
             const at = this.positions.get(n.id);
             if (at) this._addMachine(n, at, data.colors[n.id] ?? '#888');
         }
-        this.pipesByEnds = pipeIndex(data.pipes);
-        for (const pipe of data.pipes) {
-            const points = pipePath(pipe, this.positions);
-            if (!points) continue;
-            const color = data.colors[pipe.b] ?? '#888';
-            const conveyor = pipe.kind === 'conveyor';
-            const mat = new THREE.MeshStandardMaterial({
-                color: conveyor ? 0x4a3a22 : 0x3a3e45, metalness: 0.7, roughness: 0.45,
-                emissive: new THREE.Color(color), emissiveIntensity: 0,
-            });
-            const meshes = [], joints = [];
-            for (let i = 1; i < points.length; i++) {
-                const m = new THREE.Mesh(this.shared.segment, mat);
-                m.position.addVectors(points[i - 1], points[i]).multiplyScalar(0.5);
-                m.lookAt(points[i]);
-                m.userData.len = points[i].distanceTo(points[i - 1]);
-                this.pipeGroup.add(m);
-                meshes.push(m);
-            }
-            for (let i = 1; i < points.length - 1; i++) {
-                const j = new THREE.Mesh(this.shared.joint, mat);
-                j.position.copy(points[i]);
-                this.pipeGroup.add(j);
-                joints.push(j);
-            }
-            this.pipes.set(pipe.id, { pipe, points, meshes, joints, mat, bore: 0.55, targetBore: 0.55, active: false, conveyor });
-        }
-        this._buildWires();
+        this.temperLabel = this.pipes.temperAt ? { el: this._temperLabel(), at: this.pipes.temperAt } : null;
         this._nodeKey = data.nodes.map((n) => `${n.id}:${n.locked}`).join('|');
     }
 
-    /** Copper wires from the atlas and calendar into the lantern, hanging slack behind them. */
-    _buildWires() {
-        const lantern = this.positions.get('nexus');
-        if (!lantern) return;
-        ['atlas', 'calendar'].forEach((id, i) => {
-            const from = this.positions.get(id);
-            if (!from) return;
-            const back = -9 - i * 7; // the calendar's wire runs behind the atlas
-            const a = from.clone().add(new THREE.Vector3(0, 9, back));
-            const b = lantern.clone().add(new THREE.Vector3(0, 9, back));
-            const sag = (t) => a.clone().lerp(b, t).setY(a.y - 7 * Math.sin(Math.PI * t));
-            const curve = new THREE.CatmullRomCurve3([a, sag(0.25), sag(0.5), sag(0.75), b]);
-            const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.55, 6, false), new THREE.MeshStandardMaterial({
-                color: COPPER, metalness: 0.9, roughness: 0.3, emissive: COPPER, emissiveIntensity: 0.08,
-            }));
-            this.lightGroup.add(mesh);
-            this.wires.set(id, { curve, mesh });
-        });
-    }
-
     /**
-     * Relight the machines: the filter or lens changed. A pulse runs down the wire first if
-     * the calendar or atlas caused it, then the beam sweeps across and each machine takes
-     * its new liquid as the beam passes (call before update()).
-     * @param {{ from?: 'calendar' | 'atlas' | null }} [opts]
-     */
-    relight({ from = null } = {}) {
-        let delay = 0;
-        const wire = from ? this.wires.get(from) : null;
-        if (wire) {
-            const sprite = this._glow(0xffb070, 14, 0.95);
-            this.lightGroup.add(sprite);
-            this.pulses.push({ curve: wire.curve, t: 0, dur: PULSE_S, sprite });
-            delay = PULSE_S;
-        }
-        this.sweepT = this.time + delay;
-        const [x0, x1] = this._sweepSpan();
-        for (const rec of this.machines.values()) {
-            if (!rec.liquidMax) continue;
-            const f = (rec.group.position.x - x0) / (x1 - x0 || 1);
-            rec.relightAt = this.sweepT + Math.min(1, Math.max(0, f)) * SWEEP_S;
-        }
-    }
-
-    /** Left and right edge of the machines that hold liquid (the beam's sweep). */
-    _sweepSpan() {
-        let x0 = Infinity, x1 = -Infinity;
-        for (const rec of this.machines.values()) {
-            if (!rec.liquidMax) continue;
-            x0 = Math.min(x0, rec.group.position.x);
-            x1 = Math.max(x1, rec.group.position.x);
-        }
-        return Number.isFinite(x0) ? [x0 - 20, x1 + 20] : [-100, 100];
-    }
-
-    /**
-     * Draw a magic circle at the base of the machine holding the selected row, in the row's
-     * colour (its lens colour). nodeId null: none.
+     * A magic circle on the floor around the machine holding the selected row, in the row's
+     * matter colour: the old circle closes, the new one opens. nodeId null: none.
      * @param {string | null} nodeId @param {string} [color]
      */
     setSelection(nodeId, color = '#ffffff') {
         const moved = nodeId !== this.selection.nodeId;
         this.selection = { nodeId, color };
-        for (const m of [this.circleOuter, this.circleInner]) m.material.color.set(color);
-        this.circleGlow.material.color.set(color);
-        if (moved && nodeId) {
-            const rec = this.machines.get(nodeId);
-            if (rec) {
-                this.circle.position.copy(rec.group.position).setY(rec.group.position.y + 0.25);
-                this.circleSize = ((FOOT[bodyOf(rec.node)] ?? 9) + 7) * MACHINE_SCALE * 2; // diameter: just outside the base
-                this.circleOn = 0; // draw it in afresh
-            }
-        }
+        const glowColor = lighter(color);
+        if (!moved) { this.sel.recolor(glowColor); return; }
+        const rec = nodeId ? this.machines.get(nodeId) : null;
+        const r = rec ? ((FOOT[bodyOf(rec.node)] ?? 9) + 7) * MACHINE_SCALE : 0;   // just outside the base
+        this.sel.set(rec ? rec.group.position : null, r, glowColor);
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Packets                                                            */
+    /*  Slugs                                                              */
     /* ------------------------------------------------------------------ */
 
     /**
-     * Send packets for transitions not played yet. replay: squeeze the latest REPLAY_MAX
+     * Send slugs for transitions not played yet. replay: squeeze the latest REPLAY_MAX
      * into REPLAY_SECONDS (so the twin doesn't open frozen); otherwise play now, bursts
-     * of the same move capped at BURST_MAX packets (bigger ones carry the rest).
+     * of the same move capped at BURST_MAX slugs.
      * @param {{ id: number, from: string, to: string, entity: string }[]} transitions
      */
     play(transitions, { replay = false } = {}) {
-        if (!this.data) return;
+        if (!this.data || !this.pipes) return;
         let fresh = transitions.filter((t) => t.id > this.lastPlayedId);
         if (!fresh.length) return;
         this.lastPlayedId = fresh[fresh.length - 1].id;
         if (replay) {
             fresh = fresh.slice(-REPLAY_MAX);
             const gap = Math.min(0.15, REPLAY_SECONDS / fresh.length);
-            fresh.forEach((t, i) => this._launch(t, 0.4 + i * gap, 1));
+            fresh.forEach((t, i) => this._launch(t, 0.4 + i * gap));
             return;
         }
         const groups = new Map();
@@ -685,31 +439,20 @@ export class TwinScene {
         }
         for (const list of groups.values()) {
             const n = Math.min(list.length, BURST_MAX);
-            const scale = list.length > BURST_MAX ? 1 + Math.log2(list.length / BURST_MAX) * 0.5 : 1;
-            for (let i = 0; i < n; i++) this._launch(list[i], i * 0.09, i === n - 1 ? scale : 1);
+            for (let i = 0; i < n; i++) this._launch(list[i], i * BURST_GAP_S);
         }
     }
 
-    _launch(t, delay, scale) {
+    /** One move: a slug down each pipe of its route in turn (a link runs the conveyor instead). */
+    _launch(t, delay) {
         const steps = route(this.pipesByEnds, t.from, t.to);
-        if (!steps) return;
-        const points = [];
-        for (const { pipe, forward } of steps) {
-            const rec = this.pipes.get(pipe.id);
-            if (!rec) return;
-            const pts = forward ? rec.points : [...rec.points].reverse();
-            for (const p of pts) if (!points.length || !points[points.length - 1].equals(p)) points.push(p);
-        }
-        if (points.length < 2 || this.packets.length >= MAX_PACKETS) return;
+        if (!steps?.length) return;
         const link = t.entity === 'link';
         const style = link ? null : this.data.packetStyle?.(t);
-        const color = new THREE.Color(link ? BRASS : (style?.color ?? this.data.colors[t.to === OUTSIDE ? t.from : t.to] ?? '#ffffff'));
-        const lit = style ? style.lit : true;
-        if (!lit) color.multiplyScalar(0.3); // the row fails the filter: a dim packet
-        this.packets.push({
-            points, length: pathLength(points), d: 0, delay, color, scale: (link ? 1.4 : 2) * scale * (lit ? 1 : 0.7),
-            to: t.to, link, rowId: link ? null : t.row_id, at: new THREE.Vector3(),
-        });
+        // the row's lens colour; the stage lens keeps the colour of the machine it leaves
+        const color = new THREE.Color(style?.color ?? lighter(this.data.colors[t.from === OUTSIDE ? t.to : t.from] ?? '#ffffff'));
+        if (style && !style.lit) color.multiplyScalar(0.3); // the row fails the filter: a dim slug
+        this.pipes.launch(steps, color, delay);
     }
 
     /* ------------------------------------------------------------------ */
@@ -765,7 +508,6 @@ export class TwinScene {
         const w = this.container.clientWidth, h = this.container.clientHeight;
         if (!w || !h) return;
         this.renderer.setSize(w, h, false);
-        this.composer.setSize(w, h);
         const aspect = w / h;
         this.camera.left = (-FRUSTUM * aspect) / 2;
         this.camera.right = (FRUSTUM * aspect) / 2;
@@ -812,108 +554,15 @@ export class TwinScene {
         const ease = 1 - Math.exp(-dt * 3);
 
         for (const rec of this.machines.values()) {
-            if (rec.pendingBands && this.time >= (rec.relightAt ?? 0)) {
-                const { bands, total, cap } = rec.pendingBands;   // the beam reached it
-                rec.machine.heart.setBands(bands, total, cap);
-                rec.pendingBands = null;
-            }
             // a harvester's rotor spins while it harvests; the centrifuge whirls after a purge
             rec.spin = rec.syncing ? 14 : Math.max(0, rec.spin - dt * 3);
-            rec.machine.frame(dt, this.time, ease);
+            rec.machine.frame(this.calm?.matches ? 0 : dt, this.time, ease);
         }
 
-        for (const p of this.pipes.values()) {
-            p.bore += (p.targetBore - p.bore) * ease;
-            for (const m of p.meshes) m.scale.set(p.bore, p.bore, m.userData.len);
-            for (const j of p.joints) j.scale.setScalar(p.bore * 1.15);
-            p.mat.emissiveIntensity = p.active ? 0.18 : 0;
-        }
-
-        // packets: wait out their delay, travel, flare their destination on arrival
-        let n = 0;
-        for (let i = this.packets.length - 1; i >= 0; i--) {
-            const pk = this.packets[i];
-            if (pk.delay > 0) { pk.delay -= dt; continue; }
-            pk.d += dt * Math.max(PACKET_SPEED, pk.length / MIN_TRIP_S) * (pk.link ? 0.6 : 1);
-            if (pk.d >= pk.length) {
-                const dest = this.machines.get(pk.to);
-                    this.packets.splice(i, 1);
-                continue;
-            }
-            pointAt(pk.points, pk.d, this._v);
-            pk.at.copy(this._v);
-            this._s.setScalar(pk.scale);
-            this._m.compose(this._v, this._q, this._s);
-            this.packetMesh.setMatrixAt(n, this._m);
-            this.packetMesh.setColorAt(n, pk.color);
-            n++;
-        }
-        this.packetMesh.count = n;
-        this.packetMesh.instanceMatrix.needsUpdate = true;
-        if (this.packetMesh.instanceColor) this.packetMesh.instanceColor.needsUpdate = true;
-
-        this._frameBeam();
-        this._frameCircle(dt);
-        for (let i = this.pulses.length - 1; i >= 0; i--) {
-            const pl = this.pulses[i];
-            pl.t += dt / pl.dur;
-            if (pl.t >= 1) {
-                this.lightGroup.remove(pl.sprite);
-                pl.sprite.material.dispose();
-                this.pulses.splice(i, 1);
-                continue;
-            }
-            pl.curve.getPointAt(pl.t, pl.sprite.position);
-        }
-        for (const w of this.wires.values()) w.mesh.material.emissiveIntensity = this.pulses.some((pl) => pl.curve === w.curve) ? 0.6 : 0.08;
-
-        if (this.bloomOn) this.composer.render(); else this.renderer.render(this.scene, this.camera);
+        this.pipes?.frame(dt);   // slugs always run: they carry information
+        this.sel.frame(dt);
+        this.renderer.render(this.scene, this.camera);
         this._placeLabels();
-    }
-
-    _sweeping() {
-        return this.sweepT >= 0 && this.time >= this.sweepT && this.time <= this.sweepT + SWEEP_S;
-    }
-
-    /** The lantern's beam during a sweep: from the lamp to a point crossing the machines. */
-    _frameBeam() {
-        const lantern = this.machines.get('nexus');
-        const on = lantern && this._sweeping();
-        this.beam.visible = this.beamSpot.visible = Boolean(on);
-        if (!on) return;
-        const t = (this.time - this.sweepT) / SWEEP_S;
-        const [x0, x1] = this._sweepSpan();
-        const target = new THREE.Vector3(x0 + (x1 - x0) * t, NET_Y + 14, 20);
-        const from = lantern.group.position.clone().setY(lantern.group.position.y + 22);
-        const fade = Math.sin(Math.PI * t);
-        this.beam.position.copy(from);
-        this.beam.lookAt(target);
-        const len = from.distanceTo(target);
-        this.beam.scale.set(len * 0.11, len * 0.11, len);
-        this.beam.material.opacity = 0.16 * fade;
-        this.beamSpot.position.copy(target);
-        this.beamSpot.material.opacity = 0.55 * fade;
-    }
-
-    /** The selection's magic circle: fades and grows in, the layers turn against each other. */
-    _frameCircle(dt) {
-        const rec = this.selection.nodeId ? this.machines.get(this.selection.nodeId) : null;
-        const want = rec ? 1 : 0;
-        this.circleOn += (want - this.circleOn) * Math.min(1, dt * 4);
-        this.circle.visible = this.circleOn > 0.01;
-        if (!this.circle.visible) return;
-        if (rec) this.circle.position.copy(rec.group.position).setY(rec.group.position.y + 0.25);
-        const grow = 0.6 + 0.4 * this.circleOn;
-        const breathe = 1 + 0.025 * Math.sin(this.time * 2.2);
-        this.circleOuter.scale.setScalar(this.circleSize * grow * breathe);
-        this.circleInner.scale.setScalar(this.circleSize * 0.8 * grow);
-        this.circleOuter.rotation.z += dt * 0.25;
-        this.circleInner.rotation.z -= dt * 0.45;
-        const pulse = 0.85 + 0.15 * Math.sin(this.time * 3);
-        this.circleOuter.material.opacity = this.circleOn * pulse;
-        this.circleInner.material.opacity = 0.9 * this.circleOn;
-        this.circleGlow.scale.setScalar(this.circleSize * 1.5);
-        this.circleGlow.material.opacity = 0.5 * this.circleOn * pulse;
     }
 
     _project(v) {
@@ -931,10 +580,14 @@ export class TwinScene {
             rec.label.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px) translate(-50%, -100%)`;
             rec.label.style.zIndex = String(1000 - Math.round(at[2] * 500));
         }
-        for (const z of this.zoneLabels) {
-            const at = this._project(z.at);
-            z.label.style.display = at ? '' : 'none';
-            if (at) z.label.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px)`;
+        if (this.temperLabel) {
+            const at = this._project(this.temperLabel.at);
+            const l = this.temperLabel.el;
+            l.style.display = at ? '' : 'none';
+            if (at) {
+                l.style.transform = `translate(${at[0].toFixed(1)}px, ${at[1].toFixed(1)}px) translate(-50%, -100%)`;
+                l.style.zIndex = String(1000 - Math.round(at[2] * 500));
+            }
         }
     }
 
@@ -952,12 +605,11 @@ export class TwinScene {
             o.geometry?.dispose();
             if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
         });
-        for (const v of Object.values(this.shared)) v?.dispose?.();
-        for (const t of this.circleTextures) t.dispose();
+        this.sel.dispose();
+        this.pipes?.dispose();
         this.zones?.dispose();
+        this.shop.dispose();
         this.kit.dispose();
-        this.bloom.dispose();
-        this.composer.dispose();
         this.envMap.dispose();
         this.pmrem.dispose();
         this.renderer.dispose();

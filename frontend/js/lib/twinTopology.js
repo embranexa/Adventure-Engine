@@ -77,7 +77,7 @@ export function twinNodes(sourceNames) {
         ...harvesters,
         node({ id: CENTRIFUGE, label: 'Centrifuge', zone: 'net', kind: 'processor', holds: 'events', matter: 'prima materia',
             action: { panel: 'classifier', mode: 'discovery' } }),
-        node({ id: SUMP, label: 'Sump', zone: 'net', kind: 'vessel', holds: 'events', matter: 'shade',
+        node({ id: SUMP, label: 'Sump', zone: 'net', kind: 'vessel', holds: 'events', matter: 'dross',
             action: { panel: 'classifier', mode: 'discovery', shades: true } }),
         node({ id: FORGE, label: 'Forge', zone: 'net', kind: 'dynamo', action: { panel: 'node', create: true } }),
         core('queued', 'vessel', 'Hopper'),
@@ -90,7 +90,7 @@ export function twinNodes(sourceNames) {
         core('killed', 'vessel', 'Necropolis'),
         node({ id: CODEX, label: 'Codex', zone: 'core', kind: 'cabinet', holds: 'objects', action: { panel: 'codex' } }),
         node({ id: ENTROPY_MARKET, label: 'Entropy Market', zone: 'core', kind: 'dynamo', locked: true }),
-        node({ id: 'nexus', label: 'Nexus', zone: 'viewer', kind: 'viewer', action: { panel: 'classifier' } }),
+        node({ id: 'nexus', label: 'Nexus', zone: 'viewer', kind: 'viewer', action: { panel: 'classifier', mode: 'adventures' } }),
         node({ id: 'atlas', label: 'Atlas', zone: 'viewer', kind: 'viewer', action: { panel: 'map' } }),
         node({ id: 'calendar', label: 'Calendar', zone: 'viewer', kind: 'viewer', action: { panel: 'calendar' } }),
     ];

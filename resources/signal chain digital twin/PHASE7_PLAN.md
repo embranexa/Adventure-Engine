@@ -2,9 +2,10 @@
 
 ## Resume here (read first in a new session)
 
-**State (2026-11-21):** 7a and 7b are built and committed. **Next: 7c (pipes and
-motion)**, then 7d (panel in use), then 7e (cleanup). The user approves each stage after
-a screenshot round and says when to commit (not one commit per stage).
+**State (2026-11-21):** **Phase 7 is built.** 7a and 7b are committed; 7c, 7d and 7e
+are built and **not committed**: the user commits at the end ("we'll commit at the end"),
+after their review of the whole phase. Expect a follow-up round of feedback; then ask
+before committing (leave the user's own files out: see Gotchas).
 
 **Before touching code:**
 1. Read `BUILD_PLAN.md` section 0 (environment, test server on a database copy, the
@@ -35,54 +36,11 @@ a screenshot round and says when to commit (not one commit per stage).
   objects(), pending() }`. Base meshes carry `userData.ring`, body meshes `userData.id`
   (only for nodes with an action). `FOOT` = base radius per body; `PLINTH_H` = 3.4.
 
-**7c, concretely:**
-- Replace the old pipes with the prototype's floor pipes: `pipeCurve` and `buildPipes`
-  in `atelier.html` (around line 1076). Pipes sit at y 2.4, straight when two machines line
-  up, a flat cubic S-bend otherwise, ending at the machines' bases. Net pipes (both ends in
-  the Net, incl. the manifold) are wider (shell 1.7, core 1.05) than Core pipes (1.2,
-  0.7). Market pipes (`kind: 'market'`): gold glass with dense brass/gilt bands. The Codex
-  conveyor (`kind: 'conveyor'`): two iron rails with gilt plates that move only during a
-  Codex link.
-- Add pipe ports on the bases: the prototype's `plinth()` (around line 618) draws a
-  flanged socket per pipe; collect each node's port angles while building pipes and pass
-  them to `buildMachine` (add a `ports` parameter in `machines.js`).
-- Replace packets with slugs: the `slugFrag` shader (around line 1058; 4 slugs per pipe
-  as uniforms), `launch` and `stepPipes`. A transition's route (`route()` in
-  `twinTopology.js`) gives the pipe steps; a slug runs each step in turn in the row's lens
-  colour (`data.packetStyle(t)`, dim if not lit). Keep replay-on-open from `play()`.
-  Links (Codex) run the conveyor instead.
-- The Temper: `buildTemper` (around line 1203) around the middle of the
-  centrifuge-to-hopper pipe; that pipe's glass is wide up to it and narrow after; its rings
-  run only while a slug is in that pipe.
-- Selection transition: the prototype's `setSelection` / `stepSelection` (around line
-  1330): the old circle closes, the new one opens, in the row's **matter** colour (the
-  panel passes `selection.color`; check it is the matter colour, not the lens colour).
-- Checks: type check; `check_twin_model.mjs`; `check_transitions.py` on a database copy;
-  screenshots with moves in flight (make moves through the API about 5 s after starting
-  Firefox, per the screenshot script's docstring).
+**7c:** built; see Progress below for what changed and what's left to verify.
 
-**7d, concretely:**
-- A store signal for the panel in use: the active tab of the focused dock group, or the
-  focused pop-out window (`poppedOut`, `components/Popout.js`, `lib/windows.js`). The
-  store has no "focused group" yet: track the last group the user clicked or focused (a
-  pointerdown on a `PanelGroup`), and window focus for pop-outs.
-- Map panels to machines (table under Behaviour details) and fill `scene.inUse` from
-  `SignalChainPanel.js`. The Forge counts while the Refinery panel shows the
-  new-adventure buttons or the create dialog (`NodeCard.js` around line 195: create
-  buttons when nothing is selected; `createAdventure` and `editingAdventureId` in
-  `store.js`); decide the exact rule with the user.
-- Ease mechanisms in and out (about 0.5 s) so focus changes don't flicker.
+**7d:** built; see Progress below.
 
-**7e, concretely:**
-- Remove the beam sweep and copper wires: `_buildLight`'s beam, `_buildWires`, `relight`,
-  `_sweepSpan`, `_frameBeam`, pulses, and the panel's `relightCause` / `scene.relight`
-  call (`SignalChainPanel.js` around line 96 and 374). Hearts then update at once (drop
-  `relightAt` / `pendingBands`).
-- Rename shade to dross: `REVIEW_STAGES.ignored.matter` in `frontend/js/lifecycle.js`,
-  the sump node's `matter: 'shade'` in `twinTopology.js`, and UI strings and docs that say
-  shade (grep). The internal `showShades` / `toggleShades` names can stay unless the user
-  asks.
-- Update BUILD_PLAN.md (code map, status) and this file.
+**7e:** built; see Progress below.
 
 **Gotchas met so far:**
 - The headless screenshot copies the WebGL canvas over the page, which hides HTML labels;
@@ -191,6 +149,69 @@ The panel still hands the scene one data object per change and gets events back
   Calendar time, Nexus topology). The scene moved to `lib/twin/twinScene.js` (import path
   in `SignalChainPanel.js`); the old lantern builder, liquid segments, rotors and arrival
   glows are gone. Pipes, packets, the beam and the wires are still the old ones.
+- **7c (pipes and motion): built 2026-11-21, not committed.** New `lib/twin/pipes.js`:
+  `buildPipes(shop, { pipes, positions, nodes, colors })` returns `group`, `ports` (node id
+  -> port angles), `temperAt`, `launch(steps, color, delay)`, `frame(dt)`, `dispose`.
+  Floor pipes at y 2.4 (straight or a flat S-bend, ending at the bases), Net pipes wide
+  (both ends in the Net, the manifold counts), Core narrow; market pipes gold glass with
+  brass/gilt bands; the Codex conveyor (iron rails, gilt plates moving only during a link
+  or unlink); brass collars and iron saddles on long pipes; the manifold hub. Slugs: the
+  prototype's `slugFrag` shader, 4 per pipe, extra moves wait their turn (not dropped);
+  each runs the route's steps in turn at 110 units/s, in the row's lens colour (stage
+  lens: the colour of the machine it leaves, lightened), dimmed when the row fails the
+  filter. Replay-on-open and bursts (8 per move, 0.12 s apart) kept. The Temper on the
+  Centrifuge -> Hopper pipe (wide glass up to it, narrow after; rings run only while a slug
+  is in that pipe) with its label `Temper / 120 : 12 scale`. `machines.js`: `ctx.ports`
+  draws a flanged socket per pipe; `lighter` exported. New `lib/twin/selection.js`: the
+  floor circle spins open on the new machine and shut on the old one. The panel's
+  `selection` now passes the **matter** colour (`nodeColor` of the holding machine; it was
+  the lens colour); the scene lightens it. Removed from `twinScene.js`: `pipePath`,
+  packets (`packetMesh`, `_launch`'s polyline), pipe bores, the old selection circle.
+  Checks: type check (only the old MapPanel error), `check_twin_model.mjs`,
+  `check_transitions.py` all pass; screenshots show pipes, ports, conveyor, market pipes,
+  the Temper and slugs in flight (a revive leaving the Sump). Not caught in a still: a slug
+  inside the Temper, the conveyor moving, the selection open/close.
+- **7d (panel in use): built 2026-11-21, not committed.** The user's rules: **strict**.
+  Only the focused panel counts; focusing the Signal Chain itself leaves every machine
+  still; the Forge works only while the Refinery edits an adventure it has just made
+  (`editingAdventureId === selectedItemId`), not while it shows the New buttons.
+  `store.js`: `focusedGroup` (the dock leaf last clicked or focused: `onPointerDownCapture`
+  / `onFocusCapture` on `PanelGroup`), `focusedPopout` (set by the pop-out window's
+  `focus`, cleared on `blur`, in `Popout.js`), `focusGroup(id)` (`popout:<panel>` for a
+  pop-out), `blurPopout`, and the pure selector `panelInUse(state)` (the focused pop-out's
+  panel, else the focused group's active tab in `dockedTree`). `showPanel` focuses the
+  group it shows the panel in, so clicking a machine sets its panel in use.
+  `SignalChainPanel.js`: `PANEL_MACHINES` (the table under Behaviour details) and
+  `scene.setInUse(ids)`. `machines.js`: each machine has a `pace` (0..1, smoothstepped,
+  0.5 s each way); `busy()` = 3 x pace and every `on ? speed : 0` became `speed x pace`,
+  so mechanisms wind up and down. Reduced motion (`prefers-reduced-motion`): machines get
+  dt 0 (mechanisms and base circles still; hearts, the Nexus pending cue, slugs and the
+  selection still move). Checked: type check; `panelInUse` through every focus case in the
+  page (click group, tab switch, twin, showPanel, pop-out focus and blur). Not checked:
+  the motion itself and a real pop-out window (headless can't); the user checks live.
+  Follow-ups from the user (2026-11-21): the Scripter panel also works the Crucible; the
+  Nexus machine opens the Nexus panel **in Adventures mode** (its action has `mode`).
+- **7e (cleanup): built 2026-11-21, not committed.** Removed from `twinScene.js`: the
+  beam (`_buildLight`, `_coneGeo`, `_frameBeam`, `_sweeping`, `_sweepSpan`), the copper
+  wires and pulses (`_buildWires`, `relight`), the glow sprites (`_sharedAssets`, `_glow`),
+  `lightGroup`, the empty `zoneLabels`, and the hearts' delayed relight (`relightAt`,
+  `pendingBands`): a filter or lens change shows at once. `SignalChainPanel.js`:
+  `relightCause` and the `scene.relight` call are gone; the `light` memo keeps only the
+  lens and the pending count (the Nexus prism's amber cue stays). Shade became **dross**:
+  `REVIEW_STAGES.ignored.matter`, the sump's matter, the Ignore button ("Ignore → Dross"),
+  the Discovery toggle ("Show dross"), comments, backend docstrings (`events.py`,
+  `triage.py`, `models.py`), `classifier.md`, BUILD_PLAN.md. Internal names kept:
+  `showShades` / `toggleShades`, the action flag `shades`, CSS `.shade-toggle` /
+  `--m-shade`, `SHADE` in `alembicScene.js`. `check_transitions.py`: the feed, siphon and
+  purge steps now count what the luma harvester already holds in the copied database (they
+  assumed it empty and broke once real luma events were harvested). Checks: type check,
+  `check_twin_model.mjs`, `check_transitions.py` pass; a screenshot after lens and filter
+  changes shows no errors and "Dross" in the matter gauge.
+- **Follow-ups after 7e (2026-11-21):** the Nexus panel works the Centrifuge and Sump only
+  in **Discovery** (in Adventures it works the Nexus alone). **Bloom removed**, at the
+  user's request (the Glow switch and its localStorage key are gone; the scene renders
+  straight through the renderer, no EffectComposer). The four postprocessing addons stay
+  vendored and in the import map, unused (`scripts/vendor_deps.py`), in case glow returns.
 
 ## Build stages
 
@@ -227,7 +248,7 @@ the user asks (not one commit per stage).
 
 | Interaction | What the app does | Existing code it uses |
 | --- | --- | --- |
-| Click a machine | Opens its panel (Centrifuge and Sump open the Nexus in Discovery; the Forge opens the Refinery's create dialog) | `onActivate` and `showPanel` |
+| Click a machine | Opens its panel (Centrifuge and Sump open the Nexus in Discovery, the Nexus machine opens it in Adventures; the Forge opens the Refinery's create dialog) | `onActivate` and `showPanel` |
 | Click a base | Cycles that stage's filter: include, exclude, off; applies at once | `toggleRing` and `cycleStage` |
 | Click a machine with no panel | Nothing | none |
 | Harvest, Feed, Siphon, Purge in a label | Run the source action; Harvest disabled for an hour after a harvest; Purge asks to confirm | `runCommand`, `HARVEST_FRESH_MS`, `confirmHere` |
@@ -241,10 +262,10 @@ create dialog is open.
 
 | Panel | Machines that work |
 | --- | --- |
-| Nexus (`classifier`) | Centrifuge, Sump, Nexus |
+| Nexus (`classifier`) | Nexus; also Centrifuge and Sump in Discovery |
 | Refinery (`node`) | Refinery; the Forge while the create dialog is open |
 | Alembic | Alembic |
-| Crucible (`quests`) | Crucible |
+| Crucible (`quests`), Scripter | Crucible |
 | Codex | Codex |
 | Atlas (`map`) | Atlas |
 | Calendar | Calendar |
@@ -281,5 +302,5 @@ canvas copy). Only the user can check clicks, motion and performance in their re
 3. **Packets:** slugs fully replace today's packets; Codex links show only as the plate
    conveyor moving.
 4. **Vessel scale:** fixed 120 / 12, with an overflow mark at the top when full.
-5. **Bloom:** a switch on the panel, on by default.
+5. **Bloom:** a switch on the panel, on by default. (Later removed by the user: no bloom.)
 6. **Commits:** not one per stage; commit when the user asks.

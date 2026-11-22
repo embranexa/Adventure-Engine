@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
-import { useWorkspaceStore } from '../../store.js';
+import { panelInUse, useWorkspaceStore } from '../../store.js';
 import { OBJECT_TYPES, PHASE_NODES, PHASE_STAGES, REVIEW_STAGES } from '../../lifecycle.js';
 import { passes, pendingChanges } from '../../filters.js';
 import { freshMinutes, freshTitle } from '../../lib/harvest.js';
@@ -10,6 +10,18 @@ import { CENTRIFUGE, CODEX, FORGE, OUTSIDE, SUMP, nodeStage, twinNodes, twinPipe
 import { confirmHere } from '../../lib/windows.js';
 
 const ZONE_LABELS = { net: 'Net · events', core: 'Core · adventures', viewer: 'Viewers' };
+
+/** The machines that work while a panel is in use (PHASE7_PLAN.md, stage 7d). @type {Partial<Record<PanelId, string[]>>} */
+const PANEL_MACHINES = {
+    classifier: ['nexus'],   // plus the Centrifuge and Sump in Discovery (see below)
+    node: [PHASE_NODES.classifying],
+    alembic: [PHASE_NODES.decomposing],
+    quests: [PHASE_NODES.constructing],
+    scripter: [PHASE_NODES.constructing],
+    codex: [CODEX],
+    map: ['atlas'],
+    calendar: ['calendar'],
+};
 const RECENT = 15;
 const VIEW_KEY = 'signal-chain-view';
 
@@ -39,14 +51,8 @@ function savedView() {
     try { return localStorage.getItem(VIEW_KEY) === 'table' ? 'table' : '3d'; } catch { return '3d'; }
 }
 
-const BLOOM_KEY = 'signal-chain.bloom';
-/** The Glow switch (bloom), on unless this viewer turned it off. */
-function savedBloom() {
-    try { return localStorage.getItem(BLOOM_KEY) !== 'off'; } catch { return true; }
-}
-
 /**
- * Do what clicking a machine does: switch mode or shades if needed, then open its panel.
+ * Do what clicking a machine does: switch mode or show dross if needed, then open its panel.
  * @param {import('../../lib/twinTopology.js').TwinAction} action
  */
 function runAction(action) {
@@ -84,21 +90,6 @@ function turnLens(step) {
 function toggleRing(nodeId) {
     const stage = nodeStage(nodeId);
     if (stage) useWorkspaceStore.getState().cycleStage(stage.facet, stage.value);
-}
-
-/**
- * What changed between two applied filters, for the relight: null if nothing that lights
- * the twin changed, else where the light came from ('calendar' / 'atlas' send a pulse down
- * their wire first; 'lantern' is a facet, Seal or lens change).
- * @param {FilterState | null} prev @param {FilterState} next
- * @returns {'calendar' | 'atlas' | 'lantern' | null}
- */
-function relightCause(prev, next) {
-    if (!prev || prev === next) return null;
-    if (JSON.stringify(prev.date_range) !== JSON.stringify(next.date_range)) return 'calendar';
-    if (JSON.stringify(prev.ring) !== JSON.stringify(next.ring)) return 'atlas';
-    if (prev.seal !== next.seal || prev.lens !== next.lens || JSON.stringify(prev.facets) !== JSON.stringify(next.facets)) return 'lantern';
-    return null;
 }
 
 /** The lit part of a level as a stacked bar, one segment per lens value. @param {{ level: import('../../lib/twinModel.js').TwinLevel }} props */
@@ -214,14 +205,12 @@ export function SignalChainPanel() {
     const flows = useWorkspaceStore((s) => s.flows);
     const panels = useWorkspaceStore((s) => s.panels);
     const setLens = useWorkspaceStore((s) => s.setLens);
+    const inUsePanel = useWorkspaceStore(panelInUse);
+    const poolMode = useWorkspaceStore((s) => s.mode);
+    // the Refinery is editing an adventure it has just made: the Forge works too
+    const creating = useWorkspaceStore((s) => s.editingAdventureId != null && s.editingAdventureId === s.selectedItemId);
 
     const [view, setView] = useState(savedView);
-    const [bloom, setBloom] = useState(savedBloom);
-    const toggleBloom = () => {
-        const next = !bloom;
-        setBloom(next);
-        try { localStorage.setItem(BLOOM_KEY, next ? 'on' : 'off'); } catch { /* the switch still works for this session */ }
-    };
     const [now, setNow] = useState(Date.now);
     useEffect(() => {
         const timer = setInterval(() => setNow(Date.now()), 60_000); // fresh harvests go stale, events go past
@@ -260,15 +249,11 @@ export function SignalChainPanel() {
     const eventsById = useMemo(() => new Map(rawEvents.map((e) => [e.id, e])), [rawEvents]);
     const adventuresById = useMemo(() => new Map(adventures.map((a) => [a.id, a])), [adventures]);
 
-    // the lantern: its lens, whether the hood is closed, the colours on its glass wheel
+    // the Nexus: its lens (on its label) and a pending draft (its prism pulses amber)
     const pending = pendingChanges(draftFilters, filters);
-    const light = useMemo(() => {
-        /** @type {Map<string, number>} */
-        const byValue = new Map();
-        for (const level of Object.values(model.levels)) for (const b of level.bands) byValue.set(b.color, (byValue.get(b.color) ?? 0) + b.count);
-        const colors = [...byValue.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c]) => c);
-        return { lens: filters.lens, lensLabel: LENSES.find((l) => l.key === filters.lens)?.label ?? filters.lens, pending, colors };
-    }, [model, filters.lens, pending]);
+    const light = useMemo(() => ({
+        lens: filters.lens, lensLabel: LENSES.find((l) => l.key === filters.lens)?.label ?? filters.lens, pending,
+    }), [filters.lens, pending]);
 
     // which stage each vessel's base ring has in the applied filter
     const stageFilter = useMemo(() => {
@@ -305,19 +290,19 @@ export function SignalChainPanel() {
         return out;
     }, [sources, now]);
 
-    // the selection's magic circle: the machine holding the selected row, in the row's lens colour
+    // the selection's magic circle: the machine holding the selected row, in the row's
+    // matter colour (the colour of the machine that holds it)
     const selection = useMemo(() => {
         const none = { nodeId: /** @type {string | null} */ (null), color: '#ffffff' };
         if (!selectedId) return none;
         const adventure = adventuresById.get(selectedId);
         const event = adventure ? undefined : eventsById.get(selectedId);
-        const item = /** @type {PoolItem | undefined} */ (adventure ? { ...adventure, kind: 'adventure' } : event ? { ...event, kind: 'omen' } : undefined);
-        if (!item) return none;
-        const color = lensColor(filters.lens, lensValues(item, filters.lens)[0]);
-        if (adventure) return { nodeId: PHASE_NODES[adventure.phase], color };
+        if (adventure) return { nodeId: PHASE_NODES[adventure.phase], color: nodeColor(PHASE_NODES[adventure.phase]) };
+        if (!event) return none;
         const linked = new Set(adventures.map((a) => a.event_id).filter((id) => id != null));
-        return { nodeId: eventNode(/** @type {EventRecord} */ (event), /** @type {Set<string>} */ (linked)), color };
-    }, [selectedId, adventuresById, eventsById, adventures, filters.lens]);
+        const nodeId = eventNode(event, /** @type {Set<string>} */ (linked));
+        return { nodeId, color: nodeId ? nodeColor(nodeId) : '#ffffff' };
+    }, [selectedId, adventuresById, eventsById, adventures]);
 
     const titleOf = useMemo(() => {
         /** @type {Map<string, string>} */
@@ -364,16 +349,11 @@ export function SignalChainPanel() {
         };
     }, [view]);
 
-    // feed the scene; the first time, replay the latest moves so it doesn't open frozen.
-    // When the applied filter or lens changed, relight first (wire pulse, beam sweep).
+    // feed the scene; the first time, replay the latest moves so it doesn't open frozen
     const replayed = useRef(false);
-    const litBy = useRef(/** @type {FilterState | null} */ (null));
     useEffect(() => {
         const scene = sceneRef.current;
-        if (!scene || status !== 'ready') { replayed.current = false; litBy.current = null; return; }
-        const cause = relightCause(litBy.current, filters);
-        litBy.current = filters;
-        if (cause) scene.relight({ from: cause === 'lantern' ? null : cause });
+        if (!scene || status !== 'ready') { replayed.current = false; return; }
         const colors = Object.fromEntries(nodes.map((n) => [n.id, nodeColor(n.id)]));
         scene.update({
             nodes, pipes, levels: model.levels, codex: model.codex, flows: routed.byPipe, colors, sources, io,
@@ -381,15 +361,20 @@ export function SignalChainPanel() {
         });
         scene.play(transitions, { replay: !replayed.current });
         replayed.current = true;
-    }, [status, nodes, pipes, model, routed, sources, io, centrifugeBySource, transitions, filters, stageFilter, light, packetStyle, fresh]);
+    }, [status, nodes, pipes, model, routed, sources, io, centrifugeBySource, transitions, stageFilter, light, packetStyle, fresh]);
 
     useEffect(() => {
         if (status === 'ready') sceneRef.current?.setSelection(selection.nodeId, selection.color);
     }, [status, selection]);
 
+    // the machines whose panel is in use work; everything else stands still
     useEffect(() => {
-        if (status === 'ready') sceneRef.current?.setBloom(bloom);
-    }, [status, bloom]);
+        if (status !== 'ready') return;
+        const ids = [...(inUsePanel ? PANEL_MACHINES[inUsePanel] ?? [] : [])];
+        if (inUsePanel === 'node' && creating) ids.push(FORGE);
+        if (inUsePanel === 'classifier' && poolMode === 'discovery') ids.push(CENTRIFUGE, SUMP);   // events are reviewed only in Discovery
+        sceneRef.current?.setInUse(ids);
+    }, [status, inUsePanel, creating, poolMode]);
 
     return html`
         <div className="panel-body signal-chain">
@@ -403,9 +388,6 @@ export function SignalChainPanel() {
                     ${model.check.ok ? '✓ Counts balance' : `⚠ ${model.check.problems[0]}`}
                 </span>
                 <span className="sc-spacer"></span>
-                ${view === '3d' && html`<button className=${`btn sc-glow ${bloom ? 'on' : ''}`} aria-pressed=${bloom}
-                    title="Glow: the soft halo around bright parts (turn off on a slow machine)"
-                    onClick=${toggleBloom}>Glow</button>`}
                 ${view === '3d' && html`<button className="btn sc-home" title="Frame everything"
                     onClick=${() => sceneRef.current?.fit()}>⌂</button>`}
                 ${view === 'table' && html`<label className="sc-lens">Lens

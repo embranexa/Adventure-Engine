@@ -24,7 +24,7 @@ stages are vessels or places.
 |---|---|---|---|---|
 | harvested | **Harvester** (one per source) | **flux** | raw: `harvested` | Harvest (a sync); only events never harvested before |
 | in review | **Centrifuge** | **prima materia** | raw: `new` | Feed from a harvester (Siphon sends them back) |
-| rejected | **Sump** | **shade** | raw: `ignored` | ignore in Discovery, or Purge the Centrifuge |
+| rejected | **Sump** | **dross** | raw: `ignored` | ignore in Discovery, or Purge the Centrifuge |
 | passed, waiting | **Hopper** | **ore** | `queued` | pass in Discovery |
 | classification | **Refinery** | **essence** | `classifying` | by hand |
 | decomposition | **Alembic** | **distillate** | `decomposing` | by hand |
@@ -40,7 +40,7 @@ stages are vessels or places.
   adventure leaves the factory.
 - Read as a journey: flux (Harvester) → prima materia (Centrifuge, judged in Discovery)
   → ore (Hopper) → essence (Refinery) → distillate (Alembic) → alloy (Crucible) → animus
-  (Arena) → artifact (Treasury) → relic (Archive). Side paths: shade (Sump), vestige
+  (Arena) → artifact (Treasury) → relic (Archive). Side paths: dross (Sump), vestige
   (Necropolis).
 - The **Signal Chain** twin draws every stage as a machine and every move as a packet:
   see `resources/signal chain digital twin/BUILD_PLAN.md`.
@@ -49,7 +49,7 @@ stages are vessels or places.
   lens, Alembic = action roadmap, Crucible = quest log, Arena = real life.
 - Matter colors run cold to warm along the lifecycle: flux steel, prima materia slate, ore blue, essence cyan,
   distillate amber, alloy orange, animus red, artifact violet; side paths are desaturated
-  (shade grey, vestige ash, relic bronze). Every view colors items by stage
+  (dross grey, vestige ash, relic bronze). Every view colors items by stage
   (`frontend/js/lifecycle.js`, `frontend/styles.css`).
 
 ## 3. Core objects
@@ -57,7 +57,7 @@ stages are vessels or places.
 ### Raw events (flux, prima materia)
 Everything the crawlers pull in (Luma, Resident Advisor, ...), stored separately from
 adventures, with a review state: `harvested` (flux in its Harvester), `new` (prima materia
-in the Centrifuge), `passed` (became an adventure) or `ignored` (shade in the Sump).
+in the Centrifuge), `passed` (became an adventure) or `ignored` (dross in the Sump).
 
 - Re-syncing never resets a review: events are matched by (source, source id).
 - Most raw events are expected to end up in the Sump.
@@ -102,13 +102,13 @@ raw event:  harvested ──feed──▶ new ──pass──▶ passed ◀─�
   Harvester. Known events are refreshed and keep their state.
 - **Feed** / **Siphon** (flux ⇄ prima materia): move a source's events into the
   Centrifuge (shown in Discovery) or back out.
-- **Purge** (prima materia → shade): everything left in the Centrifuge goes to the Sump.
+- **Purge** (prima materia → dross): everything left in the Centrifuge goes to the Sump.
 - **Pass** (prima materia → ore): creates the linked adventure in the Hopper.
-- **Ignore** (prima materia → shade): the raw event goes to the Sump.
+- **Ignore** (prima materia → dross): the raw event goes to the Sump.
 - **Kill** (any adventure → vestige): the adventure moves to the Necropolis and its raw
   event becomes ignored. Nothing is deleted: its fields (stats, links) and the phase it
   was in are kept. Kill works from any stage.
-- **Revive** (shade → passed): the raw event becomes passed. If it has an adventure in
+- **Revive** (dross → passed): the raw event becomes passed. If it has an adventure in
   the Necropolis, that adventure is restored to its previous phase with all its data;
   otherwise a new adventure is created in the Hopper, the same as a first pass.
 - **Missed events**: an adventure whose event ends before it reaches the Arena (still in
@@ -122,7 +122,7 @@ raw event:  harvested ──feed──▶ new ──pass──▶ passed ◀─�
 - One global switch flips between **two separate pools**:
   - **Adventures** (normal use): only adventures. Raw events are never in this pool.
   - **Discovery** (the Centrifuge): only raw events. Shows prima materia (`new`) by default, with a
-    toggle to also show shades (`ignored`) so they can be revived.
+    toggle to also show dross (`ignored`) so they can be revived.
 - Filters work the same way in both modes, applied to that mode's pool.
 - In Discovery, the node card gets **Pass** / **Ignore** / **Revive** buttons; in
   Adventures, it gets **Kill**.
@@ -162,7 +162,7 @@ changed through their own controls.
 An always-present **exclude** filter, shown in the classifier as its own star. It seals
 away adventures that are **past** (end time has passed), in the **Treasury**, the
 **Necropolis** or the **Archive**. Switching it off shows everything, like any other
-filter. Omens and shades never appear in Adventures mode, so it doesn't cover them.
+filter. Prima materia and dross never appear in Adventures mode, so it doesn't cover them.
 
 ## 7. Classifier visualization
 

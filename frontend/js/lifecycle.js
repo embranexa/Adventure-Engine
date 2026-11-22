@@ -16,7 +16,7 @@ export const REVIEW_STAGES = {
     harvested: { module: 'Harvester',  matter: 'flux',          color: '#3a4a5e', deep: '#171e27', light: '#9fb0c4', hint: 'Harvested; feed it to the Centrifuge to review' },
     new:       { module: 'Centrifuge', matter: 'prima materia', color: '#4b5a86', deep: '#1f2640', light: '#b6c1e2', hint: 'In the Centrifuge: not reviewed yet' },
     passed:    { module: 'Hopper',     matter: 'ore',           color: '#3d7bf0', deep: '#1b3a7a', light: '#a8c6ff', hint: 'Became an adventure' },
-    ignored:   { module: 'Sump',       matter: 'shade',         color: '#5d6070', deep: '#25262d', light: '#8a8d9a', hint: 'Rejected; can be revived' },
+    ignored:   { module: 'Sump',       matter: 'dross',         color: '#5d6070', deep: '#25262d', light: '#8a8d9a', hint: 'Rejected; can be revived' },
 };
 
 /** Adventure phases, in lifecycle order. @type {Record<Phase, Stage>} */

@@ -36,7 +36,8 @@ function usePanelChrome(kind) {
 /**
  * A module housing: steel pipe frame with ornate corners, glass interior, and a
  * nameplate (title, status, pop out, close), plus a tab strip when several panels share
- * the housing. Drag the nameplate or a tab to re-dock. In a pop-out window (`popout`) the
+ * the housing. A click or focus inside makes it the focused group (its active tab is the
+ * panel in use: panelInUse in store.js). Drag the nameplate or a tab to re-dock. In a pop-out window (`popout`) the
  * housing holds one panel, doesn't take part in docking, and has a Dock button instead.
  * @param {{ node: LeafNode, popout?: boolean }} props
  */
@@ -49,6 +50,7 @@ function PanelGroupImpl({ node, popout = false }) {
     const dockPanel = useWorkspaceStore((s) => s.dockPanel);
     const closePanel = useWorkspaceStore((s) => s.closePanel);
     const dockPopout = useWorkspaceStore((s) => s.dockPopout);
+    const focusGroup = useWorkspaceStore((s) => s.focusGroup);
 
     const [hoverZone, setHoverZone] = useState(/** @type {DropZone | null} */ (null));
     const groupRef = useRef(/** @type {HTMLDivElement | null} */ (null));
@@ -104,6 +106,8 @@ function PanelGroupImpl({ node, popout = false }) {
             ref=${groupRef}
             className="module"
             style=${{ '--acc': acc }}
+            onPointerDownCapture=${() => focusGroup(node.id)}
+            onFocusCapture=${() => focusGroup(node.id)}
             onDragOver=${popout ? undefined : handleDragOver}
             onDragLeave=${popout ? undefined : () => setHoverZone(null)}
             onDrop=${popout ? undefined : handleDrop}

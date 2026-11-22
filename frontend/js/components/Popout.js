@@ -87,6 +87,9 @@ export function mountPopout(panelId, win) {
     });
     open.set(panelId, { win, root });
     addWindow(win);
+    // its panel is in use while the window has focus
+    win.addEventListener('focus', () => useWorkspaceStore.getState().focusGroup(`popout:${panelId}`));
+    win.addEventListener('blur', () => useWorkspaceStore.getState().blurPopout(panelId));
     // the user closed the window (or it navigated away): back to the dock
     win.addEventListener('pagehide', () => gone(panelId, win));
 }

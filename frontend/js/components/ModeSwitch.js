@@ -87,7 +87,7 @@ function HarvesterBar() {
 
 /**
  * Adventures / Discovery switch, the inbox (prima materia in the Centrifuge + last
- * harvest), and, in Discovery, the harvesters and the toggle for showing shades.
+ * harvest), and, in Discovery, the harvesters and the toggle for showing dross.
  */
 export function ModeSwitch() {
     const mode = useWorkspaceStore((s) => s.mode);
@@ -128,9 +128,9 @@ export function ModeSwitch() {
         </div>
         ${mode === 'discovery' && html`
             <${HarvesterBar} />
-            <label className="shade-toggle" title="Also show ignored events (shades) so they can be revived">
+            <label className="shade-toggle" title="Also show ignored events (dross) so they can be revived">
                 <input type="checkbox" checked=${showShades} onChange=${toggleShades} />
-                Show shades
+                Show dross
             </label>
         `}
     `;

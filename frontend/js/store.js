@@ -143,6 +143,26 @@ function findLeafWithPanel(node, panelId) {
     return findLeafWithPanel(node.first, panelId) || findLeafWithPanel(node.second, panelId);
 }
 
+/** The leaf with this id, or null. @param {LayoutNode | null} node @param {string | null} id @returns {LeafNode | null} */
+function findLeaf(node, id) {
+    if (!node || !id) return null;
+    if (node.type === 'leaf') return node.id === id ? node : null;
+    return findLeaf(node.first, id) || findLeaf(node.second, id);
+}
+
+/**
+ * The panel in use: the focused pop-out window's panel, else the active tab of the dock
+ * group the user last clicked or focused. Null before any. (The Signal Chain's machines
+ * work while their panel is in use: PHASE7_PLAN.md, stage 7d.)
+ * @param {WorkspaceState} s @returns {PanelId | null}
+ */
+export function panelInUse(s) {
+    if (s.focusedPopout && s.poppedOut.includes(s.focusedPopout)) return s.focusedPopout;
+    const leaf = findLeaf(dockedTree(s.tree, new Set(s.poppedOut)), s.focusedGroup);
+    if (!leaf) return null;
+    return leaf.tabs.includes(leaf.activeTab) ? leaf.activeTab : leaf.tabs[0] ?? null;
+}
+
 /** Set by components/Popout.js (the store can't import it: it imports the store). */
 export const popoutHooks = { focus: (/** @type {PanelId} */ _panelId) => {} };
 
@@ -376,6 +396,8 @@ const workspaceStore = (set, get) => ({
     tree: null,
     draggingPanelId: null,
     poppedOut: [],
+    focusedGroup: null,
+    focusedPopout: null,
     layoutStatus: 'AWAITING LINK',
 
     // UI-level state subscriptions
@@ -844,6 +866,16 @@ const workspaceStore = (set, get) => ({
 
     setDraggingPanel: (panelId) => set({ draggingPanelId: panelId }),
 
+    // --- the panel in use (see panelInUse) ---
+    focusGroup: (groupId) => {
+        const popout = groupId.startsWith('popout:') ? /** @type {PanelId} */ (groupId.slice(7)) : null;
+        if (popout) { if (get().focusedPopout !== popout) set({ focusedPopout: popout }); return; }
+        if (get().focusedGroup !== groupId || get().focusedPopout) set({ focusedGroup: groupId, focusedPopout: null });
+    },
+    blurPopout: (panelId) => {
+        if (get().focusedPopout === panelId) set({ focusedPopout: null });
+    },
+
     // --- pop-out windows (components/Popout.js opens and closes the windows) ---
     popOut: (panelId) => {
         if (!get().poppedOut.includes(panelId)) set({ poppedOut: [...get().poppedOut, panelId] });
@@ -905,6 +937,9 @@ const workspaceStore = (set, get) => ({
         const leafId = findLeafWithPanel(get().tree, panelId);
         if (leafId) get().selectTab(leafId, panelId);
         else get().reopenPanel(panelId);
+        // the panel just shown is the one in use
+        const shown = findLeafWithPanel(get().tree, panelId);
+        if (shown) get().focusGroup(shown);
     },
 
     resetWorkspace: async () => {

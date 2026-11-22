@@ -34,8 +34,8 @@ Phases 0–4, 6 and 8 are built and committed. Phase 5 (the codex conveyor) is
 **skipped** (the user decided 2026-11-21: unclear value). **Now: phase 7, the
 aesthetics rebuild.** Its design was prototyped and approved as `atelier.html` (this
 folder), and its integration plan, with the user's answers, is **`PHASE7_PLAN.md`**
-(this folder). Stages 7a and 7b are done; read its "Resume here" section first, then
-continue with stage 7c. Commit only when the user asks
+(this folder). Phase 7 is built: 7a and 7b committed, 7c to 7e uncommitted (the user
+commits at the end of the phase); read its "Resume here" section first. Commit only when the user asks
 (not one commit per stage).
 
 | Commit | What |
@@ -83,7 +83,7 @@ file doesn't mention yet.
 |---|---|---|
 | **harvester** | crawler (in the UI) | the backend package `backend/crawlers/` keeps its name |
 | **centrifuge** | sensorium | events `new`; matter **prima materia** (never "omen" in the UI; the internal `kind: 'omen'` stays) |
-| **sump** | limbo | events `ignored` with no adventure; matter **shade** |
+| **sump** | limbo | events `ignored` with no adventure; matter **dross** (was shade) |
 | **hopper** | — | `queued`; ore |
 | **Refinery** | Refiner | the `classifying` machine **and** its panel (node card); node id `refinery`. Because of this, "refinery" never names the whole twin: the twin's 3D tab is "3D" |
 | **Nexus** | — | the lantern: filters and lens (panel `classifier`) |
@@ -160,15 +160,15 @@ Some older comments call the whole app "the refinery" (the theme: `styles.css`,
 | Filters | `frontend/js/filters.js` (`FACETS`, `passes`, `pendingChanges`, object names and chosen colours via `setObjectNames` / `chosenObjectColor`) |
 | Lens and colours | `frontend/js/lib/lens.js` (`LENSES`, `lensValues`, `lensColor`, `lensLabel`, `PALETTE`, `objectColor(id)` = chosen colour or a default from the id) |
 | Twin, pure | `frontend/js/lib/twinTopology.js` (nodes, pipes, `route`, `nodeStage` = the stage a base button toggles), `frontend/js/lib/twinModel.js` (levels, lit, bands, `eventNode`, `pipeFlows`, the counting check) |
-| Twin, 3D (phase 7: see PHASE7_PLAN.md) | `frontend/js/lib/twin/twinScene.js` (the scene), `twin/machines.js` (bodies, heart, base), `twin/zones.js`, `twin/textures.js`, `twin/materials.js`. Pre-phase-7 notes, partly stale: `layout()` (hand-placed positions), `_buildStage` (slabs: Net, Core, Gallery), `_addMachine` (per kind; the base button collar; the codex cabinet and jars), `_buildLantern`, `_buildWires`, `_buildLight` (beam, magic circle), `update` (no hover tooltip: removed in phase 6), `relight`, `setSelection`, `play` / `_launch` (packets), `_frame*` |
-| Twin, panel | `frontend/js/components/panels/SignalChainPanel.js`: the React boundary. `runAction`, `runCommand`, `toggleRing`, `turnLens`, `relightCause`, and memos for `light`, `stageFilter`, `packetStyle`, `fresh`, `selection`; the Table view (`TwinTable`) |
+| Twin, 3D (phase 7: see PHASE7_PLAN.md) | `frontend/js/lib/twin/twinScene.js` (orchestrator: renderer, environment, bloom, camera, `layout()` positions incl. the manifold, `_buildZones`, `_addMachine`, labels incl. the Temper's, `update`, `setSelection`, `setInUse`, `setBloom`, `play` / `_launch` (slugs), `_frame`), `twin/machines.js` (`buildMachine`: base with ports and filter rim, heart, the 17 bodies, `pace` easing), `twin/pipes.js` (floor pipes, slugs, conveyor, market pipes, Temper, manifold hub), `twin/selection.js` (floor circle open/close), `twin/zones.js`, `twin/textures.js`, `twin/materials.js` |
+| Twin, panel | `frontend/js/components/panels/SignalChainPanel.js`: the React boundary. `runAction`, `runCommand`, `toggleRing`, `turnLens`, `PANEL_MACHINES` (panel in use -> machines), and memos for `light`, `stageFilter`, `packetStyle`, `fresh`, `selection`; the Table view (`TwinTable`) |
 | Magic circles (shared) | `frontend/js/lib/magicCircle.js` (`magicCircleCanvases(size)` → `{ outer, inner }` white canvases to tint and counter-rotate) |
 | Pop-out windows | `frontend/js/components/Popout.js` (`popOut`, `mountPopout`, `PopoutShell`), `dockedTree` / `poppedOut` / `popOut` / `dockPopout` / `popoutHooks` in `store.js`, `frontend/js/lib/windows.js` (`focusedWindow`, `confirmHere`), `viewOf` in `lib/resizing.js`; the ⧉ / ⇲ buttons in `PanelGroup.js` |
 | Harvest cooldown | `frontend/js/lib/harvest.js` (`HARVEST_FRESH_MS` = 1 h, `freshMinutes`, `freshTitle`) |
 | Nexus | `frontend/js/components/panels/ClassifierPanel.js` (the Lens row = the layer: `lensLayers`), `frontend/js/lib/classifierGraph.js` (stars: `facetColor`; `ROLE_COLORS` = the role cue), `frontend/js/lib/classifierScene.js` (`_styleStar`: role sigil = magic circle) |
 | Calendar, Atlas lens colour | `itemLensColor` in `CalendarPanel.js` (`CalendarBlock`) and `MapPanel.js` (`tinted`) |
 | Codex | `frontend/js/components/panels/CodexPanel.js` (`ColorPicker`, tinted glyphs) |
-| Store | `frontend/js/store.js`: `transitions`, `flows`, `loadTransitions`, `addTransitions`, `setLens`, `cycleStage` (applies at once), `feedSource`, `siphonSource`, `purgeCentrifuge`, `setObjects`; `filters.lens` in `DEFAULT_FILTERS` (`filters.js`) and `backend/schemas/state.py`; types in `frontend/types/global.d.ts` |
+| Store | `frontend/js/store.js`: `panelInUse` (selector), `focusedGroup` / `focusedPopout` / `focusGroup` (the panel in use, 7d), `transitions`, `flows`, `loadTransitions`, `addTransitions`, `setLens`, `cycleStage` (applies at once), `feedSource`, `siphonSource`, `purgeCentrifuge`, `setObjects`; `filters.lens` in `DEFAULT_FILTERS` (`filters.js`) and `backend/schemas/state.py`; types in `frontend/types/global.d.ts` |
 | Interim Discovery controls | `HarvesterBar` in `frontend/js/components/ModeSwitch.js` (same harvest cooldown; can go once the twin is in use) |
 | Styles | `frontend/styles.css` (twin: `.sc-*`, `.twin-*`; Codex picker: `.cx-colors`, `.cx-swatch`) |
 
@@ -194,7 +194,7 @@ Because of this rule, the counting rules hold whatever filter is on.
 | **harvester: luma** | processor | its events `harvested` (flux) | **Harvest** · **Feed** · **Siphon** |
 | harvesters: 19hz, ra, eventbrite | processor, **locked** | — | unlock on their own once a crawler for them is registered in `CRAWLERS` |
 | **centrifuge** | processor | events `new` (prima materia) | **Purge**; click → Nexus, Discovery mode on |
-| **sump** | vessel | events `ignored` *with no adventure* (shade) | Nexus, Discovery with shades shown |
+| **sump** | vessel | events `ignored` *with no adventure* (dross) | Nexus, Discovery with dross shown |
 | **forge** | dynamo | — (hand-made adventures enter the chain here) | Refinery + create dialog |
 
 #### Harvester and centrifuge controls
@@ -613,7 +613,7 @@ Each phase ends with something you can look at.
   comes up. Codex colour is done.
 - Should Feed and Purge act only on **lit** rows (those passing the applied filter)? That
   would let you feed just one city's ra events, for example. Default: everything.
-- There's no sump → centrifuge path (reviving a shade sends it to the hopper). Add a
+- There's no sump → centrifuge path (reviving dross sends it to the hopper). Add a
   "Reclaim" later if a purge needs undoing in bulk.
 - Should harvested or centrifuge events whose time has passed be vented to the sump
   automatically (the sweeper only handles adventures today)?

@@ -150,7 +150,7 @@ async def pass_event(event_id: uuid.UUID) -> str:
 
 
 async def ignore_event(event_id: uuid.UUID) -> None:
-    """Prima materia -> shade (Sump)."""
+    """Prima materia -> dross (Sump)."""
     async with SessionLocal() as session:
         event = await _get_event(session, event_id)
         if event.review != "new":
@@ -161,7 +161,7 @@ async def ignore_event(event_id: uuid.UUID) -> None:
 
 
 async def revive_event(event_id: uuid.UUID) -> str:
-    """Shade -> passed. Restores its killed adventure, or creates one. Returns its id."""
+    """Dross -> passed. Restores its killed adventure, or creates one. Returns its id."""
     async with SessionLocal() as session:
         event = await _get_event(session, event_id)
         if event.review != "ignored":

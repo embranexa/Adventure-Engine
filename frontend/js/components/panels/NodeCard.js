@@ -157,7 +157,7 @@ function ItemActions({ item }) {
                 title="Becomes an adventure again: back where it was killed, else ore">↺ Revive</button>`
             : html`
                 <button className="btn nc-act pass" onClick=${() => passEvent(item.id)} title="Becomes an adventure: ore">✦ Pass → Ore</button>
-                <button className="btn nc-act" onClick=${() => ignoreEvent(item.id)} title="Rejected, a shade; can be revived later">✕ Ignore → Shade</button>
+                <button className="btn nc-act" onClick=${() => ignoreEvent(item.id)} title="Rejected, to dross; can be revived later">✕ Ignore → Dross</button>
             `;
     } else if (item.phase === 'killed') {
         const from = item.phase_before_kill ? PHASE_STAGES[item.phase_before_kill].matter : 'ore';

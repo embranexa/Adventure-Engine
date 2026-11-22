@@ -71,7 +71,7 @@ interface EventRecord {
 
 /**
  * Raw event review: harvested (flux, in its Harvester) | new (prima materia, in the Centrifuge)
- * | passed (became an adventure) | ignored (shade, in the Sump).
+ * | passed (became an adventure) | ignored (dross, in the Sump).
  */
 type ReviewState = 'harvested' | 'new' | 'passed' | 'ignored';
 
@@ -268,6 +268,10 @@ interface WorkspaceState {
     draggingPanelId: PanelId | null;
     /** Panels shown in their own window; they stay in `tree`, hidden from the main dock. */
     poppedOut: PanelId[];
+    /** The dock group (leaf id) the user last clicked or focused; see panelInUse in store.js. */
+    focusedGroup: string | null;
+    /** The popped-out panel whose window has focus. */
+    focusedPopout: PanelId | null;
     /** Whether the dock layout is saved to the server. */
     layoutStatus: string;
     feedStatus: FeedStatus;
@@ -276,7 +280,7 @@ interface WorkspaceState {
     rawEvents: EventRecord[];
     adventures: AdventureRecord[];
     mode: PoolMode;
-    /** Discovery mode: also show ignored raw events (shades), so they can be revived. */
+    /** Discovery mode: also show ignored raw events (dross), so they can be revived. */
     showShades: boolean;
 
     /** The current pool (depends on mode), sorted by start time. Every view shows this. */
@@ -315,6 +319,10 @@ interface WorkspaceState {
     initWorkspace(): Promise<void>;
     persistLayout(nextTree: LayoutNode | null): void;
     setDraggingPanel(panelId: PanelId | null): void;
+    /** A dock group (leaf id) or a pop-out (`popout:<panel>`) got the user's attention. */
+    focusGroup(groupId: string): void;
+    /** A pop-out window lost focus. */
+    blurPopout(panelId: PanelId): void;
     resizeSplit(splitId: string, ratio: number): void;
     commitResize(): void;
     selectTab(leafId: string, panelId: PanelId): void;
