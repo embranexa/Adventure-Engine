@@ -531,6 +531,7 @@ export class TwinScene {
         this.time += dt;
         this.controls.update();
         const ease = 1 - Math.exp(-dt * 3);
+        this.shop.tick(this.calm?.matches ? 0 : dt);   // the hearts' liquid drifts and ripples
 
         for (const rec of this.machines.values()) {
             // a harvester's rotor spins while it harvests; the centrifuge whirls after a purge

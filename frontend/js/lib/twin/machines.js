@@ -64,17 +64,105 @@ export function makeShop(K) {
     const CIRCLE = { outer: keep(texture(circles.outer)), inner: keep(texture(circles.inner)) };
     const RUNES = keep(runeStrip());
     const DOT = (() => { const [c, g] = canvas2d(64); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return keep(texture(c)); })();
+    const U = { uFlowT: { value: 0 }, uShimmer: { value: SHIMMER }, uTime: { value: 0 } };   // one clock for every heart
     const liquids = new Map();
     const liquidMat = (color) => {
-        // vivid and softly glowing: outside tone mapping, which would wash the colours out
-        if (!liquids.has(color)) liquids.set(color, keep(std({ color: new THREE.Color(color).multiplyScalar(0.22), emissive: new THREE.Color(color), emissiveIntensity: 0.82, roughness: 0.4, metalness: 0, envMapIntensity: 0.2, toneMapped: false })));
+        // vivid and softly glowing: outside tone mapping, which would wash the colours out; its brightness drifts (flowGain)
+        if (!liquids.has(color)) liquids.set(color, keep(withFlow(std({ color: new THREE.Color(color).multiplyScalar(0.22), emissive: new THREE.Color(color), emissiveIntensity: 0.82, roughness: 0.4, metalness: 0, envMapIntensity: 0.2, toneMapped: false }), U)));
         return liquids.get(color);
     };
+    const seamGeo = keep(new THREE.CylinderGeometry(1, 1, 1, 64, 1, true));
     const additive = (map, color, opacity = 0.9) => new THREE.MeshBasicMaterial({ map, color: new THREE.Color(color), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
     const unitCyl = keep(new THREE.CylinderGeometry(1, 1, 1, 32)); unitCyl.translate(0, 0.5, 0);
     let globe = null;
     const globeTexture = () => globe ?? (globe = keep(drawGlobe()));
-    return { ...K, CIRCLE, RUNES, DOT, liquidMat, additive, unitCyl, globeTexture, dispose: () => own.forEach((x) => x.dispose()) };
+    return { ...K, CIRCLE, RUNES, DOT, liquidMat, additive, unitCyl, seamGeo, globeTexture, U,
+        /** advance the liquid's clock once a frame (dt is 0 under reduced motion) */
+        tick(dt) { U.uTime.value += dt; U.uFlowT.value += dt; },
+        dispose: () => own.forEach((x) => x.dispose()) };
+}
+
+/* ---------------------------------------------------------------------- */
+/*  The heart's liquid as energy (prototype: resources/.../liquid.html).    */
+/*  Every effect changes brightness only; each band keeps its own hue, so  */
+/*  the lens stays readable.                                               */
+/* ---------------------------------------------------------------------- */
+
+const SHIMMER = 0.28;   // the drift's strength: brightness varies by up to ±28%
+const NOISE = /* glsl */`
+float hash3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vnoise(vec3 x) {
+    vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(hash3(i), hash3(i + vec3(1,0,0)), f.x), mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x), f.y),
+               mix(mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x), mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x), f.y), f.z);
+}
+float fbm(vec3 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p = p * 2.03 + vec3(1.7, 9.2, 3.1); a *= 0.5; } return s; }
+uniform float uFlowT, uShimmer;
+// slow billows and fine streaks drifting upward, as a brightness gain
+float flowGain(vec3 p) {
+    vec3 q = p * 0.30;
+    float n1 = fbm(vec3(q.x, q.y * 0.7 - uFlowT * 0.35, q.z));
+    float n2 = fbm(vec3(q.x * 2.4 + 3.0, q.y * 0.22 - uFlowT * 0.8, q.z * 2.4));
+    return 1.0 + uShimmer * clamp((0.6 * n1 + 0.4 * n2 - 0.46) * 2.8, -1.0, 1.0);
+}`;
+const SURF = /* glsl */`
+uniform float uTime, uWave, uHit, uR;
+// crossing waves, a ripple ring after rows arrive, and a meniscus climbing the glass
+float surfH(vec2 p) {
+    float r = length(p), t = uTime;
+    float h = uWave * 0.12 * (sin(dot(p, vec2(0.8, 0.6)) * 0.9 + t * 1.6) * 0.5
+                            + sin(dot(p, vec2(-0.5, 0.86)) * 1.3 - t * 2.1) * 0.35
+                            + sin(r * 1.7 - t * 2.4) * 0.25);
+    float a = uTime - uHit;
+    if (a > 0.0 && a < 6.0) h += 0.32 * sin(r * 2.6 - a * 7.0) * exp(-a * 0.9) * exp(-pow(r - a * 3.2, 2.0) * 0.5);
+    h *= 1.0 - pow(min(r / uR, 1.0), 6.0);
+    return h + 0.14 * smoothstep(uR - 0.7, uR, r);
+}`;
+
+/**
+ * Patch a standard material so its emissive drifts (flowGain of the world position).
+ * `surf` also displaces the vertices as the liquid's surface, with normals from the slope.
+ */
+function withFlow(mat, U, surf = null) {
+    mat.onBeforeCompile = (sh) => {
+        Object.assign(sh.uniforms, U, surf ?? {});
+        sh.vertexShader = sh.vertexShader
+            .replace('#include <common>', `#include <common>\nvarying vec3 vWPos;\n${surf ? `varying float vH;\n${SURF}` : ''}`)
+            .replace('#include <project_vertex>', '#include <project_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+        if (surf) sh.vertexShader = sh.vertexShader
+            .replace('#include <beginnormal_vertex>', `
+                float e = 0.08, h0 = surfH(position.xz);
+                vec3 objectNormal = normalize(vec3(-(surfH(position.xz + vec2(e, 0.0)) - h0) / e, 1.0, -(surfH(position.xz + vec2(0.0, e)) - h0) / e));
+                #ifdef USE_TANGENT
+                vec3 objectTangent = vec3(tangent.xyz);
+                #endif`)
+            .replace('#include <begin_vertex>', 'vec3 transformed = vec3(position); transformed.y += h0; vH = h0;');
+        sh.fragmentShader = sh.fragmentShader
+            .replace('#include <common>', `#include <common>\nvarying vec3 vWPos;\n${surf ? 'varying float vH;' : ''}\n${NOISE}`)
+            .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance *= flowGain(vWPos)${surf ? ' * (1.0 + vH * 2.4)' : ''};`);   // crests a little brighter
+    };
+    mat.customProgramCacheKey = () => (surf ? 'liquid-surface' : 'liquid');
+    return mat;
+}
+
+/** The liquid's surface (one per heart: its waves are its own). */
+const surfaceMat = (U, waves) => withFlow(std({ color: 0x000000, emissive: 0xffffff, emissiveIntensity: 0.95, roughness: 0.12, metalness: 0, envMapIntensity: 1.1, toneMapped: false }), U, waves);
+
+/** A seam where two lit bands meet: lower half in the lower band's light, upper half in the upper's, a bright core between. */
+function seamMat(low, high, U) {
+    return new THREE.ShaderMaterial({
+        uniforms: { cLow: { value: new THREE.Color(lighter(low)) }, cHigh: { value: new THREE.Color(lighter(high)) }, uTime: U.uTime },
+        vertexShader: 'varying vec2 vUv; varying vec3 vP; void main() { vUv = uv; vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: `
+            uniform vec3 cLow, cHigh; uniform float uTime; varying vec2 vUv; varying vec3 vP;
+            void main() {
+                float d = abs(vUv.y - 0.5) * 2.0;
+                float core = exp(-d * d * 22.0), halo = exp(-d * d * 3.5) * 0.35;
+                float sparkle = 0.78 + 0.22 * sin(atan(vP.z, vP.x) * 5.0 - uTime * 1.6);
+                gl_FragColor = vec4(mix(vUv.y < 0.5 ? cLow : cHigh, vec3(1.0), core * 0.5) * (core + halo) * sparkle, 1.0);
+            }`,
+        transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+    });
 }
 
 /** A lighter tint of a colour, for glows that must read on dark matter. */
@@ -118,8 +206,15 @@ export function buildMachine(S, node, ctx) {
         const g = G(), rr = r - 0.35;
         g.add(cyl(r, r, H, M.heart, y0, 48, true));
         const liquid = G(); liquid.position.y = y0 + 0.2; liquid.visible = false; g.add(liquid);
-        const topMat = ownGlow(color, 0.95); topMat.color.setScalar(0); topMat.toneMapped = false; // the surface: the top band's own colour, glowing
-        const top = new THREE.Mesh(new THREE.CircleGeometry(rr * 0.98, 32), topMat); top.rotation.x = -Math.PI / 2; liquid.add(top);
+        const overlay = G(); g.add(overlay);   // in machine units, not scaled with the liquid: the surface and the seams
+        // the surface: the top band's own colour, glowing, rippling (surfaceMat); a bright meniscus where it meets the glass
+        const waves = { uWave: { value: 0.45 }, uHit: { value: -100 }, uR: { value: rr } };
+        const topMat = mine(surfaceMat(S.U, waves));
+        const grid = new THREE.RingGeometry(0.001, rr * 0.995, 96, 24); grid.rotateX(-Math.PI / 2);
+        const top = new THREE.Mesh(grid, topMat); overlay.add(top);
+        const menMat = mine(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+        const meniscus = torus(rr - 0.02, 0.09, menMat, 0); overlay.add(meniscus);
+        const seams = [];
         const over = torus(r + 0.15, 0.22, ownGlow('#ff7a3c', 2.2), y0 + H); over.visible = false; g.add(over);
         const tk = CAM + 1.4; // the capacity ticks at the heart's edge, seen side-on
         g.add(box(0.25, H, 0.25, M.gilt, Math.cos(tk) * (r + 0.3), y0, Math.sin(tk) * (r + 0.3)));
@@ -130,29 +225,45 @@ export function buildMachine(S, node, ctx) {
             /** bands: [{ color, count, ghost? }] bottom up; total rows; cap = rows that fill it */
             setBands(bands, total, cap) {
                 for (const s of segs.splice(0)) liquid.remove(s);
+                for (const s of seams.splice(0)) { overlay.remove(s.mesh); s.mesh.material.dispose(); }
+                if (this.total != null && total > this.total) waves.uHit.value = S.U.uTime.value;   // rows arrived: a ripple
+                this.total = total;
                 const sum = bands.reduce((n, b) => n + b.count, 0) || 1;
                 let y = 0, litTop = 0;
+                const lit = [];
                 for (const b of bands) {
                     const share = b.count / sum;
                     if (share <= 0) continue;
                     const m = new THREE.Mesh(S.unitCyl, b.ghost ? M.ghost : liquidMat(b.color));
                     m.position.y = y; m.scale.set(rr * (b.ghost ? 0.995 : 1), share, rr * (b.ghost ? 0.995 : 1));
                     liquid.add(m); segs.push(m);
+                    // a glowing seam where one lit band meets the next (each half in its own band's light)
+                    if (!b.ghost && litTop > 0) {
+                        const below = lit.at(-1);
+                        const mesh = new THREE.Mesh(S.seamGeo, seamMat(below, b.color, S.U));
+                        mesh.scale.set(rr + 0.04, 0.26, rr + 0.04); overlay.add(mesh);
+                        seams.push({ mesh, at: y });
+                    }
+                    if (!b.ghost) lit.push(b.color);
                     y += share; if (!b.ghost) litTop = y;
                 }
-                top.position.y = litTop + 0.002; top.visible = litTop > 0;
-                const lit = bands.filter((b) => !b.ghost && b.count > 0);
-                if (lit.length) top.material.emissive.set(lit[lit.length - 1].color); // the surface shows the top band
+                top.visible = meniscus.visible = litTop > 0;
+                if (lit.length) { topMat.emissive.set(lit.at(-1)); menMat.color.set(lighter(lit.at(-1))); } // the surface shows the top band
                 this.litShare = litTop;
                 this.target = Math.min(1, total / cap);
                 over.visible = total > cap;
             },
             /** the lit liquid's top, in the machine's own units */
             level() { return this.y0 + this.fill * this.maxH * this.litShare; },
-            frame(ease) {
+            frame(ease, pace) {
                 this.fill += (this.target - this.fill) * ease;
                 liquid.visible = this.fill > 0.002;
-                liquid.scale.y = Math.max(0.001, this.fill * this.maxH);
+                const H = Math.max(0.001, this.fill * this.maxH);
+                liquid.scale.y = H;
+                top.position.y = this.y0 + this.litShare * H;
+                meniscus.position.y = top.position.y + 0.14;
+                for (const s of seams) s.mesh.position.y = this.y0 + s.at * H;
+                waves.uWave.value = 0.45 + 1.1 * pace;   // choppier while the machine works
             },
         };
         return g;
@@ -216,10 +327,10 @@ export function buildMachine(S, node, ctx) {
             const want = !node.locked && ctx.working();
             wind = want ? Math.min(1, wind + dt / PACE_S) : Math.max(0, wind - dt / PACE_S);
             pace = wind * wind * (3 - 2 * wind);
-            heartRec?.frame(ease);
+            heartRec?.frame(ease, pace);
             for (const f of anims) f(dt, t);
         },
-        dispose() { owned.forEach((x) => x.dispose()); group.traverse((o) => { if (o.geometry && o.geometry !== S.unitCyl) o.geometry.dispose(); }); },
+        dispose() { owned.forEach((x) => x.dispose()); group.traverse((o) => { if (o.geometry && o.geometry !== S.unitCyl && o.geometry !== S.seamGeo) o.geometry.dispose(); }); },
     };
 }
 
