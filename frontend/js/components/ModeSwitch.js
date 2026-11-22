@@ -49,9 +49,7 @@ function HarvesterBar() {
     const spinning = rawEvents.reduce((n, e) => n + (e.review === 'new' ? 1 : 0), 0);
 
     const purge = () => {
-        if (spinning && window.confirm(`Purge ${spinning} event${spinning === 1 ? '' : 's'} from the Centrifuge into the Sump? (Each can be revived.)`)) {
-            purgeCentrifuge();
-        }
+        if (spinning) purgeCentrifuge(); // no confirm: each event can be revived from the Sump
     };
 
     return html`

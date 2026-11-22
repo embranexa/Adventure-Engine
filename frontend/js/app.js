@@ -1,11 +1,11 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { html } from './html.js';
 import { useWorkspaceStore, collectMountedPanels, dockedTree } from './store.js';
 import { DockNode } from './components/DockNode.js';
 import { ModeSwitch } from './components/ModeSwitch.js';
 import { MatterGauge } from './components/MatterGauge.js';
-import { Abyss } from './components/Abyss.js';
+import { Abyss, WORLDS, saveWorld, savedWorld } from './components/Abyss.js';
 import { Sigil } from './components/PanelTitle.js';
 import { LayoutMenu } from './components/LayoutMenu.js';
 import { ADVENTURE_TYPES } from './lifecycle.js';
@@ -31,6 +31,7 @@ function App() {
     const createAdventure = useWorkspaceStore((s) => s.createAdventure);
     const showPanel = useWorkspaceStore((s) => s.showPanel);
     const poppedOut = useWorkspaceStore((s) => s.poppedOut);
+    const [world, setWorld] = useState(savedWorld); // the world outside the window
     // the main dock leaves out panels shown in their own window
     const docked = useMemo(() => dockedTree(tree, new Set(poppedOut)), [tree, poppedOut]);
 
@@ -46,7 +47,7 @@ function App() {
     const light = feedLight(feedStatus);
 
     return html`
-        <${Abyss} />
+        <${Abyss} world=${world} />
         <div className="workspace-shell">
             <header className="topbar">
                 <span className="brand"><${Sigil} />Adventure Engine</span>
@@ -86,6 +87,10 @@ function App() {
                         `)}
                     </select>
                 `}
+                <select className="btn ghost window-select" aria-label="The world outside the window" title="The world outside the window"
+                    value=${world} onChange=${(e) => { setWorld(e.target.value); saveWorld(e.target.value); }}>
+                    ${WORLDS.map((w) => html`<option key=${w.key} value=${w.key}>◐ ${w.label}</option>`)}
+                </select>
                 <${LayoutMenu} />
                 <button className="btn ghost" onClick=${resetWorkspace}>Reset layout</button>
             </header>

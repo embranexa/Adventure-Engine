@@ -157,7 +157,8 @@ type AdventureChanges = Partial<{
 
 /** An adventure's action roadmap: a dependency graph (backend/services/roadmap.py). */
 interface Roadmap {
-    actions: { id: string; title: string }[];
+    /** notes: optional free text per action (the Alembic's action bar; shown in the Crucible). */
+    actions: { id: string; title: string; notes?: string }[];
     /** [a, b]: a must be done before b. */
     edges: [string, string][];
     /** Ids of completed actions. */

@@ -81,7 +81,7 @@ function cascade(roadmap) {
 
 /**
  * @typedef {'done' | 'ready' | 'locked'} ActionState
- * @typedef {{ id: string, title: string, parents: string[], children: string[],
+ * @typedef {{ id: string, title: string, notes: string, parents: string[], children: string[],
  *             state: ActionState, layer: number, row: number }} ActionInfo
  * @typedef {{ actions: ActionInfo[], byId: Map<string, ActionInfo>, layers: string[][],
  *             total: number, doneCount: number, bottlenecks: ActionInfo[], complete: boolean }} RoadmapAnalysis
@@ -98,7 +98,7 @@ export function analyze(input) {
     /** @type {Map<string, ActionInfo>} */
     const byId = new Map();
     for (const a of roadmap.actions) {
-        byId.set(a.id, { id: a.id, title: a.title, parents: [], children: [], state: 'locked', layer: 0, row: 0 });
+        byId.set(a.id, { id: a.id, title: a.title, notes: a.notes ?? '', parents: [], children: [], state: 'locked', layer: 0, row: 0 });
     }
     for (const [a, b] of roadmap.edges) {
         const src = byId.get(a), tgt = byId.get(b);
@@ -195,6 +195,19 @@ export function renameAction(roadmap, id, title) {
     return { ...roadmap, actions: roadmap.actions.map((a) => (a.id === id ? { ...a, title: clean } : a)) };
 }
 
+/** Set (or with '', clear) an action's notes. @param {Roadmap} roadmap @param {string} id @param {string} notes */
+export function setNotes(roadmap, id, notes) {
+    const clean = notes.trim().slice(0, 2000);
+    return {
+        ...roadmap,
+        actions: roadmap.actions.map((a) => {
+            if (a.id !== id) return a;
+            const { notes: _old, ...rest } = a;
+            return clean ? { ...rest, notes: clean } : rest;
+        }),
+    };
+}
+
 /** Remove an action and its links. @param {Roadmap} roadmap @param {string} id @returns {Roadmap} */
 export function removeAction(roadmap, id) {
     return cascade({
@@ -281,8 +294,9 @@ export function parseScript(text, previous = null) {
     }
     // keep the previous order (so stills don't jump around); new actions go last
     const order = new Map((previous?.actions ?? []).map((a, i) => [a.id, i]));
+    const notes = new Map((previous?.actions ?? []).filter((a) => a.notes).map((a) => [a.id, a.notes])); // notes aren't in the script: kept by id
     const actions = [...titles]
-        .map(([id, title]) => ({ id, title: title || id }))
+        .map(([id, title]) => (notes.has(id) ? { id, title: title || id, notes: notes.get(id) } : { id, title: title || id }))
         .sort((a, b) => (order.get(a.id) ?? Infinity) - (order.get(b.id) ?? Infinity));
     if (actions.length > 200) return { roadmap: null, error: 'At most 200 actions' };
     const cycle = findCycle(actions.map((a) => a.id), edges);

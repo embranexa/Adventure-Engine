@@ -2,19 +2,22 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import {
-    addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, roadmapColors, toggleDone, toggleLink,
+    addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, roadmapColors, setNotes, toggleDone, toggleLink,
 } from '../../lib/roadmap.js';
 import { PromoteButton } from '../PromoteButton.js';
 import { focusedWindow } from '../../lib/windows.js';
 
 /**
- * Controls for the selected action: rename, complete/undo, link, add the next action, delete.
+ * Controls for the selected action: rename, complete/undo, link, add the next action,
+ * delete, and its notes (free text, saved when you leave the box; shown in the Crucible).
  * @param {{ info: import('../../lib/roadmap.js').ActionInfo, linking: boolean, waiting: string[],
- *           onRename: (t: string) => void, onToggle: () => void, onLink: () => void,
+ *           onRename: (t: string) => void, onNotes: (t: string) => void, onToggle: () => void, onLink: () => void,
  *           onAddNext: () => void, onDelete: () => void, autoFocus: boolean }} props
  */
-function ActionBar({ info, linking, waiting, onRename, onToggle, onLink, onAddNext, onDelete, autoFocus }) {
+function ActionBar({ info, linking, waiting, onRename, onNotes, onToggle, onLink, onAddNext, onDelete, autoFocus }) {
     const [draft, setDraft] = useState(info.title);
+    const [notes, setNotesDraft] = useState(info.notes);
+    useEffect(() => setNotesDraft(info.notes), [info.id, info.notes]);
     const inputRef = useRef(/** @type {HTMLInputElement | null} */ (null));
     useEffect(() => setDraft(info.title), [info.id, info.title]);
     useEffect(() => {
@@ -48,6 +51,14 @@ function ActionBar({ info, linking, waiting, onRename, onToggle, onLink, onAddNe
                 title="Then click another action to make it come after this one (click a linked one to unlink)">⟶ Link</button>
             <button className="btn" onClick=${onAddNext} title="Add an action that comes after this one">+ Next</button>
             <button className="btn ghost alm-delete" onClick=${onDelete} title="Delete this action">✕</button>
+            <textarea className="alm-bar-notes" rows=${notes ? 3 : 1} maxLength=${2000} placeholder="Notes (optional)…" aria-label="Action notes"
+                value=${notes} spellCheck=${true}
+                onInput=${(/** @type {any} */ e) => setNotesDraft(e.target.value)}
+                onBlur=${() => { if (notes.trim() !== info.notes) onNotes(notes); }}
+                onKeyDown=${(/** @type {KeyboardEvent} */ e) => {
+                    if (e.key === 'Escape') { setNotesDraft(info.notes); /** @type {HTMLElement} */ (e.target).blur(); }
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) /** @type {HTMLElement} */ (e.target).blur();
+                }}></textarea>
         </div>
     `;
 }
@@ -242,6 +253,7 @@ export function AlembicPanel() {
                             linking=${linkFrom === selectedInfo.id}
                             autoFocus=${focusTitle}
                             onRename=${(/** @type {string} */ t) => save(renameAction(roadmap, selectedInfo.id, t))}
+                            onNotes=${(/** @type {string} */ t) => save(setNotes(roadmap, selectedInfo.id, t))}
                             onToggle=${() => handlers.current.activate(selectedInfo.id)}
                             onLink=${() => setLinkFrom(linkFrom === selectedInfo.id ? null : selectedInfo.id)}
                             onAddNext=${() => add(selectedInfo.id)}

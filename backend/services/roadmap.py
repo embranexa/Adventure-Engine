@@ -2,7 +2,7 @@
 
 A roadmap is stored on its adventure as JSON:
 
-    {"actions": [{"id": "A1", "title": "Buy tickets"}, ...],
+    {"actions": [{"id": "A1", "title": "Buy tickets", "notes": "..."}, ...],   # notes optional
      "edges":   [["A1", "A2"], ...],     # A1 must be done before A2
      "done":    ["A1", ...]}
 
@@ -34,6 +34,7 @@ MAX_ACTIONS = 200
 ROADMAP_PHASES = ("decomposing", "constructing", "consuming", "completed", "decommissioned")
 
 MAX_TITLE = 200
+MAX_NOTES = 2000
 ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 
 
@@ -86,7 +87,11 @@ def normalize(raw: dict[str, Any]) -> dict[str, Any]:
         if action_id in seen:
             raise InvalidRoadmap(f"action {action_id} appears twice")
         seen.add(action_id)
-        clean_actions.append({"id": action_id, "title": (title or action_id)[:MAX_TITLE]})
+        clean = {"id": action_id, "title": (title or action_id)[:MAX_TITLE]}
+        notes = str(action.get("notes") or "").strip()
+        if notes:
+            clean["notes"] = notes[:MAX_NOTES]
+        clean_actions.append(clean)
 
     ids = [a["id"] for a in clean_actions]
     edges: list[tuple[str, str]] = []

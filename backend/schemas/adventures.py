@@ -52,6 +52,7 @@ class AdventureCreate(AdventureFields):
 class RoadmapAction(BaseModel):
     id: str
     title: str
+    notes: str | None = Field(None, max_length=2000)
 
 
 class RoadmapPayload(BaseModel):

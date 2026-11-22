@@ -7,7 +7,6 @@ import { freshMinutes, freshTitle } from '../../lib/harvest.js';
 import { LENSES, lensColor, lensValues } from '../../lib/lens.js';
 import { eventNode, pipeFlows, twinModel } from '../../lib/twinModel.js';
 import { CENTRIFUGE, CODEX, FORGE, OUTSIDE, SUMP, nodeStage, twinNodes, twinPipes } from '../../lib/twinTopology.js';
-import { confirmHere } from '../../lib/windows.js';
 
 const ZONE_LABELS = { net: 'Net · events', core: 'Core · adventures', viewer: 'Viewers' };
 
@@ -75,7 +74,7 @@ function runCommand(command, nodeId) {
     else if (command === 'siphon') s.siphonSource(source);
     else if (command === 'purge') {
         const n = s.rawEvents.reduce((k, e) => k + (e.review === 'new' ? 1 : 0), 0);
-        if (n && confirmHere(`Purge ${n} event${n === 1 ? '' : 's'} from the Centrifuge into the Sump? (Each can be revived.)`)) s.purgeCentrifuge();
+        if (n) s.purgeCentrifuge(); // no confirm: each event can be revived from the Sump
     }
 }
 

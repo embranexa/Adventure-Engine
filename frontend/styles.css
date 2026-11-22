@@ -105,6 +105,55 @@ button { font-family: inherit; }
 .leviathan-body { transform-box: fill-box; transform-origin: center; animation: leviathan-undulate 11s ease-in-out infinite; }
 .lume { animation: lume 5s ease-in-out infinite; filter: drop-shadow(0 0 6px #5fe0e6); }
 
+/* the other worlds outside the window (components/Abyss.js) */
+.abyss.world-aquarium {
+    background:
+        radial-gradient(1400px 700px at 50% -10%, #0c3640, transparent 70%),
+        radial-gradient(1200px 600px at 50% 115%, #062026, transparent 70%),
+        #021014;
+}
+.aq-shaft { background: linear-gradient(180deg, rgba(140, 230, 240, 0.09), transparent 80%); }
+@keyframes aq-swim-r { from { transform: translateX(-30vw); } to { transform: translateX(120vw); } }
+@keyframes aq-swim-l { from { transform: translateX(120vw); } to { transform: translateX(-30vw); } }
+.aq-school { position: absolute; left: 0; animation: aq-swim-r 80s linear infinite; }
+.aq-kelp { position: absolute; left: 0; bottom: 0; width: 100%; height: 55%; }
+@keyframes aq-sway { 0%, 100% { transform: skewX(-3deg); } 50% { transform: skewX(3deg); } }
+.aq-strand { transform-box: fill-box; transform-origin: 50% 100%; animation: aq-sway 9s ease-in-out infinite; }
+@keyframes aq-rise { from { transform: translateY(0); opacity: 0; } 10% { opacity: 0.5; } 90% { opacity: 0.4; } to { transform: translateY(-110vh); opacity: 0; } }
+.aq-bubble { position: absolute; bottom: -20px; border-radius: 50%; border: 1px solid rgba(170, 240, 250, 0.35); animation: aq-rise 20s linear infinite; }
+
+.abyss.world-terrarium {
+    background:
+        radial-gradient(1200px 600px at 30% 0%, #10200f, transparent 70%),
+        radial-gradient(1400px 700px at 70% 110%, #0d1a0a, transparent 70%),
+        #040804;
+}
+@keyframes te-drift { 0%, 100% { translate: 0 0; } 50% { translate: 6vw -2vh; } }
+.te-mist { position: absolute; inset: 40% -20% 0 -20%; background: radial-gradient(60% 50% at 50% 60%, rgba(140, 170, 140, 0.06), transparent 70%); filter: blur(30px); animation: te-drift 60s ease-in-out infinite; }
+.te-plants { position: absolute; left: 0; bottom: 0; width: 100%; height: 50%; }
+@keyframes te-nod { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+.te-fern { transform-box: fill-box; transform-origin: 50% 100%; animation: te-nod 12s ease-in-out infinite; }
+@keyframes te-wander { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(4vw, -3vh); } 50% { transform: translate(1vw, -6vh); } 75% { transform: translate(-3vw, -2vh); } }
+@keyframes te-glow { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.85; } }
+.te-fly { position: absolute; border-radius: 50%; background: #d8f27a; box-shadow: 0 0 8px 2px rgba(216, 242, 122, 0.5); animation-name: te-wander, te-glow; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+
+.abyss.world-astrarium { background: #020309; }
+.as-nebula {
+    position: absolute; inset: -10%;
+    background:
+        radial-gradient(40% 30% at 30% 35%, rgba(120, 70, 170, 0.14), transparent 70%),
+        radial-gradient(35% 28% at 70% 65%, rgba(40, 140, 170, 0.12), transparent 70%),
+        radial-gradient(25% 20% at 55% 30%, rgba(200, 120, 90, 0.06), transparent 70%);
+    filter: blur(20px);
+}
+.as-star { position: absolute; border-radius: 50%; background: #cfe3ff; box-shadow: 0 0 3px rgba(207, 227, 255, 0.6); }
+@keyframes as-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.95; } }
+.as-twinkle { animation: as-twinkle 5s ease-in-out infinite; }
+.as-orrery { position: absolute; left: 62%; top: 58%; width: 800px; height: 800px; transform: translate(-50%, -50%) rotateX(62deg); opacity: 0.9; }
+@keyframes as-turn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.as-orbit { animation: as-turn 200s linear infinite; }
+.as-runes { animation: as-turn 600s linear infinite reverse; }
+
 /* ═════════ Shell + top bar ═════════ */
 #root, .workspace-shell {
     position: relative; z-index: 1;
@@ -511,6 +560,11 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .ae-clear:hover { color: var(--text-bright); border-color: var(--steel-4); }
 .nc-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .nc-act { padding: 5px 12px; font-size: 12px; border-radius: 5px; }
+.nc-comb { flex: 1 1 100%; display: flex; align-items: center; gap: 8px; }
+.nc-comb .btn { padding: 3px 12px; font-size: 12px; border-radius: 5px; }
+.nc-comb .btn:disabled { opacity: 0.3; cursor: default; }
+.nc-comb span { color: var(--text-bright); font: 600 12px var(--font-mono); }
+.nc-comb small { color: var(--text-dim); font: 500 10px var(--font-mono); }
 .nc-act.pass { border-color: var(--accent-light); color: #e9feff; box-shadow: 0 0 12px rgba(31, 194, 201, 0.25); }
 .nc-act.kill { border-color: rgba(239, 62, 74, 0.45); color: #ff9aa1; }
 .nc-act.kill:hover { box-shadow: 0 0 12px rgba(239, 62, 74, 0.3); }
@@ -984,6 +1038,12 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
     background: rgba(5, 6, 8, 0.85); box-shadow: inset 0 0 0 1px var(--steel-3);
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
+.alm-bar-notes {
+    flex: 1 1 100%; min-width: 0; padding: 5px 8px; border-radius: 4px; outline: none; resize: vertical;
+    border: 1px solid var(--steel-2); background: rgba(0, 0, 0, 0.35); color: var(--text); font: 400 12px/1.45 var(--font-body);
+}
+.alm-bar-notes:focus { border-color: var(--steel-5); }
+.alm-bar-notes::placeholder { color: #5a5f68; }
 .alm-bar .btn { padding: 3px 10px; font-size: 11px; border-radius: 4px; }
 .alm-bar-id {
     padding: 2px 6px; border-radius: 3px; font: 600 10px var(--font-mono);
@@ -1067,7 +1127,9 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .ql-check svg { width: 12px; height: 12px; fill: none; stroke: #120800; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
 .ql-check:hover { box-shadow: 0 0 8px color-mix(in srgb, var(--alloy) 45%, transparent); }
 .ql-check:hover svg { opacity: 0.35; stroke: var(--alloy); }
-.ql-quest-title { flex: 1 1 auto; min-width: 0; color: var(--text); font: 500 13px var(--font-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ql-quest-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.ql-quest-title { min-width: 0; color: var(--text); font: 500 13px var(--font-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ql-quest-notes { color: var(--text-dim); font: 400 11px/1.4 var(--font-body); white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .ql-quest-id { flex-shrink: 0; color: var(--text-dim); font: 500 9px var(--font-mono); }
 .ql-quest.completing { opacity: 0; transform: translateX(10px); }
 .ql-quest.completing .ql-check { background: var(--m-animus); border-color: var(--m-animus); box-shadow: 0 0 12px var(--m-animus); }
@@ -1113,12 +1175,12 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
     backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
 }
 .is-resizing .glass { background: linear-gradient(180deg, rgba(14, 16, 20, 0.72), rgba(4, 5, 7, 0.82)); }
-.is-resizing .leviathan, .is-resizing .leviathan-bob, .is-resizing .leviathan-body, .is-resizing .lume { animation-play-state: paused; }
+.is-resizing .leviathan, .is-resizing .leviathan-bob, .is-resizing .leviathan-body, .is-resizing .lume, .is-resizing .bd-anim { animation-play-state: paused; }
 .is-resizing * { transition: none !important; }
 .is-resizing { cursor: col-resize; }
 
 @media (prefers-reduced-motion: reduce) {
-    .leviathan, .leviathan-bob, .leviathan-body, .lume, .arrow, .breathe, .light i, .promote, .promote-shine::after { animation: none !important; }
+    .leviathan, .leviathan-bob, .leviathan-body, .lume, .bd-anim, .arrow, .breathe, .light i, .promote, .promote-shine::after { animation: none !important; }
 }
 
 /* Signal Chain (phase 2: the model as tables, before the 3D twin) */
@@ -1205,6 +1267,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 
 /* Layouts menu (saved dock arrangements) */
 .layout-menu { position: relative; }
+.window-select { min-width: 138px; }
 .layout-menu > .btn.on { color: var(--text-bright); border-color: var(--steel-4); }
 .layout-pop {
     position: absolute; right: 0; top: calc(100% + 6px); z-index: 300; min-width: 240px; padding: 6px;

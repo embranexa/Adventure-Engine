@@ -5,8 +5,8 @@ into stages, with their answers (2026-11-21). Written so a new session can pick 
 
 ## 0. Resume here
 
-**State (2026-11-21):** **U1 to U7 and review round 1 are built and committed.** The
-backlog (section 2) is next, to plan with the user.
+**State (2026-11-22):** U1 to U7 and review rounds 1 and 2 are committed. Still in the
+backlog: the new modules.
 The "as built" notes below each stage say what changed and what wasn't verified.
 
 - Environment, checks, test server on a database copy, the headless screenshot recipe and
@@ -229,9 +229,33 @@ in caps (U1 covered adventure and action titles only).
 - Panel flows (`PANELS_METADATA` in `backend/services/workspace.py`): Atlas matter ⟶
   space, Nexus matter ⟶ topology (matching the twin's dynamo sub-lines).
 
+### Round 2 (2026-11-21)
+
+- Signal Chain: base filter rims only on **Core** vessels (`vessel` in `machines.js`
+  needs `node.zone === 'core'`); the Net's stages aren't matter filters.
+- Purge runs without a confirm (twin label and the Discovery bar).
+- Twin liquids: every Core heart is one size (`CORE` in `machines.js`: r 5.6, h 12, same
+  base), so equal rows stand at equal heights; the Core bodies were refitted around it and
+  nothing tall stands between the camera and the glass (`CAM`, `away()`, `SQUARE_TURN`:
+  struts, posts, columns and stones sit to the sides or the back; the Crucible's coil
+  stands beside it; the Refinery's glowing trays, the "cyan circles", are gone and its
+  column is a brass tower above the heart). Liquids: dark lit colour, strong emissive,
+  outside tone mapping; the surface disc glows in the top band's own colour (it was
+  lightened toward white); lighter heart glass; capacity ticks moved to the heart's side.
+- Alembic: optional action notes (`notes` on roadmap actions, trimmed, max 2000; kept
+  through Scripter edits by id; `setNotes` in `lib/roadmap.js`; a notes box in the action
+  bar); the Crucible shows a quest's notes under its title.
+- Backdrops: a "Window" selector in the header (localStorage `backdrop-world`): Abyss
+  (the leviathan), Aquarium (kelp, fish schools, bubbles), Terrarium (ferns, fireflies,
+  mist), Astrarium (stars, nebula, a turning orrery). `components/Abyss.js`; animated parts
+  carry `.bd-anim` (paused while resizing, off under reduced motion). Pop-out windows keep
+  the plain dark background.
+- Refinery: ◀ / ▶ comb through the Centrifuge (`CentrifugeComb` in `NodeCard.js`): the
+  prima materia in time order (earliest first, undated last), "n of N"; ◀ off on the
+  first, ▶ off on the last. Shown when the selected item is prima materia.
+
 ## 2. Backlog (plan later, not built in this pass)
 
-- More visuals besides the leviathan: other fish; an aquarium, a terrarium.
 - New modules: a steering wheel; the Entropy Market (costs and rewards from U4 feed it);
   the Treasury (trophies, achievements, rewards, a feedback survey); a collaborations
   tool suite.

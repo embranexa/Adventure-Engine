@@ -140,7 +140,10 @@ export function QuestsPanel() {
                                             aria-label=${`Complete ${quest.title}`} title="Complete">
                                             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"></path></svg>
                                         </button>
-                                        <span className="ql-quest-title">${quest.title}</span>
+                                        <span className="ql-quest-text">
+                                            <span className="ql-quest-title">${quest.title}</span>
+                                            ${quest.notes && html`<span className="ql-quest-notes">${quest.notes}</span>`}
+                                        </span>
                                         <span className="ql-quest-id">${quest.id}</span>
                                     </div>
                                 `;

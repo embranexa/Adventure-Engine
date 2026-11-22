@@ -21,6 +21,16 @@ import { canvas2d, rune, runeStrip, texture } from './textures.js';
 export const PLINTH_H = 3.4;
 const Y = PLINTH_H;
 const FRONT = Math.PI / 4;   // the side facing the camera
+// The camera's side, seen from above (twinScene.js VIEW_DIR): an angle t places a part at
+// (cos t, sin t). Nothing tall stands between the camera and a heart's glass.
+const CAM = Math.atan2(1.15, 0.55);
+/** An angle on the far side, `offset` radians from straight behind. */
+const away = (offset = 0) => CAM + Math.PI + offset;
+/** Every Core heart has one size, so the same number of rows stands at the same height. */
+const CORE = { r: 5.6, h: 12, y: PLINTH_H + 1.2 };
+const CORE_TOP = CORE.y + CORE.h;
+/** Turns a square body so its corners sit 45° either side of the camera (clear of the glass). */
+const SQUARE_TURN = Math.PI / 2 - CAM;
 const RIM_COLORS = { include: '#e6ebf2', exclude: '#ff4a3d' };
 const PACE_S = 0.5;          // a mechanism winds up or down in this long
 
@@ -44,7 +54,7 @@ export function makeShop(K) {
     Object.assign(M, {
         wood: keep(std({ color: 0x3a2618, metalness: 0.1, roughness: 0.7 })),
         glass: keep(std({ color: 0xb8d0e0, metalness: 0, roughness: 0.04, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })),
-        heart: keep(std({ color: 0xd4e6f2, metalness: 0, roughness: 0.03, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.5 })),
+        heart: keep(std({ color: 0xd4e6f2, metalness: 0, roughness: 0.03, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 0.8 })),  // light glass: the liquid reads through it
         dark: keep(std({ color: 0x101114, metalness: 0.5, roughness: 0.6 })),
         ghost: keep(std({ color: 0x2a2f38, metalness: 0, roughness: 0.3, transparent: true, opacity: 0.6, depthWrite: false })),
         locked: keep(std({ color: 0x15171b, metalness: 0.6, roughness: 0.7 })),
@@ -56,7 +66,8 @@ export function makeShop(K) {
     const DOT = (() => { const [c, g] = canvas2d(64); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return keep(texture(c)); })();
     const liquids = new Map();
     const liquidMat = (color) => {
-        if (!liquids.has(color)) liquids.set(color, keep(std({ color: new THREE.Color(color), emissive: new THREE.Color(color), emissiveIntensity: 0.28, roughness: 0.25, metalness: 0, transparent: true, opacity: 0.94 })));
+        // vivid and softly glowing: outside tone mapping, which would wash the colours out
+        if (!liquids.has(color)) liquids.set(color, keep(std({ color: new THREE.Color(color).multiplyScalar(0.22), emissive: new THREE.Color(color), emissiveIntensity: 0.82, roughness: 0.4, metalness: 0, envMapIntensity: 0.2, toneMapped: false })));
         return liquids.get(color);
     };
     const additive = (map, color, opacity = 0.9) => new THREE.MeshBasicMaterial({ map, color: new THREE.Color(color), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
@@ -107,10 +118,12 @@ export function buildMachine(S, node, ctx) {
         const g = G(), rr = r - 0.35;
         g.add(cyl(r, r, H, M.heart, y0, 48, true));
         const liquid = G(); liquid.position.y = y0 + 0.2; liquid.visible = false; g.add(liquid);
-        const top = new THREE.Mesh(new THREE.CircleGeometry(rr * 0.98, 32), ownGlow(light, 0.9)); top.rotation.x = -Math.PI / 2; liquid.add(top);
+        const topMat = ownGlow(color, 0.95); topMat.color.setScalar(0); topMat.toneMapped = false; // the surface: the top band's own colour, glowing
+        const top = new THREE.Mesh(new THREE.CircleGeometry(rr * 0.98, 32), topMat); top.rotation.x = -Math.PI / 2; liquid.add(top);
         const over = torus(r + 0.15, 0.22, ownGlow('#ff7a3c', 2.2), y0 + H); over.visible = false; g.add(over);
-        g.add(box(0.25, H, 0.25, M.gilt, Math.cos(FRONT) * (r + 0.3), y0, Math.sin(FRONT) * (r + 0.3)));
-        for (let k = 1; k < 10; k++) g.add(box(k % 5 ? 0.7 : 1.3, 0.1, 0.18, M.gilt, Math.cos(FRONT) * (r + 0.6), y0 + (k / 10) * H, Math.sin(FRONT) * (r + 0.6)));
+        const tk = CAM + 1.4; // the capacity ticks at the heart's edge, seen side-on
+        g.add(box(0.25, H, 0.25, M.gilt, Math.cos(tk) * (r + 0.3), y0, Math.sin(tk) * (r + 0.3)));
+        for (let k = 1; k < 10; k++) g.add(box(k % 5 ? 0.7 : 1.3, 0.1, 0.18, M.gilt, Math.cos(tk) * (r + 0.6), y0 + (k / 10) * H, Math.sin(tk) * (r + 0.6)));
         const segs = [];
         heartRec = {
             fill: 0, target: 0, litShare: 1, maxH: H - 0.4, y0: y0 + 0.2,
@@ -128,8 +141,8 @@ export function buildMachine(S, node, ctx) {
                     y += share; if (!b.ghost) litTop = y;
                 }
                 top.position.y = litTop + 0.002; top.visible = litTop > 0;
-                const firstLit = bands.find((b) => !b.ghost);
-                if (firstLit) top.material.emissive.set(lighter(firstLit.color));
+                const lit = bands.filter((b) => !b.ghost && b.count > 0);
+                if (lit.length) top.material.emissive.set(lit[lit.length - 1].color); // the surface shows the top band
                 this.litShare = litTop;
                 this.target = Math.min(1, total / cap);
                 over.visible = total > cap;
@@ -149,7 +162,8 @@ export function buildMachine(S, node, ctx) {
     const r = FOOT[bodyOf(node)] ?? 9;
     const base = G();
     base.add(cyl(r + 1.4, r + 1.8, 1.2, M.stone, 0, 56), cyl(r + 0.6, r + 1.0, 2.2, M.stone, 1.2, 56), torus(r + 0.6, 0.22, M.iron, PLINTH_H));
-    const vessel = (node.holds === 'events' || node.holds === 'adventures');
+    // the base filters its stage: Core vessels only (the Net's stages aren't matter filters)
+    const vessel = node.zone === 'core' && (node.holds === 'events' || node.holds === 'adventures');
     let rim = null;
     if (vessel && !node.locked) {
         base.add(torus(r + 0.62, 0.12, glow(accent, 1.4), PLINTH_H + 0.12));
@@ -342,33 +356,30 @@ const BODIES = {
     },
     hopper(c) {
         const { G, M, accent, heart, band, lathe, tube, torus, rivets, glow } = c;
-        const g = G();
-        g.add(heart(6.4, 12, Y), band(6.7, Y + 0.8), band(6.7, Y + 11.6));
-        g.add(lathe([[6.8, Y + 12.2], [7.6, Y + 13], [11, Y + 20], [11.6, Y + 20.6], [11.6, Y + 21.4]], M.brass, 48));
-        for (let i = 0; i < 8; i++) { const t = (i / 8) * TAU; g.add(tube([V(Math.cos(t) * 7.6, Y + 13, Math.sin(t) * 7.6), V(Math.cos(t) * 11.2, Y + 20.4, Math.sin(t) * 11.2)], 0.25, M.gilt, 2)); }
-        g.add(torus(11.6, 0.4, M.gilt, Y + 21.4), rivets(11.6, Y + 20.9, 26), torus(11.7, 0.16, glow(accent, 1.6), Y + 21.9), torus(6.9, 0.14, glow(accent, 1.4), Y + 12.3));
-        for (let i = 0; i < 4; i++) { const t = (i / 4) * TAU + Math.PI / 4 + 0.2; g.add(tube([V(Math.cos(t) * 8.6, Y, Math.sin(t) * 8.6), V(Math.cos(t) * 9.6, Y + 10, Math.sin(t) * 9.6), V(Math.cos(t) * 11.2, Y + 20.6, Math.sin(t) * 11.2)], 0.45, M.iron, 12)); }
-        return { group: g, height: Y + 23 };
+        const g = G(), { r, h, y } = CORE, top = CORE_TOP;
+        g.add(heart(r, h, y), band(r + 0.3, y + 0.6), band(r + 0.3, top - 0.4));
+        g.add(lathe([[r + 0.4, top + 0.2], [r + 1.2, top + 1], [11, top + 8], [11.6, top + 8.6], [11.6, top + 9.4]], M.brass, 48));
+        for (let i = 0; i < 8; i++) { const t = (i / 8) * TAU; g.add(tube([V(Math.cos(t) * (r + 1.2), top + 1, Math.sin(t) * (r + 1.2)), V(Math.cos(t) * 11.2, top + 8.4, Math.sin(t) * 11.2)], 0.25, M.gilt, 2)); }
+        g.add(torus(11.6, 0.4, M.gilt, top + 9.4), rivets(11.6, top + 8.9, 26), torus(11.7, 0.16, glow(accent, 1.6), top + 9.9), torus(r + 0.5, 0.14, glow(accent, 1.4), top + 0.3));
+        // struts 45° either side of the camera's line, clear of the glass
+        for (let i = 0; i < 4; i++) { const t = CAM + Math.PI / 4 + (i * Math.PI) / 2; g.add(tube([V(Math.cos(t) * 8.8, PLINTH_H, Math.sin(t) * 8.8), V(Math.cos(t) * 9.8, y + h * 0.8, Math.sin(t) * 9.8), V(Math.cos(t) * 11.2, top + 8.6, Math.sin(t) * 11.2)], 0.45, M.iron, 12)); }
+        return { group: g, height: top + 11 };
     },
     refinery(c) {
-        const { G, M, color, light, cyl, heart, getHeart, band, box, curls, lathe, runeBand, gem, finial, torus, ball, mine, busy, pace, a } = c;
-        const g = G(), H = 26;
-        g.add(cyl(6.2, 6.8, 1.6, M.iron, Y, 24), heart(5.2, H, Y + 1.6));
-        const trays = [];
-        for (let i = 0; i < 5; i++) {
-            const y = Y + 4.6 + i * 4.6;
-            g.add(band(5.5, y, 0.8));
-            const tray = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.6, 0.3, 32), mine(std({ color: 0x050505, emissive: new THREE.Color(color), emissiveIntensity: 0.12 })));
-            tray.position.y = y; tray.userData.y = y; g.add(tray); trays.push(tray);
-        }
-        for (let i = 0; i < 4; i++) { const t = (i / 4) * TAU + 0.4; g.add(box(0.5, H, 0.5, M.brass, Math.cos(t) * 5.8, Y + 1.6, Math.sin(t) * 5.8)); }
-        curls(g, 6, Y + 15, 4, 1.8);
-        g.add(lathe([[5.8, Y + 27.6], [5.8, Y + 28.6], [4.4, Y + 30], [2, Y + 31.6], [1, Y + 32.6]], M.brass), runeBand(5.1, Y + 29.2, 0.9, light, 2));
-        const crown = gem(light, 1.3); crown.position.y = Y + 34.8; g.add(crown);
-        const f = finial(0.8); f.position.y = Y + 32.2; g.add(f);
-        g.add(bubbles(c, 5, Y + 2, H - 2));
-        // a flywheel and piston on the right, driving the column while it works
-        const fw = G(); fw.position.set(6.4, Y + 9, -6.4); fw.rotation.y = FRONT; g.add(fw);
+        const { G, M, light, cyl, heart, band, box, curls, lathe, runeBand, gem, finial, ball, busy, pace, a } = c;
+        const g = G(), { r, h, y } = CORE, top = CORE_TOP;
+        g.add(cyl(r + 0.6, r + 1.2, y - PLINTH_H, M.iron, PLINTH_H, 32), heart(r, h, y), band(r + 0.3, y + 0.6, 0.8), band(r + 0.3, top - 0.4, 0.8));
+        // the fractionating tower above the heart: a brass column ringed with bands
+        const colR = 3.4, colH = 12, colY = top + 1.4, T = colY + colH;
+        g.add(cyl(r + 0.3, colR, 1.4, M.brass, top, 32), cyl(colR, colR, colH, M.brass, colY, 32, true));
+        for (let i = 0; i < 4; i++) g.add(band(colR + 0.2, colY + 1.6 + i * 2.9, 0.6));
+        curls(g, colR + 0.4, colY + colH / 2, 4, 1.4);
+        g.add(lathe([[colR + 0.6, T], [colR + 0.6, T + 1], [2.6, T + 2.2], [1.4, T + 3.4], [0.8, T + 4.2]], M.brass), runeBand(colR + 0.3, T + 0.5, 0.9, light, 2));
+        const crown = gem(light, 1.3); crown.position.y = T + 7; g.add(crown);
+        const f = finial(0.8); f.position.y = T + 4; g.add(f);
+        g.add(bubbles(c, r - 0.6, y + 0.6, h - 1));
+        // a flywheel and piston round the back, driving the column while it works
+        const fw = G(); fw.position.set(6.4, PLINTH_H + 9, -6.4); fw.rotation.y = FRONT; g.add(fw);
         fw.add(box(0.8, 9, 0.8, M.iron, 0, -9, -1.2));
         const wheel = G(); wheel.position.z = 0.6; fw.add(wheel);
         wheel.add(new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.45, 8, 32), M.iron));
@@ -378,39 +389,39 @@ const BODIES = {
         const piston = G(); fw.add(piston);
         piston.add(cyl(0.9, 0.9, 2.2, M.iron, 0, 16));
         fw.add(cyl(1.1, 1.1, 4, M.glass, 4.6, 16, true));
-        let w = 0, ang = 0;
+        let ang = 0;
         a.push((dt) => {
-            const k = pace(), level = getHeart().level();
-            w += dt * 2 * busy(); ang += dt * 4 * k; wheel.rotation.z = ang;
-            const px = Math.cos(ang) * 2.4, py = Math.sin(ang) * 2.4, top = 5.2 + py * 0.5 + 1.2;
-            piston.position.set(0, top, 0.6);
-            const dx = 0 - px, dy = top - py, L = Math.hypot(dx, dy); rod.position.set(px / 2, (py + top) / 2, 0.9); rod.scale.y = L; rod.rotation.z = Math.atan2(-dx, dy);
-            trays.forEach((tr, i) => { const lit = tr.userData.y < level; tr.material.emissiveIntensity = lit ? 1.2 + 0.6 * Math.max(0, Math.sin(w - i * 0.9)) : 0.12; tr.position.y = tr.userData.y + Math.sin(w * 2 + i) * 0.15 * k; });
+            const k = pace();
+            ang += dt * 4 * k; wheel.rotation.z = ang;
+            const px = Math.cos(ang) * 2.4, py = Math.sin(ang) * 2.4, tp = 5.2 + py * 0.5 + 1.2;
+            piston.position.set(0, tp, 0.6);
+            const dx = 0 - px, dy = tp - py, L = Math.hypot(dx, dy); rod.position.set(px / 2, (py + tp) / 2, 0.9); rod.scale.y = L; rod.rotation.z = Math.atan2(-dx, dy);
             crown.rotation.y += dt * busy();
         });
-        return { group: g, height: Y + 37 };
+        return { group: g, height: T + 9 };
     },
     alembic(c) {
-        const { G, M, accent, light, heart, tube, band, torus, lathe, box, ball, glow, ownGlow, mine, DOT, busy, pace, a } = c;
-        const g = G();
-        g.add(heart(6.6, 12, Y));
-        for (let i = 0; i < 6; i++) { const t = (i / 6) * TAU + 0.2; g.add(tube([V(Math.cos(t) * 6.9, Y, Math.sin(t) * 6.9), V(Math.cos(t) * 6.9, Y + 12, Math.sin(t) * 6.9), V(Math.cos(t) * 5.8, Y + 13.4, Math.sin(t) * 5.8)], 0.3, M.copper, 12)); }
-        g.add(band(6.9, Y + 0.8, 1), band(6.9, Y + 11.6, 1), torus(7.0, 0.14, glow(accent, 1.4), Y + 12.3));
+        const { G, M, accent, light, heart, tube, band, torus, lathe, box, ball, glow, mine, DOT, busy, pace, a } = c;
+        const g = G(), { r, h, y } = CORE, top = CORE_TOP, d = top - (PLINTH_H + 12);
+        g.add(heart(r, h, y));
+        // copper feed pipes up the back of the heart only
+        for (const off of [-0.7, 0, 0.7]) { const t = away(off); g.add(tube([V(Math.cos(t) * (r + 0.3), y, Math.sin(t) * (r + 0.3)), V(Math.cos(t) * (r + 0.3), top, Math.sin(t) * (r + 0.3)), V(Math.cos(t) * (r - 0.8), top + 1.4, Math.sin(t) * (r - 0.8))], 0.3, M.copper, 12)); }
+        g.add(band(r + 0.3, y + 0.6, 1), band(r + 0.3, top - 0.4, 1), torus(r + 0.4, 0.14, glow(accent, 1.4), top + 0.3));
         // the still-head: a copper helm on the heart
-        g.add(lathe([[7, Y + 12.4], [6.2, Y + 14], [3.6, Y + 15.6], [2.2, Y + 17.6], [3, Y + 19], [2.6, Y + 20.4], [0, Y + 21.4]], M.copper, 48), torus(3.05, 0.3, M.gilt, Y + 19), torus(3.1, 0.14, glow(accent, 1.8), Y + 19.5));
+        g.add(lathe([[r + 0.4, top + 0.4], [r - 0.2, top + 2], [3.6, top + 3.6], [2.2, top + 5.6], [3, top + 7], [2.6, top + 8.4], [0, top + 9.4]], M.copper, 48), torus(3.05, 0.3, M.gilt, top + 7), torus(3.1, 0.14, glow(accent, 1.8), top + 7.5));
         // the swan neck falls into an open copper condenser coil, which drips into a copper cup
-        const cx = 8.5, cz = -8.5;
-        g.add(tube([V(0, Y + 20.4, 0), V(2, Y + 22.6, -2), V(5.5, Y + 22, -5.5), V(cx, Y + 18.6, cz), V(cx, Y + 16.6, cz)], 0.6, M.copper, 40));
+        const Y0 = PLINTH_H + d, cx = 8.5, cz = -8.5;
+        g.add(tube([V(0, top + 8.4, 0), V(2, Y0 + 22.6, -2), V(5.5, Y0 + 22, -5.5), V(cx, Y0 + 18.6, cz), V(cx, Y0 + 16.6, cz)], 0.6, M.copper, 40));
         const coilMat = mine(std({ color: 0xc06a3e, metalness: 1, roughness: 0.3, emissive: new THREE.Color(accent), emissiveIntensity: 0.2 }));
-        const coil = []; for (let i = 0; i <= 140; i++) { const t = i / 140, an = t * 5 * TAU; coil.push(V(cx + Math.cos(an) * 2.4, Y + 16.6 - t * 11, cz + Math.sin(an) * 2.4)); }
+        const coil = []; for (let i = 0; i <= 140; i++) { const t = i / 140, an = t * 5 * TAU; coil.push(V(cx + Math.cos(an) * 2.4, Y0 + 16.6 - t * 11, cz + Math.sin(an) * 2.4)); }
         g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(coil), 320, 0.4, 8), coilMat));
-        for (let i = 0; i < 3; i++) { const t = (i / 3) * TAU; g.add(box(0.4, Y + 17, 0.4, M.iron, cx + Math.cos(t) * 3.2, 0, cz + Math.sin(t) * 3.2)); }
-        g.add(torus(3.2, 0.25, M.brass, Y + 17));
+        for (let i = 0; i < 3; i++) { const t = (i / 3) * TAU; g.add(box(0.4, Y0 + 17, 0.4, M.iron, cx + Math.cos(t) * 3.2, 0, cz + Math.sin(t) * 3.2)); }
+        g.add(torus(3.2, 0.25, M.brass, Y0 + 17));
         g.add(lathe([[0, 0], [2, 0], [2.4, 1.6], [2.7, 2.2]], M.copper, 24).translateX(cx).translateZ(cz));
-        const drip = ball(0.32, glow(light, 2.4), cx, Y + 5, cz); drip.visible = false; g.add(drip);
-        g.add(bubbles(c, 6.2, Y + 0.6, 11, 22));
+        const drip = ball(0.32, glow(light, 2.4), cx, Y0 + 5, cz); drip.visible = false; g.add(drip);
+        g.add(bubbles(c, r - 0.4, y + 0.6, h - 1, 22));
         // a pressure gauge on the helm, its needle swinging while it boils
-        const gg = G(); gg.position.set(Math.cos(FRONT) * 4.6, Y + 15.4, Math.sin(FRONT) * 4.6); gg.rotation.y = FRONT; gg.rotation.x = -0.35;
+        const gg = G(); gg.position.set(Math.cos(FRONT) * 4.6, top + 3.4, Math.sin(FRONT) * 4.6); gg.rotation.y = FRONT; gg.rotation.x = -0.35;
         gg.add(new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.6, 24), M.brass).rotateX(Math.PI / 2), new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.18, 6, 24), M.gilt));
         const face = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), mine(std({ color: 0xe8e0c8, roughness: 0.6 }))); face.position.z = 0.32; gg.add(face);
         const needle = box(0.12, 1.2, 0.05, M.iron); needle.position.z = 0.36; gg.add(needle);
@@ -419,88 +430,103 @@ const BODIES = {
         let ph = 0;
         a.push((dt, t) => {
             const k = busy(), on = k > 0; ph += dt * 0.7 * k; const p = ph % 1;
-            drip.position.y = Y + 5.4 - p * (Y + 3.4); drip.visible = on && p < 0.92;
+            drip.position.y = Y0 + 5.4 - p * (Y0 + 3.4); drip.visible = on && p < 0.92;
             const e = pace();
             coilMat.emissiveIntensity = 0.2 + (0.6 + 0.4 * Math.sin(t * 6)) * e;
             needle.rotation.z = 1.1 + (-1.7 + Math.sin(t * 2.3) * 0.5 + Math.sin(t * 17) * 0.06) * e;
-            steam.material.opacity = (0.3 + 0.15 * Math.sin(t * 3)) * e; steam.position.y = Y + 22 + ((t * 5) % 7);
+            steam.material.opacity = (0.3 + 0.15 * Math.sin(t * 3)) * e; steam.position.y = top + 10 + ((t * 5) % 7);
         });
-        return { group: g, height: Y + 25 };
+        return { group: g, height: top + 13 };
     },
     crucible(c) {
-        const { G, M, color, accent, heart, lathe, tube, ball, torus, rivets, box, glow, gear, mine, pace, a } = c;
-        const g = G();
-        g.add(heart(6.6, 9, Y + 2.4), lathe([[0, Y + 2], [6.4, Y + 2], [6.9, Y + 2.6]], M.iron, 40));
-        for (let i = 0; i < 3; i++) {
-            const t = (i / 3) * TAU + 0.5;
-            g.add(tube([V(Math.cos(t) * 9.4, Y, Math.sin(t) * 9.4), V(Math.cos(t) * 9.4, Y + 3, Math.sin(t) * 9.4), V(Math.cos(t) * 7.6, Y + 7, Math.sin(t) * 7.6), V(Math.cos(t) * 7.2, Y + 11.8, Math.sin(t) * 7.2), V(Math.cos(t) * 6.2, Y + 12.6, Math.sin(t) * 6.2)], 0.6, M.iron, 24));
-            g.add(ball(1.1, M.gilt, Math.cos(t) * 9.4, Y + 0.6, Math.sin(t) * 9.4));
+        const { G, M, color, accent, heart, cyl, tube, ball, torus, rivets, box, glow, gear, mine, pace, a } = c;
+        const g = G(), { r, h, y } = CORE, top = CORE_TOP;
+        g.add(cyl(r + 0.8, r + 1.4, y - PLINTH_H, M.iron, PLINTH_H, 40), heart(r, h, y));
+        // three iron legs, all round the back
+        for (const off of [-1.1, 0, 1.1]) {
+            const t = away(off);
+            g.add(tube([V(Math.cos(t) * 9.4, PLINTH_H, Math.sin(t) * 9.4), V(Math.cos(t) * 9.4, PLINTH_H + 3, Math.sin(t) * 9.4), V(Math.cos(t) * 7.6, y + h * 0.4, Math.sin(t) * 7.6), V(Math.cos(t) * 7.2, top - 0.6, Math.sin(t) * 7.2), V(Math.cos(t) * (r + 0.6), top + 0.2, Math.sin(t) * (r + 0.6))], 0.6, M.iron, 24));
+            g.add(ball(1.1, M.gilt, Math.cos(t) * 9.4, PLINTH_H + 0.6, Math.sin(t) * 9.4));
         }
-        const coil = []; for (let i = 0; i <= 150; i++) { const t = i / 150, an = t * 4.5 * TAU; coil.push(V(Math.cos(an) * 8, Y + 3.2 + t * 7.8, Math.sin(an) * 8)); }
-        g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(coil), 400, 0.45, 8), mine(std({ color: 0xc06a3e, metalness: 1, roughness: 0.3, emissive: new THREE.Color(color), emissiveIntensity: 0.15 }))));
+        // the heating coil stands beside the crucible (a spring of copper), clear of the glass
+        const ct = CAM + Math.PI / 2, cx = Math.cos(ct) * 9.6, cz = Math.sin(ct) * 9.6, coilR = 2.2;
+        const coil = []; for (let i = 0; i <= 150; i++) { const t = i / 150, an = t * 6 * TAU; coil.push(V(cx + Math.cos(an) * coilR, PLINTH_H + 0.6 + t * (h - 0.6), cz + Math.sin(an) * coilR)); }
+        g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(coil), 400, 0.4, 8), mine(std({ color: 0xc06a3e, metalness: 1, roughness: 0.3, emissive: new THREE.Color(color), emissiveIntensity: 0.15 }))));
+        g.add(tube([V(cx, top, cz), V(cx * 0.8, top + 1.2, cz * 0.8), V(Math.cos(ct) * (r + 0.4), top + 0.4, Math.sin(ct) * (r + 0.4))], 0.35, M.copper, 12));
         // light that climbs the coil's rings now and then while it works
-        const climb = Array.from({ length: 5 }, (_, i) => { const m = torus(8, 0.5, mine(std({ color: 0x050505, emissive: new THREE.Color(color), emissiveIntensity: 0, transparent: true, opacity: 0.85 })), Y + 3.6 + i * 1.75); g.add(m); return m; });
-        g.add(torus(6.9, 0.4, M.gilt, Y + 11.4), rivets(6.9, Y + 2.8, 22), torus(7.0, 0.14, glow(accent, 1.6), Y + 11.9));
+        const climb = Array.from({ length: 5 }, (_, i) => { const m = torus(coilR, 0.45, mine(std({ color: 0x050505, emissive: new THREE.Color(color), emissiveIntensity: 0, transparent: true, opacity: 0.85 })), PLINTH_H + 1.4 + i * 2.2); m.position.x = cx; m.position.z = cz; g.add(m); return m; });
+        g.add(torus(r + 0.3, 0.4, M.gilt, top), rivets(r + 0.3, y + 0.4, 22), torus(r + 0.4, 0.14, glow(accent, 1.6), top + 0.5));
         // a geared stirrer on a gantry, turning in the melt while it works
-        for (const sx of [-1, 1]) g.add(tube([V(sx * 9.4, Y, 0), V(sx * 8.6, Y + 14, 0), V(sx * 4, Y + 19, 0)], 0.4, M.iron, 12));
-        g.add(box(9, 0.8, 1.2, M.brass, 0, Y + 18.8, 0));
-        const stir = G(); stir.position.y = Y + 19.2; g.add(stir);
-        stir.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 11, 8), M.iron).translateY(-5.5), box(5, 0.6, 0.4, M.iron, 0, -10.6, 0));
+        for (const sx of [-1, 1]) g.add(tube([V(sx * 9.4, PLINTH_H, 0), V(sx * 8.6, top + 2.6, 0), V(sx * 4, top + 7.6, 0)], 0.4, M.iron, 12));
+        g.add(box(9, 0.8, 1.2, M.brass, 0, top + 7.4, 0));
+        const stir = G(); stir.position.y = top + 7.8; g.add(stir);
+        stir.add(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 9, 8), M.iron).translateY(-4.5), box(3.6, 0.5, 0.3, M.iron, 0, -8.6, 0));
         const g1 = gear(1.8, 12); g1.rotation.x = -Math.PI / 2; g1.position.y = 0.6; stir.add(g1);
-        const g2 = gear(1.2, 8, M.gilt); g2.rotation.x = -Math.PI / 2; g2.position.set(2.9, Y + 19.8, 0); g.add(g2);
+        const g2 = gear(1.2, 8, M.gilt); g2.rotation.x = -Math.PI / 2; g2.position.set(2.9, top + 8.4, 0); g.add(g2);
         let cp = 0;
         a.push((dt) => {
             const k = pace(); cp += dt * 0.9 * k;
             climb.forEach((m, i) => { const f = (cp - i * 0.14) % 1.8; m.material.emissiveIntensity = f > 0 && f < 0.35 ? Math.sin((f / 0.35) * Math.PI) * 1.2 * k : 0; });
             stir.rotation.y += dt * 2.4 * k; g2.rotation.z -= dt * 3.6 * k;
         });
-        return { group: g, height: Y + 22 };
+        return { group: g, height: top + 10.6 };
     },
     arena(c) {
         const { G, M, color, accent, heart, band, torus, box, glow } = c;
-        const g = G();
-        g.add(heart(6.2, 8, Y), band(6.5, Y + 0.7, 0.9), band(6.5, Y + 7.6, 0.9), torus(6.6, 0.14, glow(accent, 1.6), Y + 8.2));
+        const g = G(), { r, h, y } = CORE, top = CORE_TOP;
+        g.add(heart(r, h, y), band(r + 0.3, y + 0.6, 0.9), band(r + 0.3, top - 0.4, 0.9), torus(r + 0.4, 0.14, glow(accent, 1.6), top + 0.2));
+        // a ring of standing stones, open toward the camera
         for (let i = 0; i < 8; i++) {
-            const t = (i / 8) * TAU + 0.2, h = 9 + (i % 3) * 1.6;
-            const st = new THREE.Mesh(new THREE.BoxGeometry(2.4, h, 1.5), M.stone); st.position.set(Math.cos(t) * 10, Y + h / 2, Math.sin(t) * 10); st.rotation.y = -t + Math.PI / 2; g.add(st);
-            const cap = box(2.8, 0.5, 1.9, M.brass); cap.position.set(Math.cos(t) * 10, Y + h, Math.sin(t) * 10); cap.rotation.y = -t + Math.PI / 2; g.add(cap);
-            const rr = new THREE.Mesh(new THREE.PlaneGeometry(0.8, h * 0.7), glow(color, 1.6)); rr.position.set(Math.cos(t) * 9.2, Y + h / 2, Math.sin(t) * 9.2); rr.lookAt(0, rr.position.y, 0); g.add(rr);
+            const off = (i / 8) * TAU + Math.PI / 8, t = CAM + off;
+            if (Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) < 1.2) continue; // the ones in front would hide the glass
+            const hh = 9 + (i % 3) * 1.6;
+            const st = new THREE.Mesh(new THREE.BoxGeometry(2.4, hh, 1.5), M.stone); st.position.set(Math.cos(t) * 10, PLINTH_H + hh / 2, Math.sin(t) * 10); st.rotation.y = -t + Math.PI / 2; g.add(st);
+            const cap = box(2.8, 0.5, 1.9, M.brass); cap.position.set(Math.cos(t) * 10, PLINTH_H + hh, Math.sin(t) * 10); cap.rotation.y = -t + Math.PI / 2; g.add(cap);
+            const rr = new THREE.Mesh(new THREE.PlaneGeometry(0.8, hh * 0.7), glow(color, 1.6)); rr.position.set(Math.cos(t) * 9.2, PLINTH_H + hh / 2, Math.sin(t) * 9.2); rr.lookAt(0, rr.position.y, 0); g.add(rr);
         }
-        return { group: g, height: Y + 14 };
+        return { group: g, height: top + 2 };
     },
     treasury(c) {
         const { G, M, light, accent, heart, box, finial, gem, torus, glow } = c;
-        const g = G();
-        g.add(heart(5.8, 10, Y + 0.8), box(13, 0.8, 13, M.wood, 0, Y, 0), box(13.4, 0.3, 13.4, M.gilt, 0, Y + 0.8, 0));
-        for (const x of [-6, 6]) for (const z of [-6, 6]) { g.add(box(0.9, 11, 0.9, M.gilt, x, Y + 0.8, z)); const f = finial(0.5); f.position.set(x, Y + 11.8, z); g.add(f); const gm2 = gem(accent, 0.45); gm2.position.set(x, Y + 14.4, z); g.add(gm2); }
-        g.add(torus(6.1, 0.14, glow(accent, 1.6), Y + 11));
-        for (const ry of [0, Math.PI / 2]) { const arch = new THREE.Mesh(new THREE.TorusGeometry(6, 0.35, 8, 32, Math.PI), M.gilt); arch.position.y = Y + 11.8; arch.rotation.y = ry; g.add(arch); }
-        g.add(box(13, 0.4, 0.4, M.gilt, 0, Y + 11.6, 6), box(13, 0.4, 0.4, M.gilt, 0, Y + 11.6, -6), box(0.4, 0.4, 13, M.gilt, 6, Y + 11.6, 0), box(0.4, 0.4, 13, M.gilt, -6, Y + 11.6, 0));
-        const gm = gem(light, 1); gm.position.y = Y + 18.4; g.add(gm);
-        return { group: g, height: Y + 20 };
+        const g = G(), { r, h, y } = CORE, top = CORE_TOP;
+        g.add(heart(r, h, y), torus(r + 0.3, 0.14, glow(accent, 1.6), top - 0.2));
+        // the casket, turned so its corner posts frame the glass instead of crossing it
+        const deco = G(); deco.rotation.y = SQUARE_TURN; g.add(deco);
+        const q = 6.4, postH = top + 0.6 - (PLINTH_H + 0.8);
+        deco.add(box(14, 0.8, 14, M.wood, 0, PLINTH_H, 0), box(14.4, 0.3, 14.4, M.gilt, 0, PLINTH_H + 0.8, 0));
+        for (const x of [-q, q]) for (const z of [-q, q]) { deco.add(box(0.9, postH, 0.9, M.gilt, x, PLINTH_H + 0.8, z)); const f = finial(0.5); f.position.set(x, top + 1.4, z); deco.add(f); const gm2 = gem(accent, 0.45); gm2.position.set(x, top + 4, z); deco.add(gm2); }
+        for (const ry of [0, Math.PI / 2]) { const arch = new THREE.Mesh(new THREE.TorusGeometry(q, 0.35, 8, 32, Math.PI), M.gilt); arch.position.y = top + 1.4; arch.rotation.y = ry; deco.add(arch); }
+        deco.add(box(2 * q + 0.4, 0.4, 0.4, M.gilt, 0, top + 1.2, q), box(2 * q + 0.4, 0.4, 0.4, M.gilt, 0, top + 1.2, -q), box(0.4, 0.4, 2 * q + 0.4, M.gilt, q, top + 1.2, 0), box(0.4, 0.4, 2 * q + 0.4, M.gilt, -q, top + 1.2, 0));
+        const gm = gem(light, 1); gm.position.y = top + 8; g.add(gm);
+        return { group: g, height: top + 10 };
     },
     archive(c) {
         const { G, M, accent, heart, band, box, torus, glow, curl } = c;
-        const g = G();
-        g.add(heart(5.4, 14, Y), band(5.7, Y + 0.8, 0.8), band(5.7, Y + 13.4, 0.8));
-        for (const x of [-8, 8]) for (const z of [-8, 8]) g.add(box(0.7, 17, 0.7, M.iron, x, Y, z));
-        for (let s = 0; s < 3; s++) for (const [x, z, w, d] of [[0, -8, 16.6, 3], [-8, 0, 3, 16.6], [8, 0, 3, 16.6]]) g.add(box(w, 0.35, d, M.iron, x, Y + 2 + s * 5.4, z));
+        const g = G(), { r, h, y } = CORE, top = CORE_TOP;
+        g.add(heart(r, h, y), band(r + 0.3, y + 0.6, 0.8), band(r + 0.3, top - 0.4, 0.8), torus(r + 0.35, 0.14, glow(accent, 1.6), top));
+        // the shelving, turned so its open side faces the camera
+        const deco = G(); deco.rotation.y = SQUARE_TURN; g.add(deco);
+        const Y = PLINTH_H;
+        for (const x of [-8, 8]) for (const z of [-8, 8]) deco.add(box(0.7, 17, 0.7, M.iron, x, Y, z));
+        for (let s = 0; s < 3; s++) for (const [x, z, w, d] of [[0, -8, 16.6, 3], [-8, 0, 3, 16.6], [8, 0, 3, 16.6]]) deco.add(box(w, 0.35, d, M.iron, x, Y + 2 + s * 5.4, z));
         let k = 0;
-        for (let s = 0; s < 3; s++) for (const [x, z] of [[-4, -8], [4, -8], [-8, -3], [-8, 3], [8, -3], [8, 3]]) { if ((k++ * 5) % 7 > 4) continue; g.add(box(2.6, 3, 2.4, M.wood, x, Y + 2.35 + s * 5.4, z), box(2.7, 0.25, 2.5, M.brass, x, Y + 3.8 + s * 5.4, z)); }
-        g.add(box(17.4, 0.6, 17.4, M.iron, 0, Y + 17, 0), torus(5.75, 0.14, glow(accent, 1.6), Y + 14), box(17.6, 0.2, 0.2, glow(accent, 1.4), 0, Y + 17.6, 8.8), box(0.2, 0.2, 17.6, glow(accent, 1.4), 8.8, Y + 17.6, 0));
-        const c1 = curl(2.2); c1.position.set(-2, Y + 19.6, 0); g.add(c1); const c2 = curl(2.2); c2.scale.x = -1; c2.position.set(2, Y + 19.6, 0); g.add(c2);
-        return { group: g, height: Y + 22 };
+        for (let s = 0; s < 3; s++) for (const [x, z] of [[-4, -8], [4, -8], [-8, -3], [-8, 3], [8, -3], [8, 3]]) { if ((k++ * 5) % 7 > 4) continue; deco.add(box(2.6, 3, 2.4, M.wood, x, Y + 2.35 + s * 5.4, z), box(2.7, 0.25, 2.5, M.brass, x, Y + 3.8 + s * 5.4, z)); }
+        deco.add(box(17.4, 0.6, 17.4, M.iron, 0, Y + 17, 0), box(17.6, 0.2, 0.2, glow(accent, 1.4), 0, Y + 17.6, 8.8), box(0.2, 0.2, 17.6, glow(accent, 1.4), 8.8, Y + 17.6, 0));
+        const c1 = curl(2.2); c1.position.set(-2, Y + 19.6, 0); deco.add(c1); const c2 = curl(2.2); c2.scale.x = -1; c2.position.set(2, Y + 19.6, 0); deco.add(c2);
+        return { group: g, height: PLINTH_H + 22 };
     },
     necropolis(c) {
         const { G, M, accent, heart, lathe, cyl, box, finial, gem, torus, glow } = c;
-        const g = G();
-        g.add(heart(4.8, 9, Y + 1.2), lathe([[0, Y], [6, Y], [6, Y + 1.2], [5.2, Y + 1.2]], M.stone, 40), lathe([[4.9, Y + 10.2], [5.4, Y + 10.8], [3, Y + 12], [1.4, Y + 12.4]], M.stone, 40));
-        for (let i = 0; i < 6; i++) { const t = (i / 6) * TAU; g.add(cyl(0.55, 0.6, 13, M.stone, Y, 12).translateX(Math.cos(t) * 8).translateZ(Math.sin(t) * 8), box(1.4, 0.5, 1.4, M.gilt, Math.cos(t) * 8, Y + 13, Math.sin(t) * 8)); }
-        g.add(cyl(9.4, 9.4, 1, M.stone, Y + 13.5, 6), new THREE.Mesh(new THREE.CylinderGeometry(0.5, 9.6, 4, 6), M.stone).translateY(Y + 16.5));
-        const f = finial(0.6); f.position.y = Y + 18.4; g.add(f);
-        const gm = gem(accent, 0.8); gm.position.y = Y + 23.6; g.add(gm);
-        g.add(torus(5.1, 0.14, glow(accent, 1.4), Y + 10.4));
-        return { group: g, height: Y + 25 };
+        const g = G(), { r, h, y } = CORE, top = CORE_TOP, Y = PLINTH_H;
+        g.add(heart(r, h, y), lathe([[0, Y], [r + 0.6, Y], [r + 0.6, y], [r + 0.1, y]], M.stone, 40), lathe([[r + 0.1, top], [r + 0.6, top + 0.6], [3, top + 1.8], [1.4, top + 2.2]], M.stone, 40));
+        // a portico of columns round the back, open toward the camera
+        const colH = top + 2.8 - Y;
+        for (const off of [-1.26, -0.63, 0, 0.63, 1.26]) { const t = away(off); g.add(cyl(0.55, 0.6, colH, M.stone, Y, 12).translateX(Math.cos(t) * 8).translateZ(Math.sin(t) * 8), box(1.4, 0.5, 1.4, M.gilt, Math.cos(t) * 8, Y + colH, Math.sin(t) * 8)); }
+        g.add(cyl(9.4, 9.4, 1, M.stone, Y + colH + 0.5, 6), new THREE.Mesh(new THREE.CylinderGeometry(0.5, 9.6, 4, 6), M.stone).translateY(Y + colH + 3.5));
+        const f = finial(0.6); f.position.y = Y + colH + 5.4; g.add(f);
+        const gm = gem(accent, 0.8); gm.position.y = Y + colH + 10.6; g.add(gm);
+        g.add(torus(r + 0.35, 0.14, glow(accent, 1.4), top - 0.4));
+        return { group: g, height: Y + colH + 12 };
     },
     codex(c) {
         const { G, M, box, cyl, gear, curl, liquidMat, mine, working, pace, ctx, a } = c;

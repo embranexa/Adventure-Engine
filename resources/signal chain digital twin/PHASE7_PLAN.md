@@ -251,7 +251,7 @@ the user asks (not one commit per stage).
 | Click a machine | Opens its panel (Centrifuge and Sump open the Nexus in Discovery, the Nexus machine opens it in Adventures; the Forge opens the Refinery's create dialog) | `onActivate` and `showPanel` |
 | Click a base | Cycles that stage's filter: include, exclude, off; applies at once | `toggleRing` and `cycleStage` |
 | Click a machine with no panel | Nothing | none |
-| Harvest, Feed, Siphon, Purge in a label | Run the source action; Harvest disabled for an hour after a harvest; Purge asks to confirm | `runCommand`, `HARVEST_FRESH_MS`, `confirmHere` |
+| Harvest, Feed, Siphon, Purge in a label | Run the source action; Harvest disabled for an hour after a harvest; Purge runs at once (no confirm since round 2 of the upgrades) | `runCommand`, `HARVEST_FRESH_MS`, `confirmHere` |
 | Click a pipe | Nothing (the prototype's test trigger goes) | none |
 | Select a row in any panel | The floor circle closes on the old machine and opens on the new one, in the row's matter colour | the `selection` memo, with a transition in the scene |
 | A transition arrives | A slug runs along each pipe step of its route, in its lens colour | `play`, `route`, `packetStyle` |
