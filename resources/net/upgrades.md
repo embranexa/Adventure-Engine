@@ -15,3 +15,6 @@
 [autonomous_filter]
 - represented in signal chain by new machine, probably in between centrifuge and harvesters
 1. tunable filter chain
+
+[enricher]
+- nested crawl on dedicated event listing to complete fields

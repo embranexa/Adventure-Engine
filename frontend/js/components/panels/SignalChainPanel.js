@@ -32,6 +32,8 @@ const NODE_COLORS = {
     [FORGE]: '#ff7a3c',
     [CODEX]: '#c8a46a',
     entropy_market: '#c8a46a',
+    enricher: '#c8a46a',
+    sieve: '#c8a46a',
     nexus: '#9fb4c8', atlas: '#9fb4c8', calendar: '#9fb4c8', ledger: '#9fb4c8',
     ...Object.fromEntries(Object.entries(PHASE_NODES).map(([phase, id]) => [id, PHASE_STAGES[/** @type {Phase} */ (phase)].color])),
 };

@@ -40,6 +40,10 @@ export const FORGE = 'forge';
 export const CODEX = 'codex';
 export const MANIFOLD = 'manifold';
 export const ENTROPY_MARKET = 'entropy_market';
+/** Fills in what harvested events lack (cover, exact place, end time): not built yet. */
+export const ENRICHER = 'enricher';
+/** The autonomous filter: a tunable chain of rules between the harvesters and the Centrifuge: not built yet. */
+export const SIEVE = 'sieve';
 export const CRUCIBLE = PHASE_NODES.constructing;
 export const ARENA = PHASE_NODES.consuming;
 export const TREASURY = PHASE_NODES.completed;
@@ -47,7 +51,8 @@ export const NECROPOLIS = PHASE_NODES.killed;
 export const REFINERY = PHASE_NODES.classifying;
 
 /** Harvesters drawn even before their crawler exists (locked until then). */
-export const KNOWN_HARVESTERS = ['luma', '19hz', 'ra', 'eventbrite'];
+// ig-collection: events you send in (Telegram); ig-profiles: watched Instagram accounts (resources/net/BUILD_PLAN.md)
+export const KNOWN_HARVESTERS = ['luma', '19hz', 'ig-collection', 'ig-profiles'];
 
 /** @param {string} source */
 export const harvesterId = (source) => `harvester:${source}`;
@@ -80,6 +85,8 @@ export function twinNodes(sourceNames) {
         node({ id: SUMP, label: 'Sump', zone: 'net', kind: 'vessel', holds: 'events', matter: 'dross',
             action: { panel: 'classifier', mode: 'discovery', shades: true } }),
         node({ id: FORGE, label: 'Forge', zone: 'net', kind: 'dynamo', action: { panel: 'node', create: true } }),
+        node({ id: ENRICHER, label: 'Enricher', zone: 'net', kind: 'dynamo', locked: true }),
+        node({ id: SIEVE, label: 'Sieve', zone: 'net', kind: 'processor', locked: true }),
         core('queued', 'vessel', 'Hopper'),
         core('classifying', 'processor', 'Refinery', { panel: 'node', mode: 'adventures' }),
         core('decomposing', 'processor', 'Alembic', { panel: 'alembic', mode: 'adventures' }),

@@ -161,7 +161,7 @@ button { font-family: inherit; }
 }
 .topbar {
     display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
-    padding: 14px 24px 6px; position: relative; z-index: 2;
+    padding: 14px 24px 6px; position: relative; z-index: 3;   /* above the gauge row: its menus (Layouts) drop over it */
 }
 .brand {
     display: flex; align-items: center; gap: 10px;

@@ -3,3 +3,4 @@ __pycache__/
 legacy/
 data/*.db
 data/covers/
+.env

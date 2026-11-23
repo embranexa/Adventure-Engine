@@ -36,7 +36,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { deferredResize, isResizing, viewOf } from '../resizing.js';
-import { CENTRIFUGE, CODEX, ENTROPY_MARKET, FORGE, MAIN_CHAIN, MANIFOLD, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from '../twinTopology.js';
+import { CENTRIFUGE, CODEX, ENRICHER, ENTROPY_MARKET, FORGE, SIEVE, MAIN_CHAIN, MANIFOLD, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from '../twinTopology.js';
 import { makeMaterials } from './materials.js';
 import { buildZones, zoneRects } from './zones.js';
 import { FOOT, bodyOf, buildMachine, lighter, makeShop } from './machines.js';
@@ -84,6 +84,8 @@ function layout(nodes) {
     const fixed = {
         [MANIFOLD]: [-258, NET_Y, 0],
         [CENTRIFUGE]: [-210, NET_Y, 0], [SUMP]: [-205, NET_Y, -122], [FORGE]: [-215, NET_Y, 118],
+        [ENRICHER]: [-295, NET_Y, 118],   // front, between the harvesters and the Forge
+        [SIEVE]: [-272, NET_Y, -104],     // back, between the harvesters and the Centrifuge
         [CODEX]: [-40, CORE_Y, 104], [ENTROPY_MARKET]: [180, CORE_Y, 104],
         [NECROPOLIS]: [110, CORE_Y, -104],
     };

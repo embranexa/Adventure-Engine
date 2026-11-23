@@ -35,7 +35,7 @@ const RIM_COLORS = { include: '#e6ebf2', exclude: '#ff4a3d' };
 const PACE_S = 0.5;          // a mechanism winds up or down in this long
 
 /** Plinth radius per body: the base is sized to the machine. */
-export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, market: 9, nexus: 8, atlas: 7, calendar: 8, ledger: 8 };
+export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, market: 9, nexus: 8, atlas: 7, calendar: 8, ledger: 8, enricher: 8, sieve: 8 };
 
 /** Which body a node gets. */
 export function bodyOf(node) {
@@ -676,6 +676,43 @@ const BODIES = {
             });
         });
         return { group: g, height: Y + 27 };
+    },
+    // a sieve: three mesh trays stacked on a tripod, finest at the bottom (locked until built)
+    sieve(c) {
+        const { G, M, node, cyl, torus, box, finial } = c;
+        const g = G();
+        for (let i = 0; i < 3; i++) { const t = (i / 3) * TAU + Math.PI / 2; g.add(cyl(0.4, 0.5, 16, M.brass, Y, 8).translateX(Math.cos(t) * 6.6).translateZ(Math.sin(t) * 6.6)); }
+        const mesh = (r, cells) => {   // a tray: a rim and a grid of wires
+            const tray = G();
+            tray.add(torus(r, 0.35, M.gilt, 0), cyl(r, r * 0.92, 1.2, M.copper, -1.2, 40, true));
+            for (let k = -cells; k <= cells; k++) {
+                const off = (k / cells) * r * 0.92, half = Math.sqrt(Math.max(0, (r * 0.92) ** 2 - off ** 2));
+                if (half < 0.5) continue;
+                tray.add(box(half * 2, 0.08, 0.08, M.brass, 0, -0.9, off), box(0.08, 0.08, half * 2, M.brass, off, -0.9, 0));
+            }
+            return tray;
+        };
+        [[7, 3, Y + 15], [6.2, 5, Y + 10.5], [5.4, 8, Y + 6]].forEach(([r, cells, y]) => { const t = mesh(r, cells); t.position.y = y; g.add(t); });
+        g.add(torus(7.1, 0.3, M.gilt, Y + 0.4));
+        const f = finial(0.6); f.position.y = Y + 15.4; g.add(f);
+        if (node.locked) { for (let k = 0; k < 3; k++) { const ch = torus(7.3, 0.3, M.iron, Y + 4 + k * 4); ch.rotation.z = (k - 1) * 0.12; g.add(ch); } g.add(box(2.4, 2.2, 1.2, M.brass, 0, Y + 7, 7.2)); }
+        return { group: g, height: Y + 20 };
+    },
+    // a still: three feed funnels over a cauldron under a glass dome (locked until built)
+    enricher(c) {
+        const { G, M, node, lathe, cyl, torus, tube, box, finial } = c;
+        const g = G();
+        g.add(lathe([[6.6, Y], [6.8, Y + 1], [6.2, Y + 6], [4.6, Y + 8], [4.6, Y + 8.6]], M.copper, 40), torus(6.5, 0.3, M.gilt, Y + 3));
+        g.add(new THREE.Mesh(new THREE.SphereGeometry(4.4, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), M.glass).translateY(Y + 8.6), torus(4.5, 0.25, M.gilt, Y + 8.6));
+        for (let i = 0; i < 3; i++) {
+            const t = (i / 3) * TAU + Math.PI / 6, x = Math.cos(t) * 8.6, z = Math.sin(t) * 8.6;
+            g.add(cyl(0.35, 0.35, 12, M.brass, Y, 8).translateX(x).translateZ(z));
+            const funnel = lathe([[2.2, 0], [2.2, 0.3], [0.5, 2.6], [0.4, 3.4]], M.brass, 24); funnel.rotation.x = Math.PI; funnel.position.set(x, Y + 15.4, z); g.add(funnel);
+            g.add(tube([V(x, Y + 12, z), V(x * 0.6, Y + 11.4, z * 0.6), V(x * 0.3, Y + 10.6, z * 0.3)], 0.25, M.brass, 12));
+        }
+        const f = finial(0.6); f.position.y = Y + 12.6; g.add(f);
+        if (node.locked) { for (let k = 0; k < 3; k++) { const ch = torus(7, 0.3, M.iron, Y + 1.6 + k * 2.4); ch.rotation.z = (k - 1) * 0.12; g.add(ch); } g.add(box(2.4, 2.2, 1.2, M.brass, 0, Y + 3.4, 6.9)); }
+        return { group: g, height: Y + 19 };
     },
     market(c) {
         const { G, M, cyl, torus, box } = c;

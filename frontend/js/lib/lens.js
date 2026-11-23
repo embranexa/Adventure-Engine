@@ -35,7 +35,7 @@ export const LENSES = [
 ];
 
 /** Fixed colors where a value has an identity of its own. */
-const SOURCE_COLORS = { luma: '#3ccf8e', '19hz': '#4f8cff', ra: '#f2b134', eventbrite: '#f0643c' };
+const SOURCE_COLORS = { luma: '#3ccf8e', '19hz': '#4f8cff', 'ig-collection': '#e1306c', 'ig-profiles': '#f77737' };
 const TYPE_COLORS = { event: '#4fb3ff', item: '#e0a43a', song: '#c86bf0' };
 /** Everything else: a value keeps the same color across reloads (picked by its text). */
 export const PALETTE = ['#4fb3ff', '#3ccf8e', '#f2b134', '#f0643c', '#c86bf0', '#2fd2c9', '#ff7aa8', '#a3d14b', '#8f8cff', '#ffb27a'];
