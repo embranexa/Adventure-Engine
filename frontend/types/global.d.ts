@@ -114,6 +114,8 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     phase: Phase;
     phase_before_kill: Phase | null;
     stats: Record<string, unknown>;
+    /** Set by hand (js/lifecycle.js ADVENTURE_FLAGS). */
+    flags: AdventureFlag[];
     /** Action roadmap (Alembic), or null before one is drafted. */
     roadmap: Roadmap | null;
     /** Linked virtual objects (the Codex). */
@@ -152,7 +154,7 @@ type AdventureChanges = Partial<{
     cover_url: string | null; start_time: string | null; end_time: string | null; timezone: string | null;
     venue: string | null; address: string | null; city: string | null; lat: number | null; lon: number | null;
     all_day: boolean | null; recurrence: { days: number[]; until: string | null } | null;
-    costs: string | null; rewards: string | null;
+    costs: string | null; rewards: string | null; flags: AdventureFlag[];
 }>;
 
 /** An adventure's action roadmap: a dependency graph (backend/services/roadmap.py). */
@@ -193,7 +195,9 @@ interface TransferRecord {
 /** siphon: back to their harvesters · purge: to the Sump · keep: stay in the centrifuge */
 type ExcludedFate = 'siphon' | 'purge' | 'keep';
 
-type FacetKey = 'source' | 'tag' | 'city' | 'region' | 'metro' | 'type' | 'phase' | 'review';
+type AdventureFlag = 'important' | 'urgent' | 'favorite' | 'maybe' | 'waiting';
+
+type FacetKey = 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'type' | 'phase' | 'review';
 
 /** Local calendar days, inclusive. */
 interface DateRange { start: string; end: string; mode: FilterMode }
@@ -218,7 +222,7 @@ interface FilterState {
 }
 
 /** "stage" (Matter) or a facet that can color rows. */
-type LensKey = 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'type' | 'pillar' | 'site' | 'contact' | 'organization' | 'skill';
+type LensKey = 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'type' | 'pillar' | 'site' | 'contact' | 'organization' | 'skill';
 
 /** One move between signal chain nodes (backend/services/transitions.py). */
 interface TransitionRecord {
@@ -432,7 +436,8 @@ interface WorkspaceState {
     toggleSeal(): void;
     setUnits(units: 'mi' | 'km'): void;
     /** Clear facets (pending) and ranges (immediately); keeps the Seal and units. */
-    clearFilters(): void;
+    /** Clear every filter, applied and draft (lens and units stay). */
+    resetFilters(): void;
     setObjects(objects: VObject[]): void;
     /** Center the proximity ring on a site (keeps the radius and mode); it follows the site. */
     anchorRingOnSite(siteId: string): void;

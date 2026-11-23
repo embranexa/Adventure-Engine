@@ -116,6 +116,7 @@ def adventure_to_dict(
         "phase": a.phase,
         "phase_before_kill": a.phase_before_kill,
         "stats": a.stats,
+        "flags": a.flags or [],
         "roadmap": a.roadmap,
         "costs": a.costs,
         "rewards": a.rewards,

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { excludedFromCentrifuge, useWorkspaceStore } from '../../store.js';
-import { FACETS, facetLabel, formatDistance, parseDay, pendingChanges } from '../../filters.js';
+import { DEFAULT_FILTERS, FACETS, facetLabel, formatDistance, hasActiveFilters, parseDay, pendingChanges } from '../../filters.js';
 import { buildModel } from '../../lib/classifierGraph.js';
 import { LENSES } from '../../lib/lens.js';
 
@@ -61,6 +61,7 @@ function FilterTray({ passCount }) {
     const setRing = useWorkspaceStore((s) => s.setRing);
     const passFilters = useWorkspaceStore((s) => s.passFilters);
     const discardDraft = useWorkspaceStore((s) => s.discardDraft);
+    const resetFilters = useWorkspaceStore((s) => s.resetFilters);
     const rawEvents = useWorkspaceStore((s) => s.rawEvents);
     const fate = useWorkspaceStore((s) => s.excludedFate);
     const setFate = useWorkspaceStore((s) => s.setExcludedFate);
@@ -72,6 +73,8 @@ function FilterTray({ passCount }) {
     );
     const moving = fate !== 'keep' ? excluded : 0;
     const canPass = pending > 0 || moving > 0;
+    // anything to reset: a filter (draft or applied) or a broken Seal
+    const canReset = [draft, applied].some((f) => hasActiveFilters(f) || f.seal !== DEFAULT_FILTERS.seal);
 
     const facetChips = FACETS.filter((f) => f.modes.includes(mode)).flatMap((facet) =>
         Object.entries(draft.facets[facet.key] ?? {}).map(([value, fmode]) => ({
@@ -117,6 +120,7 @@ function FilterTray({ passCount }) {
             ${!hasChips && html`<span className="tray-hint">Click a star to filter</span>`}
             <span className="tray-spacer"></span>
             <span className="tray-applied">map + calendar show <b>${shown}</b></span>
+            ${canReset && html`<button className="btn" onClick=${resetFilters} title="Clear every filter now (applied and pending); the lens stays">↺ Reset</button>`}
             ${pending > 0 && html`<button className="btn" onClick=${discardDraft} title="Throw away pending changes">Discard</button>`}
             ${mode === 'discovery' && html`
                 <span className="fate" title="What Pass through does with the centrifuge events the filters leave out">

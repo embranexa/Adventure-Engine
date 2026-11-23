@@ -7,10 +7,10 @@ from typing import Any, Literal, get_args
 from pydantic import BaseModel, Field, model_validator
 
 FilterMode = Literal["include", "exclude"]
-FacetKey = Literal["source", "tag", "city", "region", "metro", "type", "phase", "review",
+FacetKey = Literal["source", "tag", "city", "region", "metro", "type", "phase", "review", "flag",
                    "pillar", "site", "contact", "organization", "skill"]
 # what colors the matter: "stage" (Matter) or a facet (frontend/js/lib/lens.js)
-LensKey = Literal["stage", "source", "tag", "city", "region", "metro", "type",
+LensKey = Literal["stage", "source", "tag", "city", "region", "metro", "type", "flag",
                   "pillar", "site", "contact", "organization", "skill"]
 FACET_KEYS, LENS_KEYS = set(get_args(FacetKey)), set(get_args(LensKey))
 

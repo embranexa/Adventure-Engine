@@ -43,6 +43,15 @@ export const ADVENTURE_TYPES = {
     song: { label: 'Song', glyph: '♪', hint: 'A song to write or learn: no when/where' },
 };
 
+/** Flags an adventure can carry, any number, set by hand (backend.db.models.ADVENTURE_FLAGS). @type {Record<AdventureFlag, { label: string, glyph: string, color: string }>} */
+export const ADVENTURE_FLAGS = {
+    important: { label: 'Important', glyph: '★', color: '#f2b134' },
+    urgent: { label: 'Urgent', glyph: '⚡', color: '#f0643c' },
+    favorite: { label: 'Favorite', glyph: '♥', color: '#ff7aa8' },
+    maybe: { label: 'Maybe', glyph: '?', color: '#8f8cff' },
+    waiting: { label: 'Waiting', glyph: '⧗', color: '#2fd2c9' },
+};
+
 /**
  * Virtual object types (the Codex). Only sites have a location. Same list in
  * backend/db/models.py.

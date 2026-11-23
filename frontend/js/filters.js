@@ -8,7 +8,7 @@
 // site, contact) and tags have several: an item passes an include if ANY of its values is
 // included, and fails if any is excluded. An item with none counts as UNKNOWN.
 
-import { ADVENTURE_TYPES, OBJECT_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
+import { ADVENTURE_FLAGS, ADVENTURE_TYPES, OBJECT_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
 import { occursIn, span } from './lib/occurrences.js';
 import { cityName, itemMetro, itemRegion } from './lib/regions.js';
 
@@ -64,6 +64,13 @@ export const FACETS = [
     { key: 'city', label: 'City', modes: ['adventures', 'discovery'], value: (i) => cityName(i.city), unknown: 'No city' },
     { key: 'region', label: 'Region', modes: ['adventures', 'discovery'], value: itemRegion, unknown: 'No region' },
     { key: 'metro', label: 'Metro', modes: ['adventures', 'discovery'], value: itemMetro, unknown: 'No metro' },
+    // set by hand, any number per adventure (many-to-many, like tags)
+    {
+        key: 'flag', label: 'Flag', modes: ['adventures'],
+        value: (i) => (i.kind === 'adventure' ? i.flags ?? [] : null),
+        display: (v) => { const f = ADVENTURE_FLAGS[/** @type {AdventureFlag} */ (v)]; return f ? `${f.glyph} ${f.label}` : v; },
+        unknown: 'Unflagged',
+    },
     {
         key: 'type', label: 'Type', modes: ['adventures'],
         value: (i) => (i.kind === 'adventure' ? i.type : null),

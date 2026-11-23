@@ -1375,6 +1375,17 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .ld-table tbody tr.selected { background: rgba(95, 224, 230, 0.1); box-shadow: inset 2px 0 0 var(--accent-light); }
 .ld-table td.ld-title { color: var(--text-bright); max-width: 320px; }
 .ld-table td.ld-tags { color: var(--text-dim); max-width: 200px; }
-.ld-table .ld-dot { width: 14px; padding-right: 0; cursor: default; }
+.ld-table .ld-dot { width: 8px; padding: 0 4px 0 12px; overflow: visible; cursor: default; }   /* room for the dot and its glow */
 .ld-dot i { display: block; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
 .ld-empty { padding: 30px; text-align: center; color: var(--text-dim); font: 500 11px var(--font-mono); }
+
+/* adventure flags (Refinery card) */
+.nc-flags { display: flex; flex-wrap: wrap; gap: 5px; margin: -6px 0 14px; }
+.nc-flag {
+    --f: #888; padding: 2px 9px; border: 0; border-radius: 999px; cursor: pointer; background: transparent;
+    box-shadow: inset 0 0 0 1px var(--steel-2); color: var(--text-dim); font: 600 10px var(--font-display); letter-spacing: 0.12em; text-transform: uppercase;
+}
+.nc-flag span { font-size: 12px; letter-spacing: 0; }
+.nc-flag:hover { color: var(--text-bright); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--f) 60%, transparent); }
+.nc-flag.on { color: #0b0c0e; background: var(--f); box-shadow: 0 0 10px color-mix(in srgb, var(--f) 55%, transparent); }
+.ld-table td.ld-flags { color: #f2b134; letter-spacing: 0.1em; }

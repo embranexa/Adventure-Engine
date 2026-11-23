@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { centrifugeOrder, useWorkspaceStore } from '../../store.js';
 import { formatEventWhen, formatPrice, safeHttpUrl } from '../../events.js';
-import { ADVENTURE_TYPES, MAIN_ROUTE, PHASE_STAGES, hasWhenWhere, stageOf } from '../../lifecycle.js';
+import { ADVENTURE_FLAGS, ADVENTURE_TYPES, MAIN_ROUTE, PHASE_STAGES, hasWhenWhere, stageOf } from '../../lifecycle.js';
 import { AdventureEditor } from './AdventureEditor.js';
 import { ObjectLinks } from '../ObjectLinks.js';
 
@@ -233,6 +233,33 @@ function ItemActions({ item }) {
     `;
 }
 
+/**
+ * The adventure's flags: one toggle each (lit when set). Saved at once.
+ * @param {{ adventure: PoolItem & { kind: 'adventure' } }} props
+ */
+function FlagToggles({ adventure }) {
+    const updateAdventure = useWorkspaceStore((s) => s.updateAdventure);
+    const [error, setError] = useState(/** @type {string | null} */ (null));
+    const flags = new Set(adventure.flags ?? []);
+    const toggle = async (/** @type {AdventureFlag} */ f) => {
+        const next = new Set(flags);
+        if (next.has(f)) next.delete(f); else next.add(f);
+        setError(await updateAdventure(adventure.id, { flags: [...next] }));
+    };
+    return html`
+        <div className="nc-flags">
+            ${Object.entries(ADVENTURE_FLAGS).map(([key, f]) => html`
+                <button key=${key} className=${`nc-flag ${flags.has(/** @type {AdventureFlag} */ (key)) ? 'on' : ''}`} style=${{ '--f': f.color }}
+                    title=${`${flags.has(/** @type {AdventureFlag} */ (key)) ? 'Unflag' : 'Flag as'} ${f.label.toLowerCase()}`}
+                    onClick=${() => toggle(/** @type {AdventureFlag} */ (key))}>
+                    <span>${f.glyph}</span> ${f.label}
+                </button>
+            `)}
+            ${error && html`<div className="nc-error">${error}</div>`}
+        </div>
+    `;
+}
+
 /** Buttons that make a hand-made adventure (it opens here, in edit mode). */
 export function NewAdventureButtons() {
     const createAdventure = useWorkspaceStore((s) => s.createAdventure);
@@ -286,6 +313,7 @@ export function NodeCard() {
                     ${event.kind === 'adventure' && editing
                         ? html`<${AdventureEditor} adventure=${event} focusTitle=${fresh} onDone=${stopEditing} />`
                         : html`<${ItemActions} item=${event} />`}
+                    ${event.kind === 'adventure' && !editing && html`<${FlagToggles} adventure=${event} />`}
                     ${event.kind === 'adventure' && html`<${ObjectLinks} adventure=${event} />`}
                     ${!(event.kind === 'adventure' && editing) && html`<${EventRows} event=${event} />`}
                 `

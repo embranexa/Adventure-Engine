@@ -86,6 +86,12 @@ const DRAW = {
             g.globalAlpha = 1; g.beginPath(); g.arc(x, y, 5, 0, Math.PI * 2); g.fill();
         }
     },
+    // a flag: a pennant on its staff
+    flag(g) {
+        poly(g, [[44, 96], [44, 32]]);
+        poly(g, [[44, 34], [92, 46], [44, 62]], true);
+        g.beginPath(); g.arc(44, 30, 4, 0, Math.PI * 2); g.fill();
+    },
     // a tag: a label with its eyelet
     tag(g) {
         poly(g, [[36, 40], [70, 40], [94, 64], [70, 88], [36, 88]], true);

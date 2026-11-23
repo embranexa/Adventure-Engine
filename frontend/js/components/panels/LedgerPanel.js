@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { formatPrice, parseTime } from '../../events.js';
-import { stageOf } from '../../lifecycle.js';
+import { ADVENTURE_FLAGS, stageOf } from '../../lifecycle.js';
 import { itemLensColor } from '../../lib/lens.js';
 import { cityName, itemMetro, itemRegion } from '../../lib/regions.js';
 
@@ -15,6 +15,10 @@ function priceCents(d) {
     return typeof n === 'number' ? n : null;
 }
 
+const FLAG_ORDER = /** @type {AdventureFlag[]} */ (Object.keys(ADVENTURE_FLAGS));
+/** @param {PoolItem} i @returns {AdventureFlag[]} */
+const flagsOf = (i) => (i.kind === 'adventure' ? FLAG_ORDER.filter((f) => i.flags?.includes(f)) : []);
+
 /** @param {unknown} v */
 const tagsOf = (v) => (Array.isArray(v) ? v.filter((t) => typeof t === 'string') : []);
 
@@ -25,6 +29,12 @@ const tagsOf = (v) => (Array.isArray(v) ? v.filter((t) => typeof t === 'string')
  */
 const COLUMNS = [
     { key: 'title', label: 'Title', cls: 'ld-title', sort: (i) => i.title?.toLowerCase(), show: (i) => i.title ?? 'Untitled' },
+    {
+        // sorts by the most significant flag (ADVENTURE_FLAGS order), unflagged last
+        key: 'flags', label: 'Flags', cls: 'ld-flags',
+        sort: (i) => { const f = flagsOf(i); return f.length ? FLAG_ORDER.indexOf(f[0]) : null; },
+        show: (i) => flagsOf(i).map((f) => ADVENTURE_FLAGS[f].glyph).join(' ') || '',
+    },
     {
         key: 'when', label: 'When', sort: (i) => parseTime(i.start)?.getTime(),
         show: (i) => parseTime(i.start)?.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) ?? '—',

@@ -6,7 +6,7 @@
 // See resources/signal chain digital twin/BUILD_PLAN.md, section 1 ("Light").
 
 import { FACETS, UNKNOWN, chosenObjectColor, facetLabel, facetValues } from '../filters.js';
-import { ADVENTURE_TYPES, PHASE_STAGES, REVIEW_STAGES } from '../lifecycle.js';
+import { ADVENTURE_FLAGS, ADVENTURE_TYPES, PHASE_STAGES, REVIEW_STAGES } from '../lifecycle.js';
 
 /** Facets that can't be a lens: the stage lens already covers them. */
 const NOT_LENSES = new Set(['phase', 'review']);
@@ -78,6 +78,7 @@ export function lensColor(lens, value) {
     }
     if (lens === 'source') return sourceColor(value);
     if (OBJECT_LENSES.has(lens)) return objectColor(value);
+    if (lens === 'flag') return ADVENTURE_FLAGS[/** @type {AdventureFlag} */ (value)]?.color ?? PALETTE[hash(value) % PALETTE.length];
     if (lens === 'type') return TYPE_COLORS[/** @type {keyof typeof TYPE_COLORS} */ (value)] ?? PALETTE[hash(value) % PALETTE.length];
     return PALETTE[hash(value) % PALETTE.length];
 }

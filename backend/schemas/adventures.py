@@ -39,6 +39,8 @@ class AdventureFields(BaseModel):
     lon: float | None = None
     costs: str | None = None
     rewards: str | None = None
+    # flags (backend.db.models.ADVENTURE_FLAGS): the full set it should carry; [] clears them
+    flags: list[Literal["important", "urgent", "favorite", "maybe", "waiting"]] | None = None
 
 
 class AdventureUpdate(AdventureFields):

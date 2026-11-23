@@ -14,7 +14,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from backend.db.base import SessionLocal
-from backend.db.models import ADVENTURE_TYPES, WHEN_WHERE_TYPES, Adventure
+from backend.db.models import ADVENTURE_FLAGS, ADVENTURE_TYPES, WHEN_WHERE_TYPES, Adventure
 from backend.db.queries import list_adventures
 from backend.services.hub import hub
 from backend.services.triage import _get_adventure
@@ -78,6 +78,11 @@ def _apply(adventure: Adventure, changes: dict[str, Any]) -> None:
     for field in ("start_time", "end_time"):
         if field in changes:
             setattr(adventure, field, changes[field])
+    if "flags" in changes:  # the whole set, kept in ADVENTURE_FLAGS order
+        wanted = set(changes["flags"] or [])
+        if wanted - set(ADVENTURE_FLAGS):
+            raise InvalidAdventure(f"unknown flags: {', '.join(sorted(wanted - set(ADVENTURE_FLAGS)))}")
+        adventure.flags = [f for f in ADVENTURE_FLAGS if f in wanted]
     if "all_day" in changes:
         adventure.all_day = bool(changes["all_day"]) or None
     if "recurrence" in changes:

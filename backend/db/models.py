@@ -66,6 +66,8 @@ def harvester_node(source_name: str) -> str:
 # that uses one (calendar, map, date/proximity filters, the missed-adventure sweeper).
 ADVENTURE_TYPES = ("event", "item", "song")
 WHEN_WHERE_TYPES = ("event",)
+# Flags an adventure can carry (any number), set by hand; display in frontend/js/lifecycle.js
+ADVENTURE_FLAGS = ("important", "urgent", "favorite", "maybe", "waiting")
 
 # Phases set by hand from the node card; "killed" only via kill, "decommissioned" only from "completed".
 MANUAL_PHASES = ("queued", "classifying", "decomposing", "constructing", "consuming", "completed")
@@ -149,6 +151,7 @@ class Adventure(Base):
     phase: Mapped[str] = mapped_column(String(20), default="queued")
     phase_before_kill: Mapped[str | None] = mapped_column(String(20))  # restored on revive
     stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # set by hand (HP, ATK, ...)
+    flags: Mapped[list[str] | None] = mapped_column(JSON, default=list)  # ADVENTURE_FLAGS, set by hand
     # action roadmap (Alembic): {actions, edges, done}; see backend/services/roadmap.py
     roadmap: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

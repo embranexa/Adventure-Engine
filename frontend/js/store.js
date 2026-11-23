@@ -710,12 +710,13 @@ const workspaceStore = (set, get) => ({
         saveApplied(get); saveDraft(get);
     },
 
-    clearFilters: () => {
-        // facets go pending (draft); ranges clear immediately everywhere
-        set((state) => withVisible(state, {
-            filters: { ...state.filters, date_range: null, ring: null },
-            draftFilters: { ...state.draftFilters, facets: {}, date_range: null, ring: null },
-        }));
+    // Back to no filters at once, applied and draft alike (the Seal back on); the lens and
+    // units stay. Moves no matter: nothing is siphoned or purged.
+    resetFilters: () => {
+        set((state) => {
+            const reset = (/** @type {FilterState} */ f) => ({ ...DEFAULT_FILTERS, lens: f.lens, units: f.units });
+            return withVisible(state, { filters: reset(state.filters), draftFilters: reset(state.draftFilters) });
+        });
         saveApplied(get); saveDraft(get);
     },
 
