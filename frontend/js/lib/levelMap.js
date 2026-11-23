@@ -1196,6 +1196,17 @@ export class LevelMap {
     }
 
     /** Fly to a point (e.g. a site opened from the Codex). */
+    /** Frame a circle: `km` around (lat, lon), e.g. a site and its proximity ring. */
+    fitArea(lat, lon, km) {
+        if (!this.map) return;
+        const go = () => {
+            const bounds = new maplibregl.LngLatBounds();
+            for (const bearing of [0, 90, 180, 270]) bounds.extend(LevelMap._destination(lat, lon, km, bearing));
+            this.map.fitBounds(bounds, { padding: 60, pitch: this.map.getPitch(), duration: 1200, maxZoom: 16 });
+        };
+        if (this._styleReady) go(); else this.map.once('load', go);
+    }
+
     flyTo(lat, lon) {
         this.map.flyTo({ center: [lon, lat], zoom: Math.max(this.map.getZoom(), 14), duration: 1200 });
     }

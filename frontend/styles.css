@@ -677,6 +677,9 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .cal-mday.out { opacity: 0.4; }
 .cal-mday.in-range { background: rgba(255, 255, 255, 0.05); }
 .cal-mday.in-range.exclude { background: rgba(255, 255, 255, 0.02); }
+.cal-mday.in-range.preview { background: rgba(255, 255, 255, 0.1); }
+.cal-mday { cursor: crosshair; user-select: none; }
+.cal-mday .cal-mentry, .cal-mday .cal-mday-num { cursor: pointer; }
 .cal-mday-num { align-self: flex-start; padding: 0 4px; border: 0; border-radius: 3px; background: none; cursor: pointer; color: var(--text-muted); font: 600 11px var(--font-mono); }
 .cal-mday-num:hover { color: var(--text-bright); background: rgba(255, 255, 255, 0.06); }
 .cal-mday.today .cal-mday-num { color: #000; background: var(--text-bright); }
@@ -1389,3 +1392,14 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .nc-flag:hover { color: var(--text-bright); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--f) 60%, transparent); }
 .nc-flag.on { color: #0b0c0e; background: var(--f); box-shadow: 0 0 10px color-mix(in srgb, var(--f) 55%, transparent); }
 .ld-table td.ld-flags { color: #f2b134; letter-spacing: 0.1em; }
+
+/* lens groups (City / Region / Metro under Place): one bracket, its name on top */
+.cls-layer-group {
+    position: relative; display: inline-flex; gap: 3px; padding: 3px; margin-top: 6px; border-radius: 5px;
+    box-shadow: inset 0 0 0 1px var(--steel-2);
+}
+.cls-layer-group.on { box-shadow: inset 0 0 0 1px var(--steel-4, var(--steel-5)); }
+.cls-layer-group-name {
+    position: absolute; left: 6px; top: -7px; padding: 0 3px; background: rgba(5, 6, 8, 0.95); border-radius: 2px;
+    color: var(--text-dim); font: 600 8px var(--font-display); letter-spacing: 0.2em; text-transform: uppercase; line-height: 11px;
+}

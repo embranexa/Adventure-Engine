@@ -4,7 +4,7 @@ import { useWorkspaceStore } from '../../store.js';
 import { addDays, hourOf, layoutMonth, layoutWeek, sameDay, startOfWeek } from './calendarLayout.js';
 import { dayKey, parseDay } from '../../filters.js';
 import { stageOf } from '../../lifecycle.js';
-import { itemLensColor, lensLabel, lensValues } from '../../lib/lens.js';
+import { byMatter, itemLensColor, lensLabel, lensValues } from '../../lib/lens.js';
 import { focusedWindow } from '../../lib/windows.js';
 
 const FIRST_HOUR = 6;   // visible range: 06:00 ...
@@ -44,7 +44,7 @@ function useNow(ms) {
 function CalendarBlockImpl({ block, selected, hovered, lens, selectItem, hoverItem }) {
     const { event } = block;
     // coloured and labelled by the lens (Matter: the stage)
-    const tag = lens === 'stage' ? stageOf(event)?.matter ?? '' : lensLabel(lens, lensValues(event, lens)[0]);
+    const tag = byMatter(lens) ? stageOf(event)?.matter ?? '' : lensLabel(lens, lensValues(event, lens)[0]);
     const className = ['cal-block', selected && 'sel', hovered && 'hov',
         block.clippedTop && 'clip-top', block.clippedBottom && 'clip-bottom'].filter(Boolean).join(' ');
     return html`
@@ -158,7 +158,8 @@ export function CalendarPanel() {
         scroller.scrollTop = Math.max(0, hour) * HOUR_PX;
     }, [weekStart, hasEvents]);
 
-    // --- day-range filter: drag across day headers; click = one day; shift+click extends ---
+    // --- day-range filter: drag across day headers (week) or day cells (month);
+    //     click = one day; shift+click extends ---
     const [drag, setDrag] = useState(/** @type {{ anchor: Date, current: Date } | null} */ (null));
     const dragRef = useRef(drag);
     dragRef.current = drag;
@@ -241,7 +242,8 @@ export function CalendarPanel() {
             </div>
 
             ${view === 'month' && month && html`
-                <div className="cal-month" onClick=${() => selectItem(null, 'calendar')}>
+                <div className="cal-month" onClick=${() => selectItem(null, 'calendar')}
+                    title="Drag across days to filter by date · click a day for one day · shift+click to extend">
                     <div className="cal-month-head">
                         ${['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d) => html`<div key=${d}>${d}</div>`)}
                     </div>
@@ -249,7 +251,13 @@ export function CalendarPanel() {
                         <div key=${w} className="cal-month-week">
                             ${weekDays.map((cell) => html`
                                 <div key=${cell.date.toDateString()}
-                                    className=${['cal-mday', !cell.inMonth && 'out', sameDay(cell.date, now) && 'today', inShown(cell.date) && `in-range ${dateRange?.mode}`].filter(Boolean).join(' ')}>
+                                    className=${['cal-mday', !cell.inMonth && 'out', sameDay(cell.date, now) && 'today', inShown(cell.date) && `in-range ${drag ? 'preview' : dateRange?.mode}`].filter(Boolean).join(' ')}
+                                    onPointerDown=${(/** @type {PointerEvent} */ e) => {
+                                        // an event, the day number (opens the week) or "+N more" keep their own clicks
+                                        if (/** @type {Element} */ (e.target).closest('.cal-mentry, .cal-mday-num, .cal-more')) return;
+                                        onHeadDown(e, cell.date);
+                                    }}
+                                    onPointerEnter=${() => drag && setDrag({ ...drag, current: cell.date })}>
                                     <button className="cal-mday-num" title="Open this week"
                                         onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); setWeekStart(startOfWeek(cell.date)); setView('week'); }}>
                                         ${cell.date.getDate()}

@@ -4,7 +4,7 @@ import { panelInUse, useWorkspaceStore } from '../../store.js';
 import { OBJECT_TYPES, PHASE_NODES, PHASE_STAGES, REVIEW_STAGES } from '../../lifecycle.js';
 import { passes, pendingChanges } from '../../filters.js';
 import { freshMinutes, freshTitle } from '../../lib/harvest.js';
-import { LENSES, lensColor, lensValues, sourceColor } from '../../lib/lens.js';
+import { LENSES, byMatter, lensColor, lensRuns, lensValues, sourceColor } from '../../lib/lens.js';
 import { eventNode, pipeFlows, twinModel } from '../../lib/twinModel.js';
 import { CENTRIFUGE, CODEX, FORGE, OUTSIDE, SUMP, nodeStage, twinNodes, twinPipes } from '../../lib/twinTopology.js';
 
@@ -276,7 +276,7 @@ export function SignalChainPanel() {
         const item = /** @type {PoolItem | undefined} */ (event ? { ...event, kind: 'omen' } : adventure ? { ...adventure, kind: 'adventure' } : undefined);
         if (!item) return null; // row gone: the machine's colour
         const lit = passes(item, filters, event ? 'discovery' : 'adventures', now);
-        if (filters.lens === 'stage') return { color: null, lit };
+        if (byMatter(filters.lens)) return { color: null, lit };
         return { color: lensColor(filters.lens, lensValues(item, filters.lens)[0]), lit };
     }, [eventsById, adventuresById, filters, now]);
 
@@ -397,7 +397,9 @@ export function SignalChainPanel() {
                 ${view === 'table' && html`<label className="sc-lens">Lens
                     <select className="btn" value=${filters.lens}
                         onChange=${(/** @type {any} */ e) => setLens(e.target.value)}>
-                        ${LENSES.map((l) => html`<option key=${l.key} value=${l.key}>${l.label}</option>`)}
+                        ${lensRuns(LENSES).map((run) => (run.group
+                            ? html`<optgroup key=${run.group} label=${run.group}>${run.items.map((l) => html`<option key=${l.key} value=${l.key}>${l.label}</option>`)}</optgroup>`
+                            : html`<option key=${run.items[0].key} value=${run.items[0].key}>${run.items[0].label}</option>`))}
                     </select>
                 </label>`}
             </div>

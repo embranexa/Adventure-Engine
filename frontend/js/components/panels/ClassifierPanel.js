@@ -3,7 +3,7 @@ import { html } from '../../html.js';
 import { excludedFromCentrifuge, useWorkspaceStore } from '../../store.js';
 import { DEFAULT_FILTERS, FACETS, facetLabel, formatDistance, hasActiveFilters, parseDay, pendingChanges } from '../../filters.js';
 import { buildModel } from '../../lib/classifierGraph.js';
-import { LENSES } from '../../lib/lens.js';
+import { LENSES, lensRuns } from '../../lib/lens.js';
 
 /**
  * The lens is also the Nexus's layer: the facet it colours by shows as stars (Matter shows
@@ -12,6 +12,7 @@ import { LENSES } from '../../lib/lens.js';
  * @returns {import('../../lib/classifierGraph.js').Layers}
  */
 function lensLayers(lens, mode) {
+    if (lens === 'none') return {};   // no lens: only the active filters show as stars
     if (lens === 'stage') return mode === 'adventures' ? { phase: true } : { review: true };
     return { [lens]: true };
 }
@@ -41,6 +42,22 @@ const FATES = /** @type {{ key: ExcludedFate, label: string, title: string }[]} 
     { key: 'purge', label: '↓ Purge', title: 'Into the Sump as dross (each can be revived)' },
     { key: 'keep', label: 'Keep', title: 'Leave them in the centrifuge (only the calendar and map are filtered)' },
 ]);
+
+/**
+ * One lens button. Clicking the active lens turns the lens off (None).
+ * @param {{ key: LensKey, label: string }} l @param {LensKey} lens @param {(lens: LensKey) => void} setLens
+ */
+function lensButton(l, lens, setLens) {
+    return html`
+        <button key=${l.key} className=${`cls-layer ${lens === l.key ? 'on' : ''}`}
+            onClick=${() => setLens(lens === l.key && l.key !== 'none' ? 'none' : l.key)}
+            title=${l.key === 'none'
+                ? 'No lens: no stars but the active filters; colours fall back to matter'
+                : `Colour the matter by ${l.label.toLowerCase()} in the Signal Chain, and show each ${l.key === 'stage' ? 'stage' : l.label.toLowerCase()} as a star. Active filters always show. Click again to turn the lens off.`}>
+            ${l.label}
+        </button>
+    `;
+}
 
 const fmtDay = (/** @type {string} */ d) => parseDay(d).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
@@ -235,7 +252,7 @@ export function ClassifierPanel() {
     const allCollapsed = model.stars.length > 0 && model.stars.every((s) => s.collapsed);
 
     // the lenses that mean something in this mode (Matter always does)
-    const lenses = LENSES.filter((l) => l.key === 'stage' || FACETS.find((f) => f.key === l.key)?.modes.includes(mode));
+    const lenses = LENSES.filter((l) => l.key === 'stage' || l.key === 'none' || FACETS.find((f) => f.key === l.key)?.modes.includes(mode));
 
     return html`
         <div className="panel-body classifier">
@@ -244,12 +261,13 @@ export function ClassifierPanel() {
             ${status === 'ready' && html`
                 <div className="cls-layers" onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
                     <span className="cls-layers-title">Lens</span>
-                    ${lenses.map((l) => html`
-                        <button key=${l.key} className=${`cls-layer ${lens === l.key ? 'on' : ''}`} onClick=${() => setLens(l.key)}
-                            title=${`Colour the matter by ${l.label.toLowerCase()} in the Signal Chain, and show each ${l.key === 'stage' ? 'stage' : l.label.toLowerCase()} as a star. Active filters always show.`}>
-                            ${l.label}
-                        </button>
-                    `)}
+                    ${lensRuns(lenses).map((run) => (run.group
+                        ? html`<span key=${run.group} className=${`cls-layer-group ${run.items.some((l) => l.key === lens) ? 'on' : ''}`}
+                            style=${{ minWidth: `${14 + run.group.length * 7}px` }}>
+                            <span className="cls-layer-group-name">${run.group}</span>
+                            ${run.items.map((l) => lensButton(l, lens, setLens))}
+                        </span>`
+                        : lensButton(run.items[0], lens, setLens)))}
                 </div>
                 <button className="btn view-home" title="Frame everything" onClick=${() => sceneRef.current?.fit()}>⌂</button>
                 <button className="btn view-collapse" disabled=${model.stars.length === 0}

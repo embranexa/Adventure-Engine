@@ -745,11 +745,14 @@ const workspaceStore = (set, get) => ({
         const site = get().objects.find((o) => o.id === siteId);
         if (!site || site.lat == null || site.lon == null) return;
         const ring = get().filters.ring;
+        const radius_km = ring?.radius_km ?? DEFAULT_RING_RADIUS_KM;
         get().setRing({
             center: { lat: site.lat, lon: site.lon, label: site.name, site_id: site.id },
-            radius_km: ring?.radius_km ?? DEFAULT_RING_RADIUS_KM,
+            radius_km,
             mode: ring?.mode ?? 'include',
         });
+        // the Atlas frames the site and its ring
+        set({ atlasFocus: { lat: site.lat, lon: site.lon, radius_km, at: Date.now() } });
     },
 
     atlasFocus: null,

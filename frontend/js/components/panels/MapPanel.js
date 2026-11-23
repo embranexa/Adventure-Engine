@@ -3,7 +3,7 @@ import { html } from '../../html.js';
 import { DEFAULT_RING_RADIUS_KM, useWorkspaceStore } from '../../store.js';
 import { LevelMap, loadMapLibraries } from '../../lib/levelMap.js';
 import { KM_PER_MI, formatDistance } from '../../filters.js';
-import { itemLensColor } from '../../lib/lens.js';
+import { byMatter, itemLensColor } from '../../lib/lens.js';
 
 /**
  * Proximity ring controls: place by clicking the map or anchor it on a site; set radius,
@@ -151,7 +151,7 @@ export function MapPanel() {
     const lens = useWorkspaceStore((s) => s.filters.lens);
     // pins in the lens colour (Matter: the stage colour each item already has)
     const tinted = useMemo(
-        () => (lens === 'stage' ? events : events.map((e) => ({ ...e, color: itemLensColor(e, lens) }))),
+        () => (byMatter(lens) ? events : events.map((e) => ({ ...e, color: itemLensColor(e, lens) }))),
         [events, lens, objects],
     );
     const [siteMenu, setSiteMenu] = useState(/** @type {{ site: VObject, x: number, y: number } | null} */ (null));
@@ -214,7 +214,9 @@ export function MapPanel() {
     }, [objects, ring?.center.site_id, status]);
 
     useEffect(() => {
-        if (atlasFocus) mapRef.current?.flyTo(atlasFocus.lat, atlasFocus.lon);
+        if (!atlasFocus) return;
+        if (atlasFocus.radius_km) mapRef.current?.fitArea(atlasFocus.lat, atlasFocus.lon, atlasFocus.radius_km);
+        else mapRef.current?.flyTo(atlasFocus.lat, atlasFocus.lon);
     }, [atlasFocus, status]);
 
     const menuSite = siteMenu && objects.find((o) => o.id === siteMenu.site.id);

@@ -2,7 +2,8 @@
 //
 // A filter picks which rows are lit; the lens picks how lit rows are split up. "stage"
 // (shown as Matter) is the default: each row in its stage's color. Any other lens is a
-// facet from filters.js, so a row's lens values are its facet values.
+// facet from filters.js, so a row's lens values are its facet values. "none" turns the
+// lens off: no lens stars in the Nexus, and colours fall back to matter (as under "stage").
 // See resources/signal chain digital twin/BUILD_PLAN.md, section 1 ("Light").
 
 import { FACETS, UNKNOWN, chosenObjectColor, facetLabel, facetValues } from '../filters.js';
@@ -11,10 +12,26 @@ import { ADVENTURE_FLAGS, ADVENTURE_TYPES, PHASE_STAGES, REVIEW_STAGES } from '.
 /** Facets that can't be a lens: the stage lens already covers them. */
 const NOT_LENSES = new Set(['phase', 'review']);
 
-/** Lens choices, Matter first. @type {{ key: LensKey, label: string }[]} */
+/** The lenses in their groups, in order (None stands alone, first). A facet missing here
+ *  is appended ungrouped, so a new facet still becomes a lens. */
+const LENS_GROUPS = /** @type {[string, LensKey[]][]} */ ([
+    ['Basic', ['stage', 'source', 'type']],
+    ['Descriptor', ['tag', 'flag']],
+    ['Place', ['city', 'region', 'metro']],
+    ['Object', ['pillar', 'site', 'contact', 'organization', 'skill']],
+]);
+
+/** @param {LensKey} key */
+const lensLabelOf = (key) => (key === 'stage' ? 'Matter' : FACETS.find((f) => f.key === key)?.label ?? key);
+const FACET_LENSES = FACETS.filter((f) => !NOT_LENSES.has(f.key)).map((f) => /** @type {LensKey} */ (f.key));
+
+/** Lens choices: None, then each group's lenses. @type {{ key: LensKey, label: string, group?: string }[]} */
 export const LENSES = [
-    { key: 'stage', label: 'Matter' },
-    ...FACETS.filter((f) => !NOT_LENSES.has(f.key)).map((f) => ({ key: /** @type {LensKey} */ (f.key), label: f.label })),
+    { key: 'none', label: 'None' },
+    ...LENS_GROUPS.flatMap(([group, keys]) => keys
+        .filter((k) => k === 'stage' || FACET_LENSES.includes(k))
+        .map((key) => ({ key, label: lensLabelOf(key), group }))),
+    ...FACET_LENSES.filter((k) => !LENS_GROUPS.some(([, keys]) => keys.includes(k))).map((key) => ({ key, label: lensLabelOf(key) })),
 ];
 
 /** Fixed colors where a value has an identity of its own. */
@@ -33,6 +50,25 @@ const UNKNOWN_COLOR = '#5b616b';
 /** Value for rows the lens's facet doesn't apply to (raw events under an adventure-only facet). */
 export const NOT_APPLICABLE = 'n/a';
 const NOT_APPLICABLE_COLOR = '#3c4048';
+
+/**
+ * Lenses in runs: consecutive lenses of one group together (City, Region, Metro under Place),
+ * every other lens on its own.
+ * @param {{ key: LensKey, label: string, group?: string }[]} lenses
+ */
+export function lensRuns(lenses) {
+    /** @type {{ group?: string, items: typeof lenses }[]} */
+    const runs = [];
+    for (const l of lenses) {
+        const last = runs.at(-1);
+        if (l.group && last?.group === l.group) last.items.push(l);
+        else runs.push({ group: l.group, items: [l] });
+    }
+    return runs;
+}
+
+/** True if the lens colours by matter: Matter itself, or no lens (the fallback). @param {LensKey} lens */
+export const byMatter = (lens) => lens === 'stage' || lens === 'none';
 
 /** @param {string} text */
 function hash(text) {
@@ -54,7 +90,7 @@ function stageKey(item) {
  * @param {PoolItem} item @param {LensKey} lens @returns {string[]}
  */
 export function lensValues(item, lens) {
-    if (lens === 'stage') return [stageKey(item) ?? UNKNOWN];
+    if (byMatter(lens)) return [stageKey(item) ?? UNKNOWN];
     const facet = FACETS.find((f) => f.key === lens);
     if (!facet) return [UNKNOWN];
     if (!facet.modes.includes(item.kind === 'adventure' ? 'adventures' : 'discovery')) return [NOT_APPLICABLE];
@@ -73,7 +109,7 @@ export function objectColor(id) {
 export function lensColor(lens, value) {
     if (value === UNKNOWN) return UNKNOWN_COLOR;
     if (value === NOT_APPLICABLE) return NOT_APPLICABLE_COLOR;
-    if (lens === 'stage') {
+    if (byMatter(lens)) {
         return PHASE_STAGES[/** @type {Phase} */ (value)]?.color ?? REVIEW_STAGES[/** @type {ReviewState} */ (value)]?.color ?? UNKNOWN_COLOR;
     }
     if (lens === 'source') return sourceColor(value);
@@ -89,7 +125,7 @@ export function lensColor(lens, value) {
  * @param {PoolItem} item @param {LensKey} lens
  */
 export function itemLensColor(item, lens) {
-    return lens === 'stage' ? item.color : lensColor(lens, lensValues(item, lens)[0]);
+    return byMatter(lens) ? item.color : lensColor(lens, lensValues(item, lens)[0]);
 }
 
 /**
@@ -104,7 +140,7 @@ export function facetColor(facet, value) {
 /** Display label of one lens value. @param {LensKey} lens @param {string} value */
 export function lensLabel(lens, value) {
     if (value === NOT_APPLICABLE) return 'Raw event';
-    if (lens === 'stage') {
+    if (byMatter(lens)) {
         return PHASE_STAGES[/** @type {Phase} */ (value)]?.matter ?? REVIEW_STAGES[/** @type {ReviewState} */ (value)]?.matter ?? value;
     }
     if (lens === 'type' && value !== UNKNOWN) return ADVENTURE_TYPES[/** @type {AdventureType} */ (value)]?.label ?? value;

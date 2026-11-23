@@ -222,7 +222,7 @@ interface FilterState {
 }
 
 /** "stage" (Matter) or a facet that can color rows. */
-type LensKey = 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'type' | 'pillar' | 'site' | 'contact' | 'organization' | 'skill';
+type LensKey = 'none' | 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'type' | 'pillar' | 'site' | 'contact' | 'organization' | 'skill';
 
 /** One move between signal chain nodes (backend/services/transitions.py). */
 interface TransitionRecord {
@@ -442,7 +442,7 @@ interface WorkspaceState {
     /** Center the proximity ring on a site (keeps the radius and mode); it follows the site. */
     anchorRingOnSite(siteId: string): void;
     /** A point the Atlas should fly to (set by focusOnAtlas, e.g. from the Codex). */
-    atlasFocus: { lat: number; lon: number; at: number } | null;
+    atlasFocus: { lat: number; lon: number; at: number; radius_km?: number } | null;  // radius_km: frame that circle (a site's ring)
     /** Bring the Atlas to the front and fly to a point. */
     focusOnAtlas(lat: number, lon: number): void;
     selectObject(objectId: string | null): void;

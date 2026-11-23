@@ -36,7 +36,7 @@ export const chosenObjectColor = (id) => objectColors.get(id) ?? null;
 
 /** Facet values for an object type: the ids of the item's linked objects of that type. @param {ObjectType} type */
 const objectFacet = (type) => ({
-    key: /** @type {FacetKey} */ (type), label: OBJECT_TYPES[type].plural, modes: /** @type {PoolMode[]} */ (['adventures']),
+    key: /** @type {FacetKey} */ (type), label: OBJECT_TYPES[type].label, modes: /** @type {PoolMode[]} */ (['adventures']),
     value: (/** @type {PoolItem} */ i) => (i.kind === 'adventure' ? i.objects.filter((o) => o.type === type).map((o) => o.id) : null),
     display: (/** @type {string} */ v) => objectNames.get(v) ?? 'Deleted object',
     unknown: `No ${OBJECT_TYPES[type].label.toLowerCase()}`,
