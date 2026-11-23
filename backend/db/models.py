@@ -4,8 +4,8 @@
     events         raw harvested events, unique per (source, api_id), each with a review state
     adventures     the events you kept and hand-made ones, each with a lifecycle phase
                    and an optional action roadmap
-    objects        virtual objects (pillars, sites, contacts, organizations, skills) that adventures link to (the Codex)
-    adventure_objects  links between adventures and objects
+    entities        entities (deities, sites, contacts, organizations, skills) that adventures link to (the Codex)
+    adventure_entities  links between adventures and entities
     app_state      small JSON settings that must survive restarts (filters)
     geocache       place lookups (address / venue / city -> coordinates), so each is asked once
     transitions    log of every move between nodes of the signal chain (the twin's packets)
@@ -56,15 +56,15 @@ OUTSIDE_NODE = "outside"        # where harvested events come from
 CENTRIFUGE_NODE = "centrifuge"  # events "new"
 SUMP_NODE = "sump"              # events "ignored" that have no adventure
 FORGE_NODE = "forge"            # hand-made adventures enter here
-CODEX_NODE = "codex"            # objects; links travel codex <-> refinery
+CODEX_NODE = "codex"            # entities; links travel codex <-> refinery
 
 
 def harvester_node(source_name: str) -> str:
     return f"harvester:{source_name}"
 
-# Adventure types. Only events have a when/where; items and songs are exempt from everything
+# Adventure types. Only events have a when/where; items and performances are exempt from everything
 # that uses one (calendar, map, date/proximity filters, the missed-adventure sweeper).
-ADVENTURE_TYPES = ("event", "item", "song")
+ADVENTURE_TYPES = ("event", "item", "performance")
 WHEN_WHERE_TYPES = ("event",)
 # Flags an adventure can carry (any number), set by hand; display in frontend/js/lifecycle.js
 ADVENTURE_FLAGS = ("important", "urgent", "favorite", "maybe", "waiting")
@@ -127,7 +127,7 @@ class Adventure(Base):
     # SET NULL keeps the adventure if its raw event row is ever removed
     event_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("events.id", ondelete="SET NULL"), unique=True)
-    type: Mapped[str] = mapped_column(String(20), default="event")  # event | song | item | ...
+    type: Mapped[str] = mapped_column(String(20), default="event")  # event | performance | item | ...
     title: Mapped[str | None] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text)
     # when/where: events only (WHEN_WHERE_TYPES)
@@ -139,7 +139,7 @@ class Adventure(Base):
     # repeats: {"freq": "weekly", "days": [0..6] (Monday = 0), "until": "YYYY-MM-DD" | null};
     # start/end give the first occurrence (its time of day and length)
     recurrence: Mapped[dict[str, Any] | None] = mapped_column(JSON)
-    venue: Mapped[str | None] = mapped_column(String(500))  # free text for now (venue objects later)
+    venue: Mapped[str | None] = mapped_column(String(500))  # free text for now (venue entities later)
     address: Mapped[str | None] = mapped_column(String(500))
     city: Mapped[str | None] = mapped_column(String(200))
     lat: Mapped[float | None] = mapped_column(Float)
@@ -158,22 +158,22 @@ class Adventure(Base):
     phase_changed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
-# Virtual objects (the Codex): things adventures link to. Only sites have a location.
-OBJECT_TYPES = ("pillar", "site", "contact", "organization", "skill")
-GEO_OBJECT_TYPES = ("site",)
+# Entities (the Codex): things adventures link to. Only sites have a location.
+ENTITY_TYPES = ("deity", "site", "contact", "organization", "skill")
+GEO_ENTITY_TYPES = ("site",)
 
 
-class VirtualObject(Base):
-    """A pillar, site, contact, organization or skill that adventures link to (see services/objects.py)."""
+class Entity(Base):
+    """A deity, site, contact, organization or skill that adventures link to (see services/entities.py)."""
 
-    __tablename__ = "objects"
+    __tablename__ = "entities"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    type: Mapped[str] = mapped_column(String(20))  # OBJECT_TYPES
+    type: Mapped[str] = mapped_column(String(20))  # ENTITY_TYPES
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
     url: Mapped[str | None] = mapped_column(Text)
-    # location: sites only (GEO_OBJECT_TYPES)
+    # location: sites only (GEO_ENTITY_TYPES)
     address: Mapped[str | None] = mapped_column(String(500))
     city: Mapped[str | None] = mapped_column(String(200))
     lat: Mapped[float | None] = mapped_column(Float)
@@ -186,26 +186,26 @@ class VirtualObject(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
 
-class AdventureObject(Base):
-    """A link between an adventure and a virtual object (many-to-many).
+class AdventureEntity(Base):
+    """A link between an adventure and an entity (many-to-many).
 
     SQLite here doesn't enforce foreign keys, so services delete links explicitly.
     """
 
-    __tablename__ = "adventure_objects"
+    __tablename__ = "adventure_entities"
 
     adventure_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("adventures.id", ondelete="CASCADE"), primary_key=True)
-    object_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("objects.id", ondelete="CASCADE"), primary_key=True)
+    entity_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class Transition(Base):
     """One move of a packet between signal chain nodes (see backend/services/transitions.py).
 
-    entity: "event" (row_id = event id), "adventure" (row_id = adventure id) or
-    "link" (row_id = object id, ref_id = adventure id). synthetic: backfilled once from
+    subject: "event" (row_id = event id), "adventure" (row_id = adventure id) or
+    "link" (row_id = entity id, ref_id = adventure id). synthetic: backfilled once from
     rows that existed before the log did; never replayed as packets.
     """
 
@@ -213,7 +213,7 @@ class Transition(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
-    entity: Mapped[str] = mapped_column(String(10))
+    subject: Mapped[str] = mapped_column(String(10))
     row_id: Mapped[uuid.UUID] = mapped_column(Uuid)
     ref_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     from_node: Mapped[str] = mapped_column(String(120))

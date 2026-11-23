@@ -4,11 +4,11 @@
 // combine with OR and any exclude removes; different facets (and the date range, ring
 // and Hermetic Seal) combine with AND. The result is the subset every view shows.
 //
-// Most facets have one value per item (its city, its source). Object facets (pillar,
+// Most facets have one value per item (its city, its source). Entity facets (deity,
 // site, contact) and tags have several: an item passes an include if ANY of its values is
 // included, and fails if any is excluded. An item with none counts as UNKNOWN.
 
-import { ADVENTURE_FLAGS, ADVENTURE_TYPES, OBJECT_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
+import { ADVENTURE_FLAGS, ADVENTURE_TYPES, ENTITY_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
 import { occursIn, span } from './lib/occurrences.js';
 import { cityName, itemMetro, itemRegion } from './lib/regions.js';
 
@@ -18,28 +18,28 @@ export const DEFAULT_FILTERS = { facets: {}, date_range: null, ring: null, seal:
 /** Value used for items that have no value for a facet (e.g. no city). */
 export const UNKNOWN = '∅';
 
-/** Object id -> name, for labels of object facet values (kept current by the store). */
-const objectNames = new Map();
-/** Object id -> its chosen colour (only objects that have one). */
-const objectColors = new Map();
-/** @param {VObject[]} objects */
-export function setObjectNames(objects) {
-    objectNames.clear();
-    objectColors.clear();
-    for (const o of objects) {
-        objectNames.set(o.id, o.name);
-        if (o.color) objectColors.set(o.id, o.color);
+/** Entity id -> name, for labels of entity facet values (kept current by the store). */
+const entityNames = new Map();
+/** Entity id -> its chosen colour (only entities that have one). */
+const entityColors = new Map();
+/** @param {Entity[]} entities */
+export function setEntityNames(entities) {
+    entityNames.clear();
+    entityColors.clear();
+    for (const o of entities) {
+        entityNames.set(o.id, o.name);
+        if (o.color) entityColors.set(o.id, o.color);
     }
 }
-/** The colour chosen for an object in the Codex, if any (see objectColor in lib/lens.js). @param {string} id */
-export const chosenObjectColor = (id) => objectColors.get(id) ?? null;
+/** The colour chosen for an entity in the Codex, if any (see entityColor in lib/lens.js). @param {string} id */
+export const chosenEntityColor = (id) => entityColors.get(id) ?? null;
 
-/** Facet values for an object type: the ids of the item's linked objects of that type. @param {ObjectType} type */
-const objectFacet = (type) => ({
-    key: /** @type {FacetKey} */ (type), label: OBJECT_TYPES[type].label, modes: /** @type {PoolMode[]} */ (['adventures']),
-    value: (/** @type {PoolItem} */ i) => (i.kind === 'adventure' ? i.objects.filter((o) => o.type === type).map((o) => o.id) : null),
-    display: (/** @type {string} */ v) => objectNames.get(v) ?? 'Deleted object',
-    unknown: `No ${OBJECT_TYPES[type].label.toLowerCase()}`,
+/** Facet values for an entity type: the ids of the item's linked entities of that type. @param {EntityType} type */
+const entityFacet = (type) => ({
+    key: /** @type {FacetKey} */ (type), label: ENTITY_TYPES[type].label, modes: /** @type {PoolMode[]} */ (['adventures']),
+    value: (/** @type {PoolItem} */ i) => (i.kind === 'adventure' ? i.entities.filter((o) => o.type === type).map((o) => o.id) : null),
+    display: (/** @type {string} */ v) => entityNames.get(v) ?? 'Deleted entity',
+    unknown: `No ${ENTITY_TYPES[type].label.toLowerCase()}`,
 });
 
 /** An item's tags (genres from 19hz, ...): trimmed, lowercased, without repeats. @param {PoolItem} item */
@@ -51,14 +51,14 @@ function itemTags(item) {
 
 /**
  * Facets: the parent types. `modes` limits a facet to one pool. `value` gives one value
- * or (object facets, tags) a list; `unknown` labels items that have none. `starLimit`
+ * or (entity facets, tags) a list; `unknown` labels items that have none. `starLimit`
  * caps how many of its values the Nexus shows as stars under the lens (the most common;
  * filtered values always show), for facets with too many values to draw.
  * @type {{ key: FacetKey, label: string, modes: PoolMode[], value: (item: PoolItem) => string | string[] | null | undefined, display?: (value: string) => string, unknown?: string, starLimit?: number }[]}
  */
 export const FACETS = [
     { key: 'source', label: 'Source', modes: ['adventures', 'discovery'], value: (i) => i.source },
-    // many-to-many: an event has several tags, a tag many events (like the object facets)
+    // many-to-many: an event has several tags, a tag many events (like the entity facets)
     { key: 'tag', label: 'Tag', modes: ['adventures', 'discovery'], value: itemTags, unknown: 'No tags', starLimit: 24 },
     // spatial, finest to coarsest (lib/regions.js derives the coarser levels from the city)
     { key: 'city', label: 'City', modes: ['adventures', 'discovery'], value: (i) => cityName(i.city), unknown: 'No city' },
@@ -86,17 +86,17 @@ export const FACETS = [
         value: (i) => (i.kind === 'omen' ? i.review : null),
         display: (v) => REVIEW_STAGES[/** @type {ReviewState} */ (v)]?.matter ?? v,
     },
-    objectFacet('pillar'),
-    objectFacet('site'),
-    objectFacet('contact'),
-    objectFacet('organization'),
-    objectFacet('skill'),
+    entityFacet('deity'),
+    entityFacet('site'),
+    entityFacet('contact'),
+    entityFacet('organization'),
+    entityFacet('skill'),
 ];
 
 /** Phases the Hermetic Seal hides (on top of anything already past). */
 export const SEALED_PHASES = new Set(['completed', 'killed', 'decommissioned']);
 
-/** The item's values for a facet (one, or several for object facets); [UNKNOWN] if none.
+/** The item's values for a facet (one, or several for entity facets); [UNKNOWN] if none.
  *  @param {PoolItem} item @param {(typeof FACETS)[number]} facet @returns {string[]} */
 export function facetValues(item, facet) {
     const v = facet.value(item);
@@ -186,7 +186,7 @@ export function passes(item, filters, mode, now) {
         if (includes && !values.some((v) => settings[v] === 'include')) return false;
     }
 
-    // items and songs have no when/where: date and proximity filters don't apply to them
+    // items and performances have no when/where: date and proximity filters don't apply to them
     if (!hasWhenWhere(item)) return true;
     if (filters.date_range) {
         const inside = inDateRange(item, filters.date_range);

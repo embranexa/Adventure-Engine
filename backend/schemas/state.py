@@ -8,10 +8,11 @@ from pydantic import BaseModel, Field, model_validator
 
 FilterMode = Literal["include", "exclude"]
 FacetKey = Literal["source", "tag", "city", "region", "metro", "type", "phase", "review", "flag",
-                   "pillar", "site", "contact", "organization", "skill"]
+                   "deity", "site", "contact", "organization", "skill"]
 # what colors the matter: "stage" (Matter) or a facet (frontend/js/lib/lens.js)
 LensKey = Literal["none", "stage", "source", "tag", "city", "region", "metro", "type", "flag",
-                  "pillar", "site", "contact", "organization", "skill"]
+                  "deity", "site", "contact", "organization", "skill"]
+RENAMED_KEYS = {"pillar": "deity"}  # saved filters may still use the old name
 FACET_KEYS, LENS_KEYS = set(get_args(FacetKey)), set(get_args(LensKey))
 
 
@@ -53,11 +54,16 @@ class FilterState(BaseModel):
     @classmethod
     def drop_retired_keys(cls, data: Any) -> Any:
         """Saved state may name facets or a lens since removed (e.g. registration): drop
-        those filters and fall back to the Matter lens, rather than fail to load."""
+        those filters and fall back to the Matter lens, rather than fail to load. Renamed
+        ones (pillar -> deity, the song type -> performance) are kept under their new name."""
         if isinstance(data, dict):
             data = dict(data)
             if isinstance(data.get("facets"), dict):
-                data["facets"] = {k: v for k, v in data["facets"].items() if k in FACET_KEYS}
+                facets = {RENAMED_KEYS.get(k, k): v for k, v in data["facets"].items()}
+                if isinstance(facets.get("type"), dict):
+                    facets["type"] = {"performance" if k == "song" else k: v for k, v in facets["type"].items()}
+                data["facets"] = {k: v for k, v in facets.items() if k in FACET_KEYS}
+            data["lens"] = RENAMED_KEYS.get(data.get("lens"), data.get("lens")) or "stage"
             if data.get("lens") is not None and data["lens"] not in LENS_KEYS:
                 data["lens"] = "stage"
         return data

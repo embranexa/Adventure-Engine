@@ -302,7 +302,7 @@ async def set_phase(adventure_id: uuid.UUID, phase: str) -> None:
 async def sweep_missed() -> int:
     """Kill adventures that were still pre-Arena when their event ended.
 
-    Events only (items and songs have no when/where), crawled or hand-made. "Ended" = end
+    Events only (items and performances have no when/where), crawled or hand-made. "Ended" = end
     time, else start time, the adventure's own (set by hand) over its raw event's. Only adventures whose phase was last set
     *before* the event ended count as missed: reviving one afterwards, or passing an
     event that is already over, is a deliberate choice and isn't undone.

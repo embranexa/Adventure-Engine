@@ -38,6 +38,38 @@ def _add_missing_columns(conn: Connection) -> None:
             log.info("added column %s.%s", table.name, column.name)
 
 
+def _migrate_names(conn: Connection) -> None:
+    """Renames (2026-11-22): objects -> entities, pillar -> deity, song -> performance, and
+    transitions.entity -> subject (what moved), so "entity" only means a Codex entity.
+
+    Runs before create_all, which would otherwise make the new tables empty beside the old
+    ones. Safe to run again: each step only touches what still has its old name.
+    """
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    for old, new in (("objects", "entities"), ("adventure_objects", "adventure_entities")):
+        if old not in tables:
+            continue
+        if new in tables:
+            # an empty one is a leftover of a reload halfway through the rename
+            if not conn.execute(text(f"SELECT count(*) FROM {old}")).scalar():
+                conn.execute(text(f"DROP TABLE {old}"))
+                continue
+            if conn.execute(text(f"SELECT count(*) FROM {new}")).scalar():
+                raise RuntimeError(f"both {old} and {new} hold rows: merge them by hand")
+            conn.execute(text(f"DROP TABLE {new}"))
+        conn.execute(text(f"ALTER TABLE {old} RENAME TO {new}"))
+        log.info("renamed table %s to %s", old, new)
+    for table, old, new in (("adventure_entities", "object_id", "entity_id"), ("transitions", "entity", "subject")):
+        tables = set(inspect(conn).get_table_names())
+        if table in tables and old in {c["name"] for c in inspect(conn).get_columns(table)}:
+            conn.execute(text(f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}"))
+    if "entities" in tables:
+        conn.execute(text("UPDATE entities SET type = 'deity' WHERE type = 'pillar'"))
+    if "adventures" in tables:
+        conn.execute(text("UPDATE adventures SET type = 'performance' WHERE type = 'song'"))
+
+
 async def init_db(sources: dict[str, str]) -> None:
     """Create tables, add new columns, register crawler sources, clear stale 'syncing'.
 
@@ -46,6 +78,7 @@ async def init_db(sources: dict[str, str]) -> None:
     """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     async with engine.begin() as conn:
+        await conn.run_sync(_migrate_names)
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_add_missing_columns)
 
@@ -70,7 +103,7 @@ async def init_db(sources: dict[str, str]) -> None:
 
 async def _migrate_saved_places() -> None:
     """Saved map places (app_state "places") became sites in the Codex: move any left over."""
-    from backend.services.objects import migrate_saved_places  # avoids an import cycle
+    from backend.services.entities import migrate_saved_places  # avoids an import cycle
 
     async with SessionLocal() as session:
         row = await session.get(AppState, "places")

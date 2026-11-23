@@ -1,5 +1,5 @@
 // Icons for the Nexus's parent stars: a medallion (dark disc, ring) with a line drawing of
-// what the star is: a source, a tag, a city / region / metro, a type, a matter, an object type, the date range,
+// what the star is: a source, a tag, a city / region / metro, a type, a matter, an entity type, the date range,
 // the proximity ring, the Hermetic Seal. Drawn white on a canvas so each star tints its
 // own (the disc stays dark under any tint). Pure canvas, no three.js.
 //
@@ -105,19 +105,19 @@ const DRAW = {
         poly(g, [[48, 34], [80, 34]]);
         g.globalAlpha = 0.5; poly(g, [[44, 76], [84, 76]]); g.globalAlpha = 1;
     },
-    // types: a clock (event), a gem (item), a note (song)
+    // types: a clock (event), a gem (item), a note (performance)
     'type:event'(g) {
         g.beginPath(); g.arc(C, C, 28, 0, Math.PI * 2); g.stroke();
         poly(g, [[C, 46], [C, C], [78, 72]]);
     },
     'type:item'(g) { poly(g, [[C, 34], [90, C], [C, 94], [38, C]], true); poly(g, [[38, C], [90, C]]); },
-    'type:song'(g) {
+    'type:performance'(g) {
         poly(g, [[56, 86], [56, 40], [86, 34], [86, 78]]);
         g.beginPath(); g.ellipse(48, 86, 9, 7, -0.4, 0, Math.PI * 2); g.fill();
         g.beginPath(); g.ellipse(78, 78, 9, 7, -0.4, 0, Math.PI * 2); g.fill();
     },
-    // object types
-    pillar(g) { poly(g, [[C, 34], [92, 88], [36, 88]], true); poly(g, [[C, 52], [C, 88]]); },
+    // entity types
+    deity(g) { poly(g, [[C, 34], [92, 88], [36, 88]], true); poly(g, [[C, 52], [C, 88]]); },
     site(g) {
         g.beginPath(); g.arc(C, C, 22, 0, Math.PI * 2); g.stroke();
         /** @type {[number, number][][]} */

@@ -101,7 +101,7 @@ export function CalendarPanel() {
     const hoveredId = useWorkspaceStore((s) => s.hoveredItemId);
     const selectItem = useWorkspaceStore((s) => s.selectItem);
     const lens = useWorkspaceStore((s) => s.filters.lens);
-    useWorkspaceStore((s) => s.objects); // object colours (Codex) feed the lens colours
+    useWorkspaceStore((s) => s.entities); // entity colours (Codex) feed the lens colours
     const hoverItem = useWorkspaceStore((s) => s.hoverItem);
 
     const now = useNow(60_000);

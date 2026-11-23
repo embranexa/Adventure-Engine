@@ -4,7 +4,7 @@ import { centrifugeOrder, useWorkspaceStore } from '../../store.js';
 import { formatEventWhen, formatPrice, safeHttpUrl } from '../../events.js';
 import { ADVENTURE_FLAGS, ADVENTURE_TYPES, MAIN_ROUTE, PHASE_STAGES, hasWhenWhere, stageOf } from '../../lifecycle.js';
 import { AdventureEditor } from './AdventureEditor.js';
-import { ObjectLinks } from '../ObjectLinks.js';
+import { EntityLinks } from '../EntityLinks.js';
 
 // details keys shown in their own rows; any others are listed generically below
 const KNOWN_DETAILS = new Set([
@@ -56,7 +56,7 @@ function CardArt({ src }) {
 
 /**
  * The selected item as a trading card. Four designators: matter (foil frame + strip),
- * pillar (banner), difficulty (pips), element (corner badge). Pillar, difficulty,
+ * deity (banner), difficulty (pips), element (corner badge). Deity, difficulty,
  * element and HP/ATK/DEF are set by hand later; until then they show as empty.
  * @param {{ item: PoolItem }} props
  */
@@ -64,7 +64,7 @@ function TradingCard({ item }) {
     const stage = stageOf(item);
     const stats = item.kind === 'adventure' ? item.stats : undefined;
     const element = /** @type {keyof typeof ELEMENT_PATHS | null} */ (stat(stats, 'element'));
-    const pillar = /** @type {string | null} */ (stat(stats, 'pillar'));
+    const deity = /** @type {string | null} */ (stat(stats, 'deity'));
     const difficulty = Math.max(0, Math.min(5, Number(stat(stats, 'difficulty')) || 0));
     const kind = item.kind === 'adventure' ? ADVENTURE_TYPES[item.type] : null;
     const when = !hasWhenWhere(item) ? `${kind?.glyph ?? ''} ${kind?.label ?? ''}`.trim()
@@ -84,7 +84,7 @@ function TradingCard({ item }) {
             <div className="tcard-body">
                 <div className="tcard-banner">
                     <span className="tcard-title">${item.title}</span>
-                    ${pillar && html`<span className="tcard-pillar">${pillar}</span>`}
+                    ${deity && html`<span className="tcard-deity">${deity}</span>`}
                 </div>
                 <${CardArt} key=${item.id} src=${safeHttpUrl(item.cover_url)} />
                 <div className="tcard-strip">
@@ -314,7 +314,7 @@ export function NodeCard() {
                         ? html`<${AdventureEditor} adventure=${event} focusTitle=${fresh} onDone=${stopEditing} />`
                         : html`<${ItemActions} item=${event} />`}
                     ${event.kind === 'adventure' && !editing && html`<${FlagToggles} adventure=${event} />`}
-                    ${event.kind === 'adventure' && html`<${ObjectLinks} adventure=${event} />`}
+                    ${event.kind === 'adventure' && html`<${EntityLinks} adventure=${event} />`}
                     ${!(event.kind === 'adventure' && editing) && html`<${EventRows} event=${event} />`}
                 `
                 : html`

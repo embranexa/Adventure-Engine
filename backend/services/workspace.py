@@ -35,7 +35,7 @@ PANELS_METADATA = {
     },
     "codex": {
         "id": "codex", "kind": "codex", "icon": "codex",
-        "name": "Codex", "question": "with", "flow": ["objects", "links"],
+        "name": "Codex", "question": "with", "flow": ["entities", "links"],
     },
     "quests": {
         "id": "quests", "kind": "quests", "icon": "scroll",

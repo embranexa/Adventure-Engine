@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as feed from './feed.js';
 import { indexItems, sameList } from './events.js';
-import { DEFAULT_FILTERS, KM_PER_MI, applyFilters, nextMode, passes, setObjectNames } from './filters.js';
+import { DEFAULT_FILTERS, KM_PER_MI, applyFilters, nextMode, passes, setEntityNames } from './filters.js';
 
 /** Radius of a newly placed proximity ring. */
 export const DEFAULT_RING_RADIUS_KM = 5 * KM_PER_MI;
@@ -206,7 +206,7 @@ function startFeed(get) {
     feedWired = true;
     feed.on('events', (msg) => get().setRawEvents(msg.events));
     feed.on('adventures', (msg) => get().setAdventures(msg.adventures));
-    feed.on('objects', (msg) => get().setObjects(msg.objects));
+    feed.on('entities', (msg) => get().setEntities(msg.entities));
     feed.on('source_status', (msg) => get().setSourceStatus(msg.source));
     feed.on('transitions', (msg) => get().addTransitions(msg.transitions));
 }
@@ -461,8 +461,8 @@ const workspaceStore = (set, get) => ({
     filters: DEFAULT_FILTERS,
     draftFilters: DEFAULT_FILTERS,
     visibleItems: [],
-    objects: [],
-    selectedObjectId: null,
+    entities: [],
+    selectedEntityId: null,
     transitions: [],
     flows: [],
 
@@ -720,19 +720,19 @@ const workspaceStore = (set, get) => ({
         saveApplied(get); saveDraft(get);
     },
 
-    // --- virtual objects (the Codex) ---
+    // --- entities (the Codex) ---
 
-    setObjects: (objects) => {
-        setObjectNames(objects);
+    setEntities: (entities) => {
+        setEntityNames(entities);
         set((state) => ({
-            objects,
-            selectedObjectId: objects.some((o) => o.id === state.selectedObjectId) ? state.selectedObjectId : null,
+            entities,
+            selectedEntityId: entities.some((o) => o.id === state.selectedEntityId) ? state.selectedEntityId : null,
         }));
         // a ring anchored on a site follows it (moved), or lets go (deleted / no location)
         const ring = get().filters.ring;
         const siteId = ring?.center.site_id;
         if (ring && siteId) {
-            const site = objects.find((o) => o.id === siteId);
+            const site = entities.find((o) => o.id === siteId);
             if (!site || site.lat == null || site.lon == null) {
                 get().setRing({ ...ring, center: { ...ring.center, site_id: null } });
             } else if (site.lat !== ring.center.lat || site.lon !== ring.center.lon || site.name !== ring.center.label) {
@@ -742,7 +742,7 @@ const workspaceStore = (set, get) => ({
     },
 
     anchorRingOnSite: (siteId) => {
-        const site = get().objects.find((o) => o.id === siteId);
+        const site = get().entities.find((o) => o.id === siteId);
         if (!site || site.lat == null || site.lon == null) return;
         const ring = get().filters.ring;
         const radius_km = ring?.radius_km ?? DEFAULT_RING_RADIUS_KM;
@@ -761,35 +761,35 @@ const workspaceStore = (set, get) => ({
         set({ atlasFocus: { lat, lon, at: Date.now() } });
     },
 
-    selectObject: (objectId) => set({ selectedObjectId: objectId }),
+    selectEntity: (entityId) => set({ selectedEntityId: entityId }),
 
-    createObject: async (type, fields = {}) => {
-        const res = await sendJson('/api/objects', 'POST', { type, ...fields });
+    createEntity: async (type, fields = {}) => {
+        const res = await sendJson('/api/entities', 'POST', { type, ...fields });
         if (typeof res === 'string') return res;
-        const obj = /** @type {VObject} */ (res);
-        if (!get().objects.some((o) => o.id === obj.id)) get().setObjects([...get().objects, obj]); // before the broadcast
+        const obj = /** @type {Entity} */ (res);
+        if (!get().entities.some((o) => o.id === obj.id)) get().setEntities([...get().entities, obj]); // before the broadcast
         return obj;
     },
 
-    updateObject: async (objectId, changes) => {
-        const res = await sendJson(`/api/objects/${objectId}`, 'PATCH', changes);
+    updateEntity: async (entityId, changes) => {
+        const res = await sendJson(`/api/entities/${entityId}`, 'PATCH', changes);
         if (typeof res === 'string') return res;
-        get().setObjects(get().objects.map((o) => (o.id === objectId ? /** @type {VObject} */ (res) : o)));
+        get().setEntities(get().entities.map((o) => (o.id === entityId ? /** @type {Entity} */ (res) : o)));
         return null;
     },
 
-    deleteObject: async (objectId) => {
-        const res = await sendJson(`/api/objects/${objectId}`, 'DELETE');
+    deleteEntity: async (entityId) => {
+        const res = await sendJson(`/api/entities/${entityId}`, 'DELETE');
         return typeof res === 'string' ? res : null;
     },
 
-    linkObject: async (adventureId, objectId) => {
-        const res = await sendJson(`/api/adventures/${adventureId}/objects/${objectId}`, 'PUT');
+    linkEntity: async (adventureId, entityId) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/entities/${entityId}`, 'PUT');
         return typeof res === 'string' ? res : null;
     },
 
-    unlinkObject: async (adventureId, objectId) => {
-        const res = await sendJson(`/api/adventures/${adventureId}/objects/${objectId}`, 'DELETE');
+    unlinkEntity: async (adventureId, entityId) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/entities/${entityId}`, 'DELETE');
         return typeof res === 'string' ? res : null;
     },
 

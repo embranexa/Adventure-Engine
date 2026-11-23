@@ -32,7 +32,7 @@ from backend.db.models import (  # noqa: E402
     CENTRIFUGE_NODE, PHASE_NODES, SUMP_NODE, Adventure, Event, EventSource, Transition, harvester_node,
 )
 from backend.db.setup import init_db  # noqa: E402
-from backend.services import adventures, objects, roadmap, sync, triage  # noqa: E402
+from backend.services import adventures, entities, roadmap, sync, triage  # noqa: E402
 from backend.services.hub import hub  # noqa: E402
 
 if DB_PATH.resolve() == (DATA_DIR / "adventure.db").resolve():
@@ -86,8 +86,8 @@ async def step(label: str, action, expect: dict[tuple[str, str], int] | None = N
         new = (await s.scalars(select(Transition).where(Transition.id > since).order_by(Transition.id))).all()
     replayed = Counter(before)
     for t in new:
-        if t.entity == "link":
-            continue  # objects aren't rows: links don't change levels
+        if t.subject == "link":
+            continue  # entities aren't rows: links don't change levels
         if t.from_node not in SOURCE_NODES:
             replayed[t.from_node] -= 1
         replayed[t.to_node] += 1
@@ -207,16 +207,16 @@ async def main():
     print("ok  animus by hand marks every action done")
 
     async def make_sites():
-        state["s1"] = uuid.UUID((await objects.create_object({"type": "site", "name": "Check site 1"}))["id"])
-        state["s2"] = uuid.UUID((await objects.create_object({"type": "site", "name": "Check site 2"}))["id"])
-        state["p"] = uuid.UUID((await objects.create_object({"type": "pillar", "name": "Check pillar"}))["id"])
-    await step("create objects", make_sites, {})
-    await step("link site 1 to A", lambda: objects.link(state["A"], state["s1"]), {("codex", "refinery"): 1})
-    await step("link site 2 (replaces 1)", lambda: objects.link(state["A"], state["s2"]),
+        state["s1"] = uuid.UUID((await entities.create_entity({"type": "site", "name": "Check site 1"}))["id"])
+        state["s2"] = uuid.UUID((await entities.create_entity({"type": "site", "name": "Check site 2"}))["id"])
+        state["p"] = uuid.UUID((await entities.create_entity({"type": "deity", "name": "Check deity"}))["id"])
+    await step("create entities", make_sites, {})
+    await step("link site 1 to A", lambda: entities.link(state["A"], state["s1"]), {("codex", "refinery"): 1})
+    await step("link site 2 (replaces 1)", lambda: entities.link(state["A"], state["s2"]),
                {("refinery", "codex"): 1, ("codex", "refinery"): 1})
-    await step("link pillar", lambda: objects.link(state["A"], state["p"]), {("codex", "refinery"): 1})
-    await step("unlink pillar", lambda: objects.unlink(state["A"], state["p"]), {("refinery", "codex"): 1})
-    await step("delete site 2", lambda: objects.delete_object(state["s2"]), {("refinery", "codex"): 1})
+    await step("link deity", lambda: entities.link(state["A"], state["p"]), {("codex", "refinery"): 1})
+    await step("unlink deity", lambda: entities.unlink(state["A"], state["p"]), {("refinery", "codex"): 1})
+    await step("delete site 2", lambda: entities.delete_entity(state["s2"]), {("refinery", "codex"): 1})
 
     async def to_archive():
         for phase in ("classifying", "decomposing", "constructing", "consuming", "completed", "decommissioned"):

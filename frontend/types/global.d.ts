@@ -118,8 +118,8 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     flags: AdventureFlag[];
     /** Action roadmap (Alembic), or null before one is drafted. */
     roadmap: Roadmap | null;
-    /** Linked virtual objects (the Codex). */
-    objects: { id: string; type: ObjectType; name: string }[];
+    /** Linked entities (the Codex). */
+    entities: { id: string; type: EntityType; name: string }[];
     /** Its linked site, if any; a hand-made event takes its where from it. */
     site_id: string | null;
     /** Free text for now (the Entropy Market later). */
@@ -127,8 +127,8 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     rewards: string | null;
 }
 
-/** event | item | song; only events have a when/where (js/lifecycle.js ADVENTURE_TYPES). */
-type AdventureType = 'event' | 'item' | 'song';
+/** event | item | performance; only events have a when/where (js/lifecycle.js ADVENTURE_TYPES). */
+type AdventureType = 'event' | 'item' | 'performance';
 
 /** Fields an adventure can set itself (backend/services/adventures.py). */
 interface AdventureOwnFields {
@@ -222,14 +222,14 @@ interface FilterState {
 }
 
 /** "stage" (Matter) or a facet that can color rows. */
-type LensKey = 'none' | 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'type' | 'pillar' | 'site' | 'contact' | 'organization' | 'skill';
+type LensKey = 'none' | 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'type' | 'deity' | 'site' | 'contact' | 'organization' | 'skill';
 
 /** One move between signal chain nodes (backend/services/transitions.py). */
 interface TransitionRecord {
     id: number;
     at: string;
-    /** event (row_id = event id) | adventure (row_id = adventure id) | link (row_id = object id, ref_id = adventure id) */
-    entity: 'event' | 'adventure' | 'link';
+    /** event (row_id = event id) | adventure (row_id = adventure id) | link (row_id = entity id, ref_id = adventure id) */
+    subject: 'event' | 'adventure' | 'link';
     row_id: string;
     ref_id: string | null;
     from: string;
@@ -243,13 +243,13 @@ interface FlowRecord {
     count: number;
 }
 
-/** pillar | site | contact | organization | skill (js/lifecycle.js OBJECT_TYPES); only sites have a location. */
-type ObjectType = 'pillar' | 'site' | 'contact' | 'organization' | 'skill';
+/** deity | site | contact | organization | skill (js/lifecycle.js ENTITY_TYPES); only sites have a location. */
+type EntityType = 'deity' | 'site' | 'contact' | 'organization' | 'skill';
 
-/** A virtual object (the Codex): something adventures link to (backend/services/objects.py). */
-interface VObject {
+/** An entity (the Codex): something adventures link to (backend/services/entities.py). */
+interface Entity {
     id: string;
-    type: ObjectType;
+    type: EntityType;
     name: string;
     description: string | null;
     url: string | null;
@@ -260,13 +260,13 @@ interface VObject {
     lon: number | null;
     /** contacts: email, phone, handle */
     details: Record<string, string>;
-    /** "#rrggbb" chosen in the Codex; null = default (objectColor in lib/lens.js) */
+    /** "#rrggbb" chosen in the Codex; null = default (entityColor in lib/lens.js) */
     color: string | null;
     created_at: string;
 }
 
-/** A change sent to PATCH /api/objects/{id}: only the keys present change; null clears. */
-type ObjectChanges = Partial<{
+/** A change sent to PATCH /api/entities/{id}: only the keys present change; null clears. */
+type EntityChanges = Partial<{
     name: string | null; description: string | null; url: string | null; address: string | null;
     city: string | null; lat: number | null; lon: number | null; details: Record<string, string | null>;
     color: string | null;
@@ -285,7 +285,7 @@ interface SourceStatus {
 interface FeedMessages {
     events: { type: 'events'; events: EventRecord[] };
     adventures: { type: 'adventures'; adventures: AdventureRecord[] };
-    objects: { type: 'objects'; objects: VObject[] };
+    entities: { type: 'entities'; entities: Entity[] };
     source_status: { type: 'source_status'; source: SourceStatus };
     transitions: { type: 'transitions'; transitions: TransitionRecord[] };
 }
@@ -348,10 +348,10 @@ interface WorkspaceState {
     draftFilters: FilterState;
     /** The pool after the applied filters: what the calendar and map show. */
     visibleItems: PoolItem[];
-    /** Virtual objects (the Codex), kept current by the feed. */
-    objects: VObject[];
-    /** The object open in the Codex (separate from the adventure selection). */
-    selectedObjectId: string | null;
+    /** Entities (the Codex), kept current by the feed. */
+    entities: Entity[];
+    /** The entity open in the Codex (separate from the adventure selection). */
+    selectedEntityId: string | null;
     /** Recent observed moves, oldest first (at most 500): the twin's packets. */
     transitions: TransitionRecord[];
     /** Packets per edge over the last 7 days: the twin's pipe widths. */
@@ -438,21 +438,21 @@ interface WorkspaceState {
     /** Clear facets (pending) and ranges (immediately); keeps the Seal and units. */
     /** Clear every filter, applied and draft (lens and units stay). */
     resetFilters(): void;
-    setObjects(objects: VObject[]): void;
+    setEntities(entities: Entity[]): void;
     /** Center the proximity ring on a site (keeps the radius and mode); it follows the site. */
     anchorRingOnSite(siteId: string): void;
     /** A point the Atlas should fly to (set by focusOnAtlas, e.g. from the Codex). */
     atlasFocus: { lat: number; lon: number; at: number; radius_km?: number } | null;  // radius_km: frame that circle (a site's ring)
     /** Bring the Atlas to the front and fly to a point. */
     focusOnAtlas(lat: number, lon: number): void;
-    selectObject(objectId: string | null): void;
-    /** Create an object; resolves to it, or to an error message. */
-    createObject(type: ObjectType, fields?: ObjectChanges): Promise<VObject | string>;
+    selectEntity(entityId: string | null): void;
+    /** Create an entity; resolves to it, or to an error message. */
+    createEntity(type: EntityType, fields?: EntityChanges): Promise<Entity | string>;
     /** Resolves to an error message, or null. */
-    updateObject(objectId: string, changes: ObjectChanges): Promise<string | null>;
-    deleteObject(objectId: string): Promise<string | null>;
-    linkObject(adventureId: string, objectId: string): Promise<string | null>;
-    unlinkObject(adventureId: string, objectId: string): Promise<string | null>;
+    updateEntity(entityId: string, changes: EntityChanges): Promise<string | null>;
+    deleteEntity(entityId: string): Promise<string | null>;
+    linkEntity(adventureId: string, entityId: string): Promise<string | null>;
+    unlinkEntity(adventureId: string, entityId: string): Promise<string | null>;
     setSourceStatus(source: SourceStatus): void;
     /** Harvest: crawl the source; new events fill its Harvester (progress: source_status messages). */
     syncSource(name: string): Promise<void>;

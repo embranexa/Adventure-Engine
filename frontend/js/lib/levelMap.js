@@ -1154,11 +1154,11 @@ export class LevelMap {
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Sites (virtual objects with a location, from the Codex)            */
+    /*  Sites (entities with a location, from the Codex)            */
     /* ------------------------------------------------------------------ */
 
     /**
-     * Show sites as pins (VObject[] with lat/lon; others are skipped). Clicking a pin calls
+     * Show sites as pins (Entity[] with lat/lon; others are skipped). Clicking a pin calls
      * onSiteClick(site, point). `anchoredId` marks the site the proximity ring is on.
      */
     setSites(sites, anchoredId = null) {

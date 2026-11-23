@@ -1,22 +1,22 @@
 import { useMemo, useRef, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
-import { OBJECT_TYPES } from '../lifecycle.js';
+import { ENTITY_TYPES } from '../lifecycle.js';
 
 const MAX_SUGGESTIONS = 8;
 
 /**
- * The adventure's links to virtual objects (the Codex), in the Refinery: chips grouped by
- * type (click opens the object in the Codex, ✕ unlinks) and a type-ahead to link an
- * existing object or create a new one. An event has one site: linking another replaces it.
+ * The adventure's links to entities (the Codex), in the Refinery: chips grouped by
+ * type (click opens the entity in the Codex, ✕ unlinks) and a type-ahead to link an
+ * existing entity or create a new one. An event has one site: linking another replaces it.
  * @param {{ adventure: PoolItem & { kind: 'adventure' } }} props
  */
-export function ObjectLinks({ adventure }) {
-    const objects = useWorkspaceStore((s) => s.objects);
-    const linkObject = useWorkspaceStore((s) => s.linkObject);
-    const unlinkObject = useWorkspaceStore((s) => s.unlinkObject);
-    const createObject = useWorkspaceStore((s) => s.createObject);
-    const selectObject = useWorkspaceStore((s) => s.selectObject);
+export function EntityLinks({ adventure }) {
+    const entities = useWorkspaceStore((s) => s.entities);
+    const linkEntity = useWorkspaceStore((s) => s.linkEntity);
+    const unlinkEntity = useWorkspaceStore((s) => s.unlinkEntity);
+    const createEntity = useWorkspaceStore((s) => s.createEntity);
+    const selectEntity = useWorkspaceStore((s) => s.selectEntity);
     const showPanel = useWorkspaceStore((s) => s.showPanel);
 
     const [query, setQuery] = useState('');
@@ -25,23 +25,23 @@ export function ObjectLinks({ adventure }) {
     const [error, setError] = useState(/** @type {string | null} */ (null));
     const inputRef = useRef(/** @type {HTMLInputElement | null} */ (null));
 
-    const linkedIds = new Set(adventure.objects.map((o) => o.id));
+    const linkedIds = new Set(adventure.entities.map((o) => o.id));
     const q = query.trim().toLowerCase();
 
-    /** Options: matching unlinked objects, then "create" for each type. */
+    /** Options: matching unlinked entities, then "create" for each type. */
     const options = useMemo(() => {
-        /** @type {({ kind: 'link', obj: VObject } | { kind: 'create', type: ObjectType })[]} */
-        const list = objects
+        /** @type {({ kind: 'link', obj: Entity } | { kind: 'create', type: EntityType })[]} */
+        const list = entities
             .filter((o) => !linkedIds.has(o.id) && (!q || o.name.toLowerCase().includes(q)))
             .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name))
             .slice(0, MAX_SUGGESTIONS)
             .map((obj) => ({ kind: /** @type {const} */ ('link'), obj }));
-        const exact = objects.some((o) => o.name.toLowerCase() === q);
+        const exact = entities.some((o) => o.name.toLowerCase() === q);
         if (q && !exact) {
-            for (const type of /** @type {ObjectType[]} */ (Object.keys(OBJECT_TYPES))) list.push({ kind: 'create', type });
+            for (const type of /** @type {EntityType[]} */ (Object.keys(ENTITY_TYPES))) list.push({ kind: 'create', type });
         }
         return list;
-    }, [objects, q, adventure.objects]);
+    }, [entities, q, adventure.entities]);
 
     /** @param {Promise<string | null>} promise */
     const run = async (promise) => setError(await promise);
@@ -51,12 +51,12 @@ export function ObjectLinks({ adventure }) {
         setQuery('');
         setActive(0);
         if (option.kind === 'link') {
-            run(linkObject(adventure.id, option.obj.id));
+            run(linkEntity(adventure.id, option.obj.id));
             return;
         }
-        const res = await createObject(option.type, { name: query.trim() });
+        const res = await createEntity(option.type, { name: query.trim() });
         if (typeof res === 'string') { setError(res); return; }
-        run(linkObject(adventure.id, res.id));
+        run(linkEntity(adventure.id, res.id));
     };
 
     /** @param {KeyboardEvent} e */
@@ -67,8 +67,8 @@ export function ObjectLinks({ adventure }) {
         else if (e.key === 'Escape') { setQuery(''); setOpen(false); inputRef.current?.blur(); }
     };
 
-    const byType = /** @type {[ObjectType, { id: string, type: ObjectType, name: string }[]][]} */ (
-        Object.keys(OBJECT_TYPES).map((t) => [t, adventure.objects.filter((o) => o.type === t)]).filter(([, list]) => list.length));
+    const byType = /** @type {[EntityType, { id: string, type: EntityType, name: string }[]][]} */ (
+        Object.keys(ENTITY_TYPES).map((t) => [t, adventure.entities.filter((o) => o.type === t)]).filter(([, list]) => list.length));
 
     return html`
         <div className="ol">
@@ -77,11 +77,11 @@ export function ObjectLinks({ adventure }) {
                 <div className="ol-chips">
                     ${byType.map(([type, list]) => list.map((o) => html`
                         <span key=${o.id} className=${`ol-chip t-${type}`}>
-                            <button className="ol-chip-name" onClick=${() => { selectObject(o.id); showPanel('codex'); }}
-                                title=${`${OBJECT_TYPES[type].label} · open in the Codex`}>
-                                <i>${OBJECT_TYPES[type].glyph}</i>${o.name}
+                            <button className="ol-chip-name" onClick=${() => { selectEntity(o.id); showPanel('codex'); }}
+                                title=${`${ENTITY_TYPES[type].label} · open in the Codex`}>
+                                <i>${ENTITY_TYPES[type].glyph}</i>${o.name}
                             </button>
-                            <button className="ol-chip-x" onClick=${() => run(unlinkObject(adventure.id, o.id))}
+                            <button className="ol-chip-x" onClick=${() => run(unlinkEntity(adventure.id, o.id))}
                                 aria-label=${`Unlink ${o.name}`} title="Unlink">✕</button>
                         </span>
                     `))}
@@ -92,8 +92,8 @@ export function ObjectLinks({ adventure }) {
                     ref=${inputRef}
                     className="ol-input"
                     value=${query}
-                    placeholder=${'+ Link a pillar, site, contact, organization or skill…'}
-                    aria-label="Link an object"
+                    placeholder=${'+ Link a deity, site, contact, organization or skill…'}
+                    aria-label="Link an entity"
                     onInput=${(/** @type {any} */ e) => { setQuery(e.target.value); setOpen(true); setActive(0); }}
                     onFocus=${() => setOpen(true)}
                     onBlur=${() => setTimeout(() => setOpen(false), 120)}
@@ -112,8 +112,8 @@ export function ObjectLinks({ adventure }) {
                                 onMouseEnter=${() => setActive(i)}
                             >
                                 ${option.kind === 'link'
-                                    ? html`<i>${OBJECT_TYPES[option.obj.type].glyph}</i><span>${option.obj.name}</span><em>${OBJECT_TYPES[option.obj.type].label}</em>`
-                                    : html`<i>✦</i><span>New ${OBJECT_TYPES[option.type].label.toLowerCase()} “${query.trim()}”</span>`}
+                                    ? html`<i>${ENTITY_TYPES[option.obj.type].glyph}</i><span>${option.obj.name}</span><em>${ENTITY_TYPES[option.obj.type].label}</em>`
+                                    : html`<i>✦</i><span>New ${ENTITY_TYPES[option.type].label.toLowerCase()} “${query.trim()}”</span>`}
                             </button>
                         `)}
                     </div>

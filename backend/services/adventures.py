@@ -1,11 +1,11 @@
 """Adventures made and edited by hand (the node card's editor).
 
-    create   a new adventure with no raw event, in ore (queued): an event, item or song
+    create   a new adventure with no raw event, in ore (queued): an event, item or performance
     update   set or clear the adventure's own fields (see models.Adventure); on a crawled
              adventure these win over the event's values, and clearing one shows the
              event's again
 
-Items and songs have no when/where: those fields are refused for them, and cleared when
+Items and performances have no when/where: those fields are refused for them, and cleared when
 a hand-made adventure becomes one.
 """
 

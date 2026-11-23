@@ -172,7 +172,7 @@ export const lighter = (c) => '#' + new THREE.Color(c).lerp(new THREE.Color('#ff
  * Build one machine.
  * @param {ReturnType<typeof makeShop>} S
  * @param {{ id: string, kind: string, zone: string, locked: boolean, holds: string | null, action: object | null }} node
- * @param {{ color: string, accent?: string, working: () => boolean, spin: () => number, objects: () => number, pending: () => boolean, ports?: number[] }} ctx
+ * @param {{ color: string, accent?: string, working: () => boolean, spin: () => number, entities: () => number, pending: () => boolean, ports?: number[] }} ctx
  *   accent: the trim's colour, if not the matter colour (a harvester's source colour)
  *   ports: the angles (radians, world frame) where pipes meet the base
  */
@@ -652,7 +652,7 @@ const BODIES = {
         const g = G();
         g.add(box(12, 18, 6, M.wood, 0, Y, -0.4), box(11, 16, 0.2, M.glass, 0, Y + 1, 2.75));
         for (let s = 0; s < 3; s++) g.add(box(11, 0.4, 5, M.brass, 0, Y + 1.2 + s * 5.4, 0));
-        // one jar per object (up to nine shown), its lid lighting in turn while the Codex is open
+        // one jar per entity (up to nine shown), its lid lighting in turn while the Codex is open
         const kinds = ['#c86bf0', '#3ccf8e', '#4fb3ff'];
         const jars = [];
         for (let i = 0; i < 9; i++) {
@@ -667,7 +667,7 @@ const BODIES = {
         cg[0].position.set(-1.2, Y + 22.4, 0.6); cg[1].position.set(2.25, Y + 22.4, 0.6); cg[2].position.set(2.25, Y + 24.8, 0.6);
         for (const x of cg) g.add(x);
         a.push((dt, t) => {
-            const on = working(), sp = 1.2 * pace(), shown = Math.min(9, ctx.objects());
+            const on = working(), sp = 1.2 * pace(), shown = Math.min(9, ctx.entities());
             cg[0].rotation.z += dt * sp; cg[1].rotation.z -= dt * sp * (2.2 / 1.4); cg[2].rotation.z += dt * sp * 2.2;
             jars.forEach(({ jar, lid }, i) => {
                 jar.visible = i < shown;

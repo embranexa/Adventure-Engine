@@ -6,7 +6,7 @@
 // lens off: no lens stars in the Nexus, and colours fall back to matter (as under "stage").
 // See resources/signal chain digital twin/BUILD_PLAN.md, section 1 ("Light").
 
-import { FACETS, UNKNOWN, chosenObjectColor, facetLabel, facetValues } from '../filters.js';
+import { FACETS, UNKNOWN, chosenEntityColor, facetLabel, facetValues } from '../filters.js';
 import { ADVENTURE_FLAGS, ADVENTURE_TYPES, PHASE_STAGES, REVIEW_STAGES } from '../lifecycle.js';
 
 /** Facets that can't be a lens: the stage lens already covers them. */
@@ -18,7 +18,7 @@ const LENS_GROUPS = /** @type {[string, LensKey[]][]} */ ([
     ['Basic', ['stage', 'source', 'type']],
     ['Descriptor', ['tag', 'flag']],
     ['Place', ['city', 'region', 'metro']],
-    ['Object', ['pillar', 'site', 'contact', 'organization', 'skill']],
+    ['Entity', ['deity', 'site', 'contact', 'organization', 'skill']],
 ]);
 
 /** @param {LensKey} key */
@@ -36,7 +36,7 @@ export const LENSES = [
 
 /** Fixed colors where a value has an identity of its own. */
 const SOURCE_COLORS = { luma: '#3ccf8e', '19hz': '#4f8cff', 'ig-collection': '#e1306c', 'ig-profiles': '#f77737' };
-const TYPE_COLORS = { event: '#4fb3ff', item: '#e0a43a', song: '#c86bf0' };
+const TYPE_COLORS = { event: '#4fb3ff', item: '#e0a43a', performance: '#c86bf0' };
 /** Everything else: a value keeps the same color across reloads (picked by its text). */
 export const PALETTE = ['#4fb3ff', '#3ccf8e', '#f2b134', '#f0643c', '#c86bf0', '#2fd2c9', '#ff7aa8', '#a3d14b', '#8f8cff', '#ffb27a'];
 
@@ -44,8 +44,8 @@ export const PALETTE = ['#4fb3ff', '#3ccf8e', '#f2b134', '#f0643c', '#c86bf0', '
 export function sourceColor(name) {
     return SOURCE_COLORS[/** @type {keyof typeof SOURCE_COLORS} */ (name)] ?? PALETTE[hash(name) % PALETTE.length];
 }
-/** Object facets: their values are object ids, coloured by the object. */
-const OBJECT_LENSES = new Set(['pillar', 'site', 'contact', 'organization', 'skill']);
+/** Entity facets: their values are entity ids, coloured by the entity. */
+const ENTITY_LENSES = new Set(['deity', 'site', 'contact', 'organization', 'skill']);
 const UNKNOWN_COLOR = '#5b616b';
 /** Value for rows the lens's facet doesn't apply to (raw events under an adventure-only facet). */
 export const NOT_APPLICABLE = 'n/a';
@@ -86,7 +86,7 @@ function stageKey(item) {
 }
 
 /**
- * A row's values under the lens (several for object facets).
+ * A row's values under the lens (several for entity facets).
  * @param {PoolItem} item @param {LensKey} lens @returns {string[]}
  */
 export function lensValues(item, lens) {
@@ -98,11 +98,11 @@ export function lensValues(item, lens) {
 }
 
 /**
- * An object's colour: the one chosen in the Codex, else a stable default from its id.
+ * An entity's colour: the one chosen in the Codex, else a stable default from its id.
  * @param {string} id
  */
-export function objectColor(id) {
-    return chosenObjectColor(id) ?? PALETTE[hash(id) % PALETTE.length];
+export function entityColor(id) {
+    return chosenEntityColor(id) ?? PALETTE[hash(id) % PALETTE.length];
 }
 
 /** Display color of one lens value. @param {LensKey} lens @param {string} value */
@@ -113,7 +113,7 @@ export function lensColor(lens, value) {
         return PHASE_STAGES[/** @type {Phase} */ (value)]?.color ?? REVIEW_STAGES[/** @type {ReviewState} */ (value)]?.color ?? UNKNOWN_COLOR;
     }
     if (lens === 'source') return sourceColor(value);
-    if (OBJECT_LENSES.has(lens)) return objectColor(value);
+    if (ENTITY_LENSES.has(lens)) return entityColor(value);
     if (lens === 'flag') return ADVENTURE_FLAGS[/** @type {AdventureFlag} */ (value)]?.color ?? PALETTE[hash(value) % PALETTE.length];
     if (lens === 'type') return TYPE_COLORS[/** @type {keyof typeof TYPE_COLORS} */ (value)] ?? PALETTE[hash(value) % PALETTE.length];
     return PALETTE[hash(value) % PALETTE.length];

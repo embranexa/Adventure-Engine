@@ -71,7 +71,7 @@ export function LedgerPanel() {
     const selectItem = useWorkspaceStore((s) => s.selectItem);
     const hoverItem = useWorkspaceStore((s) => s.hoverItem);
     const lens = useWorkspaceStore((s) => s.filters.lens);
-    useWorkspaceStore((s) => s.objects); // object colours feed the lens colours
+    useWorkspaceStore((s) => s.entities); // entity colours feed the lens colours
     const [sort, setSort] = useState(savedSort);
     const bodyRef = useRef(/** @type {HTMLDivElement | null} */ (null));
 

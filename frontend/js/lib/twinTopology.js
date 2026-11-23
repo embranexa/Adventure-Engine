@@ -17,7 +17,7 @@ import { MAIN_ROUTE, PHASE_NODES, PHASE_STAGES } from '../lifecycle.js';
  * @property {string} label
  * @property {TwinZone} zone
  * @property {TwinKind} kind
- * @property {'events' | 'adventures' | 'objects' | null} holds  which rows its level counts
+ * @property {'events' | 'adventures' | 'entities' | null} holds  which rows its level counts
  * @property {string | null} matter      what it holds, by name (lifecycle.js matter)
  * @property {boolean} locked            shown, but does nothing yet
  * @property {TwinAction | null} action  what clicking the machine does
@@ -28,7 +28,7 @@ import { MAIN_ROUTE, PHASE_NODES, PHASE_STAGES } from '../lifecycle.js';
  * @typedef {{ panel: PanelId, mode?: PoolMode, shades?: boolean, create?: boolean, firstPrima?: boolean, label?: string }} TwinAction
  */
 /**
- * A pipe. `pipe` carries adventures and events; `conveyor` carries Codex objects; `market`
+ * A pipe. `pipe` carries adventures and events; `conveyor` carries Codex entities; `market`
  * carries the Entropy Market's costs and rewards. Only plain pipes route moves between stages.
  * @typedef {{ id: string, a: string, b: string, kind: 'pipe' | 'conveyor' | 'market' }} TwinPipe
  */
@@ -95,7 +95,7 @@ export function twinNodes(sourceNames) {
         core('completed', 'vessel', 'Treasury'),
         core('decommissioned', 'vessel', 'Archive'),
         core('killed', 'vessel', 'Necropolis'),
-        node({ id: CODEX, label: 'Codex', zone: 'core', kind: 'cabinet', holds: 'objects', action: { panel: 'codex' } }),
+        node({ id: CODEX, label: 'Codex', zone: 'core', kind: 'cabinet', holds: 'entities', action: { panel: 'codex' } }),
         node({ id: ENTROPY_MARKET, label: 'Entropy Market', zone: 'core', kind: 'dynamo', locked: true }),
         node({ id: 'nexus', label: 'Nexus', zone: 'viewer', kind: 'viewer', action: { panel: 'classifier', mode: 'adventures' } }),
         node({ id: 'atlas', label: 'Atlas', zone: 'viewer', kind: 'viewer', action: { panel: 'map' } }),

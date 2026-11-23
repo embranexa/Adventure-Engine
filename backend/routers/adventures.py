@@ -21,7 +21,7 @@ async def get_adventures(session: AsyncSession = Depends(get_session)):
 
 @router.post("")
 async def create_adventure(payload: AdventureCreate):
-    """A hand-made adventure (event, item or song) in ore. 422 if a field is invalid."""
+    """A hand-made adventure (event, item or performance) in ore. 422 if a field is invalid."""
     try:
         return await adventures.create_adventure(payload.model_dump(exclude_unset=True) | {"type": payload.type})
     except adventures.InvalidAdventure as e:

@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
-import { OBJECT_TYPES, PHASE_STAGES } from '../../lifecycle.js';
+import { ENTITY_TYPES, PHASE_STAGES } from '../../lifecycle.js';
 import { PLACE_PLACEHOLDER, coordsText, readPlace } from '../../lib/places.js';
-import { PALETTE, objectColor } from '../../lib/lens.js';
+import { PALETTE, entityColor } from '../../lib/lens.js';
 import { Field } from './AdventureEditor.js';
 import { confirmHere } from '../../lib/windows.js';
 
 /**
- * An object's colour (the Nexus, the lens): a preset swatch, any colour, or Auto (the
+ * An entity's colour (the Nexus, the lens): a preset swatch, any colour, or Auto (the
  * default picked from its id).
- * @param {{ obj: VObject, onChange: (color: string | null) => void }} props
+ * @param {{ obj: Entity, onChange: (color: string | null) => void }} props
  */
 function ColorPicker({ obj, onChange }) {
-    const current = objectColor(obj.id);
+    const current = entityColor(obj.id);
     return html`
         <div className="cx-colors" role="group" aria-label="Colour">
             <span className="cx-colors-title">Colour</span>
@@ -30,9 +30,9 @@ function ColorPicker({ obj, onChange }) {
     `;
 }
 
-const TYPE_KEYS = /** @type {ObjectType[]} */ (Object.keys(OBJECT_TYPES));
+const TYPE_KEYS = /** @type {EntityType[]} */ (Object.keys(ENTITY_TYPES));
 
-/** One line under an object's name in the list. @param {VObject} o */
+/** One line under an entity's name in the list. @param {Entity} o */
 function subtitle(o) {
     if (o.type === 'site') return [o.address, o.city].filter(Boolean).join(', ') || (o.lat != null ? 'Pinned' : 'No location');
     if (o.type === 'contact') return o.details.handle || o.details.email || o.details.phone || '';
@@ -40,13 +40,13 @@ function subtitle(o) {
 }
 
 /**
- * One object: its fields (by type), the adventures linked to it, and actions.
- * @param {{ obj: VObject, onBack: () => void }} props
+ * One entity: its fields (by type), the adventures linked to it, and actions.
+ * @param {{ obj: Entity, onBack: () => void }} props
  */
-function ObjectDetail({ obj, onBack }) {
-    const updateObject = useWorkspaceStore((s) => s.updateObject);
-    const deleteObject = useWorkspaceStore((s) => s.deleteObject);
-    const unlinkObject = useWorkspaceStore((s) => s.unlinkObject);
+function EntityDetail({ obj, onBack }) {
+    const updateEntity = useWorkspaceStore((s) => s.updateEntity);
+    const deleteEntity = useWorkspaceStore((s) => s.deleteEntity);
+    const unlinkEntity = useWorkspaceStore((s) => s.unlinkEntity);
     const adventures = useWorkspaceStore((s) => s.adventures);
     const itemsById = useWorkspaceStore((s) => s.itemsById);
     const selectItem = useWorkspaceStore((s) => s.selectItem);
@@ -57,13 +57,13 @@ function ObjectDetail({ obj, onBack }) {
     const [placeNote, setPlaceNote] = useState(/** @type {string | null} */ (null));
     useEffect(() => setPlaceNote(null), [obj.id]);
 
-    const t = OBJECT_TYPES[obj.type];
-    const linked = adventures.filter((a) => a.objects.some((o) => o.id === obj.id));
+    const t = ENTITY_TYPES[obj.type];
+    const linked = adventures.filter((a) => a.entities.some((o) => o.id === obj.id));
     const located = obj.lat != null && obj.lon != null;
 
-    /** @param {ObjectChanges} changes */
+    /** @param {EntityChanges} changes */
     const save = async (changes) => {
-        const err = await updateObject(obj.id, changes);
+        const err = await updateEntity(obj.id, changes);
         setError(err);
         return err;
     };
@@ -81,7 +81,7 @@ function ObjectDetail({ obj, onBack }) {
     const remove = async () => {
         const note = linked.length ? ` It's linked to ${linked.length} ${linked.length === 1 ? 'adventure' : 'adventures'}; they stay, unlinked.` : '';
         if (!confirmHere(`Delete ${t.label.toLowerCase()} “${obj.name}”?${note}`)) return;
-        const err = await deleteObject(obj.id);
+        const err = await deleteEntity(obj.id);
         if (err) setError(err);
         else onBack();
     };
@@ -90,7 +90,7 @@ function ObjectDetail({ obj, onBack }) {
         <div className="cx-detail">
             <div className="cx-detail-head">
                 <button className="cls-layer" onClick=${onBack} title="Back to the list">← ${t.plural}</button>
-                <span className=${`cx-badge t-${obj.type}`} style=${{ color: objectColor(obj.id) }}>${t.glyph} ${t.label}</span>
+                <span className=${`cx-badge t-${obj.type}`} style=${{ color: entityColor(obj.id) }}>${t.glyph} ${t.label}</span>
             </div>
             <${ColorPicker} obj=${obj} onChange=${(/** @type {string | null} */ color) => save({ color })} />
 
@@ -138,7 +138,7 @@ function ObjectDetail({ obj, onBack }) {
                                 title=${pooled ? 'Select it' : 'Not in the current pool (Discovery mode)'}>
                                 <i></i>${a.title}<em>${stage?.matter ?? ''}</em>
                             </button>
-                            <button className="ol-chip-x" onClick=${async () => setError(await unlinkObject(a.id, obj.id))} title="Unlink" aria-label=${`Unlink ${a.title}`}>✕</button>
+                            <button className="ol-chip-x" onClick=${async () => setError(await unlinkEntity(a.id, obj.id))} title="Unlink" aria-label=${`Unlink ${a.title}`}>✕</button>
                         </div>
                     `;
                 })}
@@ -152,68 +152,68 @@ function ObjectDetail({ obj, onBack }) {
 }
 
 /**
- * The Codex: virtual objects (pillars, sites, contacts, organizations, skills) that adventures link to. Browse
+ * The Codex: entities (deities, sites, contacts, organizations, skills) that adventures link to. Browse
  * by type, search, create; open one to edit it and see its adventures. Linking happens
- * in the Refinery; objects show as stars in the Nexus (in their colour), sites as pins on the Atlas.
+ * in the Refinery; entities show as stars in the Nexus (in their colour), sites as pins on the Atlas.
  */
 export function CodexPanel() {
-    const objects = useWorkspaceStore((s) => s.objects);
+    const entities = useWorkspaceStore((s) => s.entities);
     const adventures = useWorkspaceStore((s) => s.adventures);
-    const selectedId = useWorkspaceStore((s) => s.selectedObjectId);
-    const selectObject = useWorkspaceStore((s) => s.selectObject);
-    const createObject = useWorkspaceStore((s) => s.createObject);
+    const selectedId = useWorkspaceStore((s) => s.selectedEntityId);
+    const selectEntity = useWorkspaceStore((s) => s.selectEntity);
+    const createEntity = useWorkspaceStore((s) => s.createEntity);
 
-    const [type, setType] = useState(/** @type {ObjectType | 'all'} */ ('all'));
+    const [type, setType] = useState(/** @type {EntityType | 'all'} */ ('all'));
     const [query, setQuery] = useState('');
     const [error, setError] = useState(/** @type {string | null} */ (null));
 
     const counts = useMemo(() => {
         /** @type {Map<string, number>} */
         const m = new Map();
-        for (const a of adventures) for (const o of a.objects) m.set(o.id, (m.get(o.id) ?? 0) + 1);
+        for (const a of adventures) for (const o of a.entities) m.set(o.id, (m.get(o.id) ?? 0) + 1);
         return m;
     }, [adventures]);
 
-    const selected = selectedId ? objects.find((o) => o.id === selectedId) : null;
+    const selected = selectedId ? entities.find((o) => o.id === selectedId) : null;
     if (selected) {
-        return html`<div className="panel-body codex"><${ObjectDetail} key=${selected.id} obj=${selected} onBack=${() => selectObject(null)} /></div>`;
+        return html`<div className="panel-body codex"><${EntityDetail} key=${selected.id} obj=${selected} onBack=${() => selectEntity(null)} /></div>`;
     }
 
     const q = query.trim().toLowerCase();
-    const shown = objects.filter((o) => (type === 'all' || o.type === type) && (!q || o.name.toLowerCase().includes(q)));
+    const shown = entities.filter((o) => (type === 'all' || o.type === type) && (!q || o.name.toLowerCase().includes(q)));
 
-    /** @param {ObjectType} newType */
+    /** @param {EntityType} newType */
     const create = async (newType) => {
-        const res = await createObject(newType, query.trim() ? { name: query.trim() } : {});
+        const res = await createEntity(newType, query.trim() ? { name: query.trim() } : {});
         if (typeof res === 'string') { setError(res); return; }
         setError(null);
         setQuery('');
-        selectObject(res.id);
+        selectEntity(res.id);
     };
 
     return html`
         <div className="panel-body codex">
             <div className="cx-types" role="tablist">
                 <button role="tab" aria-selected=${type === 'all'} className=${`cls-layer ${type === 'all' ? 'on' : ''}`} onClick=${() => setType('all')}>
-                    All <b>${objects.length}</b>
+                    All <b>${entities.length}</b>
                 </button>
                 ${TYPE_KEYS.map((k) => html`
                     <button key=${k} role="tab" aria-selected=${type === k} className=${`cls-layer ${type === k ? 'on' : ''}`}
-                        onClick=${() => setType(k)} title=${OBJECT_TYPES[k].hint}>
-                        ${OBJECT_TYPES[k].glyph} ${OBJECT_TYPES[k].plural} <b>${objects.filter((o) => o.type === k).length}</b>
+                        onClick=${() => setType(k)} title=${ENTITY_TYPES[k].hint}>
+                        ${ENTITY_TYPES[k].glyph} ${ENTITY_TYPES[k].plural} <b>${entities.filter((o) => o.type === k).length}</b>
                     </button>
                 `)}
             </div>
             <div className="cx-bar">
-                <input className="cx-search" value=${query} placeholder=${type === 'all' ? 'Search or name a new object…' : `Search or name a new ${OBJECT_TYPES[type].label.toLowerCase()}…`}
-                    aria-label="Search objects"
+                <input className="cx-search" value=${query} placeholder=${type === 'all' ? 'Search or name a new entity…' : `Search or name a new ${ENTITY_TYPES[type].label.toLowerCase()}…`}
+                    aria-label="Search entities"
                     onInput=${(/** @type {any} */ e) => setQuery(e.target.value)}
                     onKeyDown=${(/** @type {KeyboardEvent} */ e) => { if (e.key === 'Enter' && type !== 'all' && !shown.length) create(type); }} />
             </div>
             <div className="cx-new">
                 ${(type === 'all' ? TYPE_KEYS : [type]).map((k) => html`
                     <button key=${k} className="btn" onClick=${() => create(k)}>
-                        ✦ New ${OBJECT_TYPES[k].label.toLowerCase()}${q ? ` “${query.trim()}”` : ''}
+                        ✦ New ${ENTITY_TYPES[k].label.toLowerCase()}${q ? ` “${query.trim()}”` : ''}
                     </button>
                 `)}
             </div>
@@ -221,13 +221,13 @@ export function CodexPanel() {
             <div className="cx-list">
                 ${shown.length === 0 && html`
                     <div className="nc-empty cx-none">
-                        ${objects.length ? 'Nothing matches' : 'The Codex is empty'}
-                        <small>${objects.length ? 'Try another search, or create it above' : 'Pillars, sites, contacts, organizations and skills you make here can be linked to adventures'}</small>
+                        ${entities.length ? 'Nothing matches' : 'The Codex is empty'}
+                        <small>${entities.length ? 'Try another search, or create it above' : 'Deities, sites, contacts, organizations and skills you make here can be linked to adventures'}</small>
                     </div>
                 `}
                 ${shown.map((o) => html`
-                    <button key=${o.id} className=${`cx-row t-${o.type}`} onClick=${() => selectObject(o.id)}>
-                        <i style=${{ color: objectColor(o.id) }}>${OBJECT_TYPES[o.type].glyph}</i>
+                    <button key=${o.id} className=${`cx-row t-${o.type}`} onClick=${() => selectEntity(o.id)}>
+                        <i style=${{ color: entityColor(o.id) }}>${ENTITY_TYPES[o.type].glyph}</i>
                         <span className="cx-row-text">
                             <b>${o.name}</b>
                             ${subtitle(o) && html`<small>${subtitle(o)}</small>`}

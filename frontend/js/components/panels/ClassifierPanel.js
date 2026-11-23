@@ -171,7 +171,7 @@ export function ClassifierPanel() {
     const selectedId = useWorkspaceStore((s) => s.selectedItemId);
     const selectionSource = useWorkspaceStore((s) => s.selectionSource);
     const hoveredId = useWorkspaceStore((s) => s.hoveredItemId);
-    const objects = useWorkspaceStore((s) => s.objects); // object stars' names and colours
+    const entities = useWorkspaceStore((s) => s.entities); // entity stars' names and colours
 
     const hostRef = useRef(/** @type {HTMLDivElement | null} */ (null));
     const sceneRef = useRef(/** @type {any} */ (null));
@@ -193,7 +193,7 @@ export function ClassifierPanel() {
 
     const model = useMemo(
         () => buildModel(items, filters, mode, layers, isCollapsed, Date.now()),
-        [items, filters, mode, layers, isCollapsed, tick, objects],
+        [items, filters, mode, layers, isCollapsed, tick, entities],
     );
 
     // collapse all, and reframe, whenever the lens, the mode or the applied filters change

@@ -208,8 +208,8 @@ export function Field({ label, value, kind = 'text', placeholder = '', overridde
  */
 export function AdventureEditor({ adventure, focusTitle, onDone }) {
     const updateAdventure = useWorkspaceStore((s) => s.updateAdventure);
-    const objects = useWorkspaceStore((s) => s.objects);
-    const selectObject = useWorkspaceStore((s) => s.selectObject);
+    const entities = useWorkspaceStore((s) => s.entities);
+    const selectEntity = useWorkspaceStore((s) => s.selectEntity);
     const showPanel = useWorkspaceStore((s) => s.showPanel);
     const [error, setError] = useState(/** @type {string | null} */ (null));
     const [saving, setSaving] = useState(false);
@@ -219,7 +219,7 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
     const crawled = adventure.event_id != null;
     const isEvent = adventure.type === 'event';
     // a hand-made event with a linked site takes its where from the site
-    const site = !crawled && adventure.site_id ? objects.find((o) => o.id === adventure.site_id) ?? null : null;
+    const site = !crawled && adventure.site_id ? entities.find((o) => o.id === adventure.site_id) ?? null : null;
 
     /** @param {AdventureChanges} changes @returns {Promise<string | null>} the error, if refused */
     const save = async (changes) => {
@@ -295,7 +295,7 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
                             <span className="ae-label">Where</span>
                             <div className="ae-site">
                                 <span>⌖ <b>${site.name}</b>${[site.address, site.city].filter(Boolean).length ? ` · ${[site.address, site.city].filter(Boolean).join(', ')}` : ''}</span>
-                                <button type="button" className="cls-layer" onClick=${() => { selectObject(site.id); showPanel('codex'); }}>Open site</button>
+                                <button type="button" className="cls-layer" onClick=${() => { selectEntity(site.id); showPanel('codex'); }}>Open site</button>
                             </div>
                             <span className="ae-hint">From its linked site · unlink it below to type a place instead</span>
                         </div>

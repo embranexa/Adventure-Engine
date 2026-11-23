@@ -13,19 +13,19 @@ import { byMatter, itemLensColor } from '../../lib/lens.js';
 function RingControl({ mapRef, placing, setPlacing }) {
     const ring = useWorkspaceStore((s) => s.filters.ring);
     const units = useWorkspaceStore((s) => s.filters.units);
-    const objects = useWorkspaceStore((s) => s.objects);
+    const entities = useWorkspaceStore((s) => s.entities);
     const setRing = useWorkspaceStore((s) => s.setRing);
     const setUnits = useWorkspaceStore((s) => s.setUnits);
     const toggleRangeMode = useWorkspaceStore((s) => s.toggleRangeMode);
     const anchorRingOnSite = useWorkspaceStore((s) => s.anchorRingOnSite);
-    const createObject = useWorkspaceStore((s) => s.createObject);
-    const selectObject = useWorkspaceStore((s) => s.selectObject);
+    const createEntity = useWorkspaceStore((s) => s.createEntity);
+    const selectEntity = useWorkspaceStore((s) => s.selectEntity);
     const showPanel = useWorkspaceStore((s) => s.showPanel);
     const [naming, setNaming] = useState(false);
     const [name, setName] = useState('');
     const [error, setError] = useState(/** @type {string | null} */ (null));
-    const sites = objects.filter((o) => o.type === 'site' && o.lat != null && o.lon != null);
-    const anchored = ring?.center.site_id ? objects.find((o) => o.id === ring.center.site_id) : null;
+    const sites = entities.filter((o) => o.type === 'site' && o.lat != null && o.lon != null);
+    const anchored = ring?.center.site_id ? entities.find((o) => o.id === ring.center.site_id) : null;
 
     const togglePlacing = () => {
         if (placing) { mapRef.current?.cancelPlacing(); setPlacing(false); }
@@ -35,7 +35,7 @@ function RingControl({ mapRef, placing, setPlacing }) {
     /** Make the ring's center a new site, and anchor the ring on it. @param {string} siteName */
     const saveAsSite = async (siteName) => {
         if (!ring) return;
-        const res = await createObject('site', { name: siteName || 'Site', lat: ring.center.lat, lon: ring.center.lon });
+        const res = await createEntity('site', { name: siteName || 'Site', lat: ring.center.lat, lon: ring.center.lon });
         if (typeof res === 'string') { setError(res); return; }
         setError(null);
         setNaming(false); setName('');
@@ -84,7 +84,7 @@ function RingControl({ mapRef, placing, setPlacing }) {
                 <div className="ring-ctl-row ring-ctl-meta">
                     <span>${ring.center.label || `${ring.center.lat.toFixed(4)}, ${ring.center.lon.toFixed(4)}`} · ${formatDistance(ring.radius_km, units)}</span>
                     ${anchored
-                        ? html`<button className="ring-link" onClick=${() => { selectObject(anchored.id); showPanel('codex'); }}
+                        ? html`<button className="ring-link" onClick=${() => { selectEntity(anchored.id); showPanel('codex'); }}
                             title="The ring is anchored on this site and follows it">⌖ open site</button>`
                         : naming
                             ? html`
@@ -103,13 +103,13 @@ function RingControl({ mapRef, placing, setPlacing }) {
 
 /**
  * What to do with a site pin clicked on the Atlas.
- * @param {{ site: VObject, x: number, y: number, onClose: () => void }} props
+ * @param {{ site: Entity, x: number, y: number, onClose: () => void }} props
  */
 function SiteMenu({ site, x, y, onClose }) {
     const anchorRingOnSite = useWorkspaceStore((s) => s.anchorRingOnSite);
-    const selectObject = useWorkspaceStore((s) => s.selectObject);
+    const selectEntity = useWorkspaceStore((s) => s.selectEntity);
     const showPanel = useWorkspaceStore((s) => s.showPanel);
-    const linked = useWorkspaceStore((s) => s.adventures.filter((a) => a.objects.some((o) => o.id === site.id)).length);
+    const linked = useWorkspaceStore((s) => s.adventures.filter((a) => a.entities.some((o) => o.id === site.id)).length);
     return html`
         <div className="site-menu" style=${{ left: `${x}px`, top: `${y}px` }} onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
             <div className="site-menu-head">
@@ -121,7 +121,7 @@ function SiteMenu({ site, x, y, onClose }) {
             <div className="site-menu-actions">
                 <button className="btn" onClick=${() => { anchorRingOnSite(site.id); onClose(); }}
                     title="Center the proximity ring here; it follows the site">◎ Anchor ring</button>
-                <button className="btn ghost" onClick=${() => { selectObject(site.id); showPanel('codex'); onClose(); }}>Open in Codex</button>
+                <button className="btn ghost" onClick=${() => { selectEntity(site.id); showPanel('codex'); onClose(); }}>Open in Codex</button>
             </div>
         </div>
     `;
@@ -146,15 +146,15 @@ export function MapPanel() {
     const mapRef = useRef(/** @type {LevelMap | null} */ (null));
     const [status, setStatus] = useState(/** @type {'loading' | 'ready' | 'error'} */ ('loading'));
     const [placing, setPlacing] = useState(false);
-    const objects = useWorkspaceStore((s) => s.objects);
+    const entities = useWorkspaceStore((s) => s.entities);
     const atlasFocus = useWorkspaceStore((s) => s.atlasFocus);
     const lens = useWorkspaceStore((s) => s.filters.lens);
     // pins in the lens colour (Matter: the stage colour each item already has)
     const tinted = useMemo(
         () => (byMatter(lens) ? events : events.map((e) => ({ ...e, color: itemLensColor(e, lens) }))),
-        [events, lens, objects],
+        [events, lens, entities],
     );
-    const [siteMenu, setSiteMenu] = useState(/** @type {{ site: VObject, x: number, y: number } | null} */ (null));
+    const [siteMenu, setSiteMenu] = useState(/** @type {{ site: Entity, x: number, y: number } | null} */ (null));
 
     // Create the map once; dispose it when the panel unmounts (tab switch, close).
     useEffect(() => {
@@ -176,7 +176,7 @@ export function MapPanel() {
                         });
                         setPlacing(false);
                     },
-                    onSiteClick: (/** @type {VObject} */ site, /** @type {{ x: number, y: number }} */ point) => setSiteMenu({ site, ...point }),
+                    onSiteClick: (/** @type {Entity} */ site, /** @type {{ x: number, y: number }} */ point) => setSiteMenu({ site, ...point }),
                 });
                 setStatus('ready'); // re-runs the sync effects below with the new map
             })
@@ -210,8 +210,8 @@ export function MapPanel() {
     }, [ring, units, status]);
 
     useEffect(() => {
-        mapRef.current?.setSites(objects.filter((o) => o.type === 'site'), ring?.center.site_id ?? null);
-    }, [objects, ring?.center.site_id, status]);
+        mapRef.current?.setSites(entities.filter((o) => o.type === 'site'), ring?.center.site_id ?? null);
+    }, [entities, ring?.center.site_id, status]);
 
     useEffect(() => {
         if (!atlasFocus) return;
@@ -219,7 +219,7 @@ export function MapPanel() {
         else mapRef.current?.flyTo(atlasFocus.lat, atlasFocus.lon);
     }, [atlasFocus, status]);
 
-    const menuSite = siteMenu && objects.find((o) => o.id === siteMenu.site.id);
+    const menuSite = siteMenu && entities.find((o) => o.id === siteMenu.site.id);
 
     return html`
         <div className="panel-body map-panel">

@@ -32,7 +32,7 @@ export const PHASE_STAGES = {
 };
 
 /**
- * Adventure types. Only events have a when/where: items and songs are exempt from the
+ * Adventure types. Only events have a when/where: items and performances are exempt from the
  * calendar, map, date/proximity filters and the missed-adventure sweeper (the server
  * sends their when/where as null). Same list in backend/db/models.py.
  * @type {Record<AdventureType, { label: string, glyph: string, hint: string }>}
@@ -40,7 +40,7 @@ export const PHASE_STAGES = {
 export const ADVENTURE_TYPES = {
     event: { label: 'Event', glyph: '◷', hint: 'Happens at a time and place' },
     item: { label: 'Item', glyph: '◆', hint: 'A thing to make or get: no when/where' },
-    song: { label: 'Song', glyph: '♪', hint: 'A song to write or learn: no when/where' },
+    performance: { label: 'Performance', glyph: '♪', hint: 'A piece to learn and perform; link the performance: no when/where' },
 };
 
 /** Flags an adventure can carry, any number, set by hand (backend.db.models.ADVENTURE_FLAGS). @type {Record<AdventureFlag, { label: string, glyph: string, color: string }>} */
@@ -53,12 +53,12 @@ export const ADVENTURE_FLAGS = {
 };
 
 /**
- * Virtual object types (the Codex). Only sites have a location. Same list in
+ * Virtual entity types (the Codex). Only sites have a location. Same list in
  * backend/db/models.py.
- * @type {Record<ObjectType, { label: string, plural: string, glyph: string, hint: string }>}
+ * @type {Record<EntityType, { label: string, plural: string, glyph: string, hint: string }>}
  */
-export const OBJECT_TYPES = {
-    pillar: { label: 'Pillar', plural: 'Pillars', glyph: '⟁', hint: 'A theme or project adventures serve' },
+export const ENTITY_TYPES = {
+    deity: { label: 'Deity', plural: 'Deities', glyph: '⟁', hint: 'A demand signal that adventures fulfil' },
     site: { label: 'Site', plural: 'Sites', glyph: '⌖', hint: 'A place: shows on the Atlas, anchors the proximity ring' },
     contact: { label: 'Contact', plural: 'Contacts', glyph: '☉', hint: 'A person' },
     organization: { label: 'Organization', plural: 'Organizations', glyph: '⎔', hint: 'An organization or a network' },

@@ -93,7 +93,7 @@ export function buildPipes(S, { pipes, positions, nodes, colors }) {
         if (!A || !B) continue;
         const curve = pipeCurve(A, B), len = curve.getLength(), segs = Math.max(16, Math.round(len / 2));
         if (pipe.kind === 'conveyor') {
-            // two iron rails carrying gilt plates (Codex objects)
+            // two iron rails carrying gilt plates (Codex entities)
             for (const off of [-1.4, 1.4]) {
                 const pts = curve.getSpacedPoints(segs).map((p, i, arr) => { const t = curve.getTangentAt(i / (arr.length - 1)); return p.clone().add(V(-t.z, 0, t.x).multiplyScalar(off)).setY(1.2); });
                 mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), segs, 0.3, 6), M.iron);

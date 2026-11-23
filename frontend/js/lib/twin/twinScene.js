@@ -60,7 +60,7 @@ const REPLAY_SECONDS = 5;
 const BURST_MAX = 8;                     // slugs drawn per (from, to) in one batch
 const BURST_GAP_S = 0.12;                // between the slugs of one burst
 
-/** A count for a label: whole numbers as they are, shared rows (object lenses) to one decimal. */
+/** A count for a label: whole numbers as they are, shared rows (entity lenses) to one decimal. */
 const fmtCount = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 function el(tag, cls, text) {
@@ -228,7 +228,7 @@ export class TwinScene {
             accent: this.data?.accents?.[node.id],
             working: () => this.inUse.has(node.id),
             spin: () => rec.spin,
-            objects: () => this.data?.codex?.total ?? 0,
+            entities: () => this.data?.codex?.total ?? 0,
             pending: () => (this.data?.light?.pending ?? 0) > 0,
             ports: this.pipes?.ports.get(node.id) ?? [],
         });
@@ -342,7 +342,7 @@ export class TwinScene {
         const { label, node } = rec;
         // what it holds, in its matter's colour; dynamos name what they work with
         if (node.locked) label._count.textContent = 'locked';
-        else if (node.holds === 'objects') label._count.textContent = `${this.data.codex.total} objects`;
+        else if (node.holds === 'entities') label._count.textContent = `${this.data.codex.total} entities`;
         else if (node.holds) label._count.textContent = level.lit < level.total ? `${fmtCount(level.lit)} of ${level.total} ${node.matter} lit` : `${level.total} ${node.matter}`;
         else label._count.textContent = SUB[node.id] ?? '';
         if (label._harvest) {
@@ -405,7 +405,7 @@ export class TwinScene {
      * Send slugs for transitions not played yet. replay: squeeze the latest REPLAY_MAX
      * into REPLAY_SECONDS (so the twin doesn't open frozen); otherwise play now, bursts
      * of the same move capped at BURST_MAX slugs.
-     * @param {{ id: number, from: string, to: string, entity: string }[]} transitions
+     * @param {{ id: number, from: string, to: string, subject: string }[]} transitions
      */
     play(transitions, { replay = false } = {}) {
         if (!this.data || !this.pipes) return;
@@ -434,7 +434,7 @@ export class TwinScene {
     _launch(t, delay) {
         const steps = route(this.pipesByEnds, t.from, t.to);
         if (!steps?.length) return;
-        const link = t.entity === 'link';
+        const link = t.subject === 'link';
         const style = link ? null : this.data.packetStyle?.(t);
         // the row's lens colour; the stage lens keeps the colour of the machine it leaves
         const color = new THREE.Color(style?.color ?? lighter(this.data.colors[t.from === OUTSIDE ? t.to : t.from] ?? '#ffffff'));

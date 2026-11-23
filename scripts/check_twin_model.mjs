@@ -13,23 +13,23 @@ const fe = fileURLToPath(new URL('../frontend/js/', import.meta.url));
 const { twinModel, pipeFlows } = await import(`${fe}lib/twinModel.js`);
 const { twinPipes, pipeIndex, route } = await import(`${fe}lib/twinTopology.js`);
 const { LENSES } = await import(`${fe}lib/lens.js`);
-const { DEFAULT_FILTERS, setObjectNames } = await import(`${fe}filters.js`);
+const { DEFAULT_FILTERS, setEntityNames } = await import(`${fe}filters.js`);
 
 const get = async (path) => {
     const res = await fetch(`${base}/api/${path}`);
     if (!res.ok) throw new Error(`${path}: ${res.status}`);
     return res.json();
 };
-const [rawEvents, adventures, objects, sources, flows, saved] = await Promise.all(
-    ['events', 'adventures', 'objects', 'sources', 'transitions/flows', 'state/filters'].map(get));
-setObjectNames(objects);
+const [rawEvents, adventures, entities, sources, flows, saved] = await Promise.all(
+    ['events', 'adventures', 'entities', 'sources', 'transitions/flows', 'state/filters'].map(get));
+setEntityNames(entities);
 
 let failures = 0;
 const fail = (msg) => { failures++; console.log(`FAIL ${msg}`); };
 
 for (const [name, filters] of [['no filter', { ...DEFAULT_FILTERS, seal: false }], ['saved filter', saved]]) {
     for (const { key: lens } of LENSES) {
-        const m = twinModel({ rawEvents, adventures, objects, filters, lens, now: Date.now() });
+        const m = twinModel({ rawEvents, adventures, entities, filters, lens, now: Date.now() });
         if (!m.check.ok) fail(`${name} / ${lens}: ${m.check.problems.join('; ')}`);
         for (const [id, level] of Object.entries(m.levels)) {
             const sum = level.bands.reduce((n, b) => n + b.count, 0);
@@ -37,7 +37,7 @@ for (const [name, filters] of [['no filter', { ...DEFAULT_FILTERS, seal: false }
             if (level.lit > level.total) fail(`${name} / ${lens}: ${id} lit ${level.lit} > held ${level.total}`);
         }
     }
-    const m = twinModel({ rawEvents, adventures, objects, filters, lens: 'stage', now: Date.now() });
+    const m = twinModel({ rawEvents, adventures, entities, filters, lens: 'stage', now: Date.now() });
     console.log(`${name}:`, Object.entries(m.levels).map(([id, l]) => `${id} ${l.lit}/${l.total}`).join(' · '));
 }
 

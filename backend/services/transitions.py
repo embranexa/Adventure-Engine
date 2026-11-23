@@ -12,8 +12,8 @@ Two ways rows get recorded:
        Event.review new -> ignored       centrifuge -> sump
        Event.review ignored -> new       sump -> centrifuge   (revive; other review changes
                                                                are recorded by the adventure)
-       new AdventureObject               codex -> refinery     (a link)
-       deleted AdventureObject           refinery -> codex     (an unlink)
+       new AdventureEntity               codex -> refinery     (a link)
+       deleted AdventureEntity           refinery -> codex     (an unlink)
 2. Explicitly, with record() / record_many(), for SQL statements that change rows without
    ORM objects (harvest, feed, siphon, purge, link deletes): `before_flush` never sees those.
 
@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import (
     CENTRIFUGE_NODE, CODEX_NODE, FORGE_NODE, MANUAL_PHASES, OUTSIDE_NODE, PHASE_NODES, SUMP_NODE,
-    Adventure, AdventureObject, AppState, Event, EventSource, Transition, harvester_node,
+    Adventure, AdventureEntity, AppState, Event, EventSource, Transition, harvester_node,
 )
 from backend.services.hub import hub
 
@@ -49,7 +49,7 @@ def transition_to_dict(t: Transition) -> dict[str, Any]:
     return {
         "id": t.id,
         "at": t.at.isoformat() if t.at else None,
-        "entity": t.entity,
+        "subject": t.subject,
         "row_id": str(t.row_id),
         "ref_id": str(t.ref_id) if t.ref_id else None,
         "from": t.from_node,
@@ -58,11 +58,11 @@ def transition_to_dict(t: Transition) -> dict[str, Any]:
 
 
 def record(
-    session: Session | AsyncSession, entity: str, row_id: uuid.UUID, from_node: str, to_node: str,
+    session: Session | AsyncSession, subject: str, row_id: uuid.UUID, from_node: str, to_node: str,
     *, ref_id: uuid.UUID | None = None, at: datetime | None = None, synthetic: bool = False,
 ) -> Transition:
     """Add one transition to the session (saved with the session's next commit)."""
-    t = Transition(entity=entity, row_id=row_id, ref_id=ref_id, from_node=from_node,
+    t = Transition(subject=subject, row_id=row_id, ref_id=ref_id, from_node=from_node,
                    to_node=to_node, at=at or utcnow(), synthetic=synthetic)
     session.add(t)
     if not synthetic:
@@ -71,13 +71,13 @@ def record(
 
 
 def record_many(
-    session: Session | AsyncSession, entity: str, row_ids: Iterable[uuid.UUID], from_node: str, to_node: str,
+    session: Session | AsyncSession, subject: str, row_ids: Iterable[uuid.UUID], from_node: str, to_node: str,
 ) -> int:
     """Record the same move for many rows (bulk statements). Returns how many."""
     at = utcnow()
     n = 0
     for row_id in row_ids:
-        record(session, entity, row_id, from_node, to_node, at=at)
+        record(session, subject, row_id, from_node, to_node, at=at)
         n += 1
     return n
 
@@ -109,8 +109,8 @@ def _record_orm_changes(session: Session, flush_context, instances) -> None:
             else:
                 origin = SUMP_NODE if old_review.get(obj.event_id) == "ignored" else CENTRIFUGE_NODE
             record(session, "adventure", obj.id, origin, PHASE_NODES[obj.phase or "queued"])
-        elif isinstance(obj, AdventureObject):
-            record(session, "link", obj.object_id, CODEX_NODE, REFINERY_NODE, ref_id=obj.adventure_id)
+        elif isinstance(obj, AdventureEntity):
+            record(session, "link", obj.entity_id, CODEX_NODE, REFINERY_NODE, ref_id=obj.adventure_id)
 
     for obj in list(session.dirty):
         if isinstance(obj, Adventure) and (change := _change(obj, "phase")):
@@ -121,8 +121,8 @@ def _record_orm_changes(session: Session, flush_context, instances) -> None:
             record(session, "event", obj.id, SUMP_NODE, CENTRIFUGE_NODE)
 
     for obj in session.deleted:
-        if isinstance(obj, AdventureObject):
-            record(session, "link", obj.object_id, REFINERY_NODE, CODEX_NODE, ref_id=obj.adventure_id)
+        if isinstance(obj, AdventureEntity):
+            record(session, "link", obj.entity_id, REFINERY_NODE, CODEX_NODE, ref_id=obj.adventure_id)
 
 
 @event.listens_for(Session, "after_commit")
@@ -185,12 +185,12 @@ def _route_to(phase: str, phase_before_kill: str | None) -> list[str]:
     return _MAIN_ROUTE[: _MAIN_ROUTE.index(PHASE_NODES[phase]) + 1]
 
 
-def _path(session: AsyncSession, entity: str, row_id: uuid.UUID, nodes: list[str],
+def _path(session: AsyncSession, subject: str, row_id: uuid.UUID, nodes: list[str],
           first_at: datetime, last_at: datetime) -> int:
     """Record one synthetic transition per step of `nodes`; the last step at `last_at`."""
     steps = list(zip(nodes, nodes[1:]))
     for i, (a, b) in enumerate(steps):
-        record(session, entity, row_id, a, b, at=last_at if i == len(steps) - 1 else first_at, synthetic=True)
+        record(session, subject, row_id, a, b, at=last_at if i == len(steps) - 1 else first_at, synthetic=True)
     return len(steps)
 
 
@@ -222,8 +222,8 @@ async def backfill() -> int:
                 nodes = [origin] + _route_to(a.phase, a.phase_before_kill)
                 written += _path(session, "adventure", a.id, nodes, a.created_at, a.phase_changed_at)
 
-            for link in (await session.scalars(select(AdventureObject))).all():
-                record(session, "link", link.object_id, CODEX_NODE, REFINERY_NODE,
+            for link in (await session.scalars(select(AdventureEntity))).all():
+                record(session, "link", link.entity_id, CODEX_NODE, REFINERY_NODE,
                        ref_id=link.adventure_id, at=link.created_at, synthetic=True)
                 written += 1
 

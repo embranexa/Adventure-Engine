@@ -4,7 +4,7 @@
 // See resources/signal chain digital twin/BUILD_PLAN.md, sections 1-3.
 
 import { passes } from '../filters.js';
-import { OBJECT_TYPES, PHASE_NODES } from '../lifecycle.js';
+import { ENTITY_TYPES, PHASE_NODES } from '../lifecycle.js';
 import { lensColor, lensLabel, lensValues } from './lens.js';
 import { CENTRIFUGE, SUMP, harvesterId, pipeIndex, route } from './twinTopology.js';
 
@@ -18,7 +18,7 @@ import { CENTRIFUGE, SUMP, harvesterId, pipeIndex, route } from './twinTopology.
 /**
  * @typedef {object} TwinModel
  * @property {Record<string, TwinLevel>} levels   by node id (only nodes that hold rows)
- * @property {{ total: number, byType: Record<ObjectType, number> }} codex
+ * @property {{ total: number, byType: Record<EntityType, number> }} codex
  * @property {{ ok: boolean, problems: string[] }} check   the counting rules
  */
 
@@ -36,11 +36,11 @@ export function eventNode(e, linked) {
 }
 
 /**
- * @param {{ rawEvents: EventRecord[], adventures: AdventureRecord[], objects: VObject[],
+ * @param {{ rawEvents: EventRecord[], adventures: AdventureRecord[], entities: Entity[],
  *           filters: FilterState, lens: LensKey, now: number }} input
  * @returns {TwinModel}
  */
-export function twinModel({ rawEvents, adventures, objects, filters, lens, now }) {
+export function twinModel({ rawEvents, adventures, entities, filters, lens, now }) {
     /** @type {Map<string, { total: number, lit: number, bands: Map<string, number> }>} */
     const acc = new Map();
     /** @param {string} nodeId @param {PoolItem} item @param {boolean} lit */
@@ -79,10 +79,10 @@ export function twinModel({ rawEvents, adventures, objects, filters, lens, now }
         levels[nodeId] = { total: level.total, lit: level.lit, bands };
     }
 
-    const byType = /** @type {Record<ObjectType, number>} */ (Object.fromEntries(Object.keys(OBJECT_TYPES).map((t) => [t, 0])));
-    for (const o of objects) byType[o.type] = (byType[o.type] ?? 0) + 1;
+    const byType = /** @type {Record<EntityType, number>} */ (Object.fromEntries(Object.keys(ENTITY_TYPES).map((t) => [t, 0])));
+    for (const o of entities) byType[o.type] = (byType[o.type] ?? 0) + 1;
 
-    return { levels, codex: { total: objects.length, byType }, check: checkRules(levels, rawEvents, adventures, unplaced) };
+    return { levels, codex: { total: entities.length, byType }, check: checkRules(levels, rawEvents, adventures, unplaced) };
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { panelInUse, useWorkspaceStore } from '../../store.js';
-import { OBJECT_TYPES, PHASE_NODES, PHASE_STAGES, REVIEW_STAGES } from '../../lifecycle.js';
+import { ENTITY_TYPES, PHASE_NODES, PHASE_STAGES, REVIEW_STAGES } from '../../lifecycle.js';
 import { passes, pendingChanges } from '../../filters.js';
 import { freshMinutes, freshTitle } from '../../lib/harvest.js';
 import { LENSES, byMatter, lensColor, lensRuns, lensValues, sourceColor } from '../../lib/lens.js';
@@ -143,9 +143,9 @@ function TwinTable({ nodes, pipes, model, routed, io, transitions, titleOf }) {
                                         ${n.locked && html`<span className="sc-lock" title="Not built yet">🔒</span>`}
                                     </td>
                                     <td className="sc-dim">${n.kind}${n.matter ? ` · ${n.matter}` : ''}</td>
-                                    ${n.holds === 'objects'
+                                    ${n.holds === 'entities'
                                         ? html`<td>${model.codex.total}</td><td colSpan="2" className="sc-dim">
-                                            ${Object.entries(model.codex.byType).map(([t, c]) => `${OBJECT_TYPES[/** @type {ObjectType} */ (t)].glyph} ${c}`).join('   ')}
+                                            ${Object.entries(model.codex.byType).map(([t, c]) => `${ENTITY_TYPES[/** @type {EntityType} */ (t)].glyph} ${c}`).join('   ')}
                                           </td>`
                                         : n.holds
                                             ? html`<td>${level.total}</td><td>${level.lit}</td><td><${Bands} level=${level} /></td>`
@@ -181,7 +181,7 @@ function TwinTable({ nodes, pipes, model, routed, io, transitions, titleOf }) {
                         <tr key=${t.id}>
                             <td className="sc-dim">${clock(t.at)}</td>
                             <td>${t.from} → ${t.to}</td>
-                            <td className="sc-dim">${titleOf.get(t.row_id) ?? t.entity}</td>
+                            <td className="sc-dim">${titleOf.get(t.row_id) ?? t.subject}</td>
                         </tr>
                     `)}
                     ${!transitions.length && html`<tr><td colSpan="3" className="sc-dim">No moves in the last 24 hours</td></tr>`}
@@ -199,7 +199,7 @@ function TwinTable({ nodes, pipes, model, routed, io, transitions, titleOf }) {
 export function SignalChainPanel() {
     const rawEvents = useWorkspaceStore((s) => s.rawEvents);
     const adventures = useWorkspaceStore((s) => s.adventures);
-    const objects = useWorkspaceStore((s) => s.objects);
+    const entities = useWorkspaceStore((s) => s.entities);
     const filters = useWorkspaceStore((s) => s.filters);
     const draftFilters = useWorkspaceStore((s) => s.draftFilters);
     const selectedId = useWorkspaceStore((s) => s.selectedItemId);
@@ -230,8 +230,8 @@ export function SignalChainPanel() {
     nodesRef.current = nodes;
     const pipes = useMemo(() => twinPipes(sourceNames), [sourceNames]);
     const model = useMemo(
-        () => twinModel({ rawEvents, adventures, objects, filters, lens: filters.lens, now }),
-        [rawEvents, adventures, objects, filters, now],
+        () => twinModel({ rawEvents, adventures, entities, filters, lens: filters.lens, now }),
+        [rawEvents, adventures, entities, filters, now],
     );
     const routed = useMemo(() => pipeFlows(flows, pipes), [flows, pipes]);
     const io = useMemo(() => {
@@ -273,8 +273,8 @@ export function SignalChainPanel() {
     // a packet's colour: its row's lens colour (the stage lens keeps the machine's colour),
     // dim when the row fails the applied filter
     const packetStyle = useMemo(() => (/** @type {TransitionRecord} */ t) => {
-        const event = t.entity === 'event' ? eventsById.get(t.row_id) : undefined;
-        const adventure = t.entity === 'adventure' ? adventuresById.get(t.row_id) : undefined;
+        const event = t.subject === 'event' ? eventsById.get(t.row_id) : undefined;
+        const adventure = t.subject === 'adventure' ? adventuresById.get(t.row_id) : undefined;
         const item = /** @type {PoolItem | undefined} */ (event ? { ...event, kind: 'omen' } : adventure ? { ...adventure, kind: 'adventure' } : undefined);
         if (!item) return null; // row gone: the machine's colour
         const lit = passes(item, filters, event ? 'discovery' : 'adventures', now);
@@ -312,9 +312,9 @@ export function SignalChainPanel() {
         const m = new Map();
         for (const e of rawEvents) m.set(e.id, e.title);
         for (const a of adventures) m.set(a.id, a.title);
-        for (const o of objects) m.set(o.id, o.name);
+        for (const o of entities) m.set(o.id, o.name);
         return m;
-    }, [rawEvents, adventures, objects]);
+    }, [rawEvents, adventures, entities]);
 
     const chooseView = (/** @type {'3d' | 'table'} */ v) => {
         setView(v);

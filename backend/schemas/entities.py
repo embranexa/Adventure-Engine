@@ -1,9 +1,9 @@
-"""Request bodies for the virtual object endpoints (services/objects.py checks the rest)."""
+"""Request bodies for the entity endpoints (services/entities.py checks the rest)."""
 
 from pydantic import BaseModel
 
 
-class ObjectFields(BaseModel):
+class EntityFields(BaseModel):
     """Only the fields sent change: send null or "" to clear one."""
 
     name: str | None = None
@@ -20,9 +20,9 @@ class ObjectFields(BaseModel):
     color: str | None = None
 
 
-class ObjectCreate(ObjectFields):
-    type: str  # pillar | site | contact
+class EntityCreate(EntityFields):
+    type: str  # deity | site | contact
 
 
-class ObjectUpdate(ObjectFields):
+class EntityUpdate(EntityFields):
     pass

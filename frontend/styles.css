@@ -455,7 +455,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
     flex: 1 1 auto; min-width: 0; font: 700 14px/1.1 var(--font-display); letter-spacing: 0.02em;
     color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
-.tcard-pillar {
+.tcard-deity {
     flex: none; padding: 1px 5px; border-radius: 3px; background: rgba(0, 0, 0, 0.35);
     font: 600 9px var(--font-display); letter-spacing: 0.14em; color: rgba(255, 255, 255, 0.85); text-transform: uppercase;
 }
@@ -886,7 +886,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .btn:disabled { opacity: 0.4; cursor: default; border-color: var(--steel-2); color: var(--text-dim); }
 .btn.on { border-color: var(--text-muted); color: var(--text-bright); background: rgba(255, 255, 255, 0.07); }
 
-/* ═════════ Object links (Refinery) ═════════ */
+/* ═════════ Entity links (Refinery) ═════════ */
 .ol { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .ol-head { color: var(--text-dim); font: 600 12px var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; }
 .ol-chips { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -925,7 +925,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 }
 .ae-site b { color: var(--text-bright); font-weight: 600; }
 
-/* ═════════ Codex: virtual objects ═════════ */
+/* ═════════ Codex: entities ═════════ */
 .codex { gap: 8px; }
 .codex, .codex * { user-select: text; }
 .cx-types { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 4px; }

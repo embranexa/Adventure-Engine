@@ -64,13 +64,13 @@ export function Corners() {
 
 /** What each panel is for: shown when hovering its rune icon. */
 const PANEL_HELP = {
-    node: 'The selected adventure or event as a trading card. Triage it, move it along the chain, edit it, link it to Codex objects. Here ore becomes essence: why do I want this?',
+    node: 'The selected adventure or event as a trading card. Triage it, move it along the chain, edit it, link it to Codex entities. Here ore becomes essence: why do I want this?',
     classifier: 'The whole pool as a constellation. Stars are facets (source, city, type, matter…); galaxies group the items that share them. Click a star: include → exclude → off. The sphere holds what passes; Pass through sends it to the Calendar and Atlas.',
     map: 'Where things happen: events as towers on the map, sites from the Codex, and the proximity ring that filters by distance.',
     calendar: 'When things happen, by week or month. Weekly events show on every day they repeat; all-day ones as banners. Drag across the day headers to filter by date.',
     alembic: 'How to do it: the adventure’s roadmap, a graph of actions. Completing the first action turns distillate into alloy.',
     scripter: 'The roadmap as text: one statement per line, e.g. A1[Buy tickets] --> A2[Pack].',
-    codex: 'The objects adventures link to: pillars (themes), sites (places), contacts (people), organizations and skills.',
+    codex: 'The entities adventures link to: deities (demand signals), sites (places), contacts (people), organizations and skills.',
     quests: 'What can I do right now: the next actions of every alloy adventure, ready to tick off.',
     signal_chain: 'The whole pipeline as a 3D twin: every machine, every move between them, lit by the lens.',
 };
