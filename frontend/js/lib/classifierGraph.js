@@ -38,11 +38,11 @@ const RING_COLOR = '#5fe0e6';
  * @param {FilterState} filters
  * @param {PoolMode} mode
  * @param {Layers} layers  which facet types are shown as stars
- * @param {Set<string>} collapsed  ids of collapsed stars (visual only)
+ * @param {(id: string) => boolean} isCollapsed  is this star collapsed (visual only)
  * @param {number} now
  * @returns {ClassifierModel}
  */
-export function buildModel(items, filters, mode, layers, collapsed, now) {
+export function buildModel(items, filters, mode, layers, isCollapsed, now) {
     /** @type {Star[]} */
     const stars = [];
     /** @type {Map<string, (item: PoolItem) => boolean>} */
@@ -56,7 +56,9 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
         for (const item of items) {
             for (const v of facetValues(item, facet)) counts.set(v, (counts.get(v) ?? 0) + 1);
         }
-        const values = new Set(layers[facet.key] ? counts.keys() : []);
+        // under the lens: every value, or only the most common if the facet has too many
+        const ranked = [...counts.keys()].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a.localeCompare(b));
+        const values = new Set(layers[facet.key] ? ranked.slice(0, facet.starLimit ?? Infinity) : []);
         for (const v of Object.keys(active)) values.add(v); // active filters are always stars
         for (const value of values) {
             const id = `facet:${facet.key}:${value}`;
@@ -65,7 +67,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
                 id, kind: 'facet', facet: facet.key, value, group: facet.label,
                 label: facetLabel(facet, value),
                 role, color: facetColor(facet.key, value),
-                count: counts.get(value) ?? 0, collapsed: collapsed.has(id),
+                count: counts.get(value) ?? 0, collapsed: isCollapsed(id),
             });
             membership.set(id, (item) => facetValues(item, facet).includes(value));
         }
@@ -75,7 +77,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
         const r = filters.date_range;
         stars.push({
             id: 'date', kind: 'date', group: 'Date', label: r.start === r.end ? r.start : `${r.start} → ${r.end}`,
-            role: r.mode, color: DATE_COLOR, count: 0, collapsed: collapsed.has('date'),
+            role: r.mode, color: DATE_COLOR, count: 0, collapsed: isCollapsed('date'),
         });
         membership.set('date', (item) => inDateRange(item, r));
     }
@@ -83,7 +85,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
         const ring = filters.ring;
         stars.push({
             id: 'ring', kind: 'ring', group: 'Proximity', label: ring.center.label || 'Ring',
-            role: ring.mode, color: RING_COLOR, count: 0, collapsed: collapsed.has('ring'),
+            role: ring.mode, color: RING_COLOR, count: 0, collapsed: isCollapsed('ring'),
         });
         membership.set('ring', (item) => inRing(item, ring));
     }
@@ -91,7 +93,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
         stars.push({
             id: 'seal', kind: 'seal', group: 'Hermetic Seal', label: filters.seal ? 'Sealed' : 'Seal broken',
             role: filters.seal ? 'seal' : 'off', color: filters.seal ? ROLE_COLORS.seal : '#5c626c',
-            count: 0, collapsed: collapsed.has('seal'),
+            count: 0, collapsed: isCollapsed('seal'),
         });
         membership.set('seal', (item) => isSealed(item, now));
     }
@@ -115,7 +117,7 @@ export function buildModel(items, filters, mode, layers, collapsed, now) {
     for (const s of stars) {
         if (s.kind !== 'facet') s.count = items.filter((i) => membership.get(s.id)?.(i)).length;
     }
-    for (const g of galaxies.values()) g.hidden = g.starIds.some((id) => collapsed.has(id));
+    for (const g of galaxies.values()) g.hidden = g.starIds.some((id) => isCollapsed(id));
 
     return { stars, galaxies: [...galaxies.values()], passCount, total: items.length };
 }

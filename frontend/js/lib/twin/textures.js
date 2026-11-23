@@ -85,8 +85,10 @@ export function plaqueTexture(zone, name) {
  * @param {'net' | 'core' | 'viewer'} zone
  * @param {{ x0: number, x1: number, z0: number, z1: number }} r  the zone's rectangle (world units)
  * @param {Record<string, [number, number]>} viewers  atlas / nexus / calendar positions (x, z)
+ * @param {{ x: number, z: number, w: number, h: number } | null} [plaque]  where the plaque lies
+ *   (world units): the frame opens there into a cartouche that holds it
  */
-export function zoneFloor(zone, r, viewers = {}) {
+export function zoneFloor(zone, r, viewers = {}, plaque = null) {
     const w = r.x1 - r.x0, d = r.z1 - r.z0, k = 2048 / Math.max(w, d), W = Math.round(w * k), H = Math.round(d * k);
     const [c, g] = canvas2d(W, H);
     const P = (x, z) => [(x - r.x0) * k, (z - r.z0) * k], S = Math.min(W, H);
@@ -167,6 +169,44 @@ export function zoneFloor(zone, r, viewers = {}) {
         glyphs(kx, ky, R * 0.65, ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'], R * 0.12, -Math.PI / 2 + TAU / 24);
         ring(kx, ky, R * 0.12, 3); rays(kx, ky, R * 0.15, R * 0.3, 8, 1.5);
         g.lineWidth = 1.2; g.setLineDash([6, 10]); g.beginPath(); g.moveTo(ax + R, ay); g.lineTo(nx - R, ny); g.moveTo(nx + R, ny); g.lineTo(kx - R, ky); g.stroke(); g.setLineDash([]);
+        if (viewers.ledger) {   // a ruled page under the Ledger
+            const [lx, ly] = at('ledger'); medallion(lx, ly, R);
+            ring(lx, ly, R * 0.72, 1.5);
+            for (let i = -3; i <= 3; i++) { const y = ly + i * R * 0.16, half = Math.sqrt(Math.max(0, (R * 0.6) ** 2 - (i * R * 0.16) ** 2)); g.lineWidth = i === -3 ? 2.5 : 1.3; g.beginPath(); g.moveTo(lx - half, y); g.lineTo(lx + half, y); g.stroke(); }
+            ring(lx, ly, R * 0.1, 2.5);
+            g.lineWidth = 1.2; g.setLineDash([6, 10]); g.beginPath(); g.moveTo(kx + R, ky); g.lineTo(lx - R, ly); g.stroke(); g.setLineDash([]);
+        }
     }
+    if (plaque) cartouche(g, P, k, plaque, W, H);
     return c;
+}
+
+/**
+ * Open the floor where the plaque lies and frame the opening as part of the pattern: the
+ * engraving is cleared under it, a double-ruled cartouche (like the frame's own double
+ * rule) surrounds it, and a ring finial at each end ties it into the frieze.
+ */
+function cartouche(g, P, k, plaque, W, H) {
+    const pad = 5 * k;
+    const [px, py] = P(plaque.x, plaque.z);
+    const hw = (plaque.w * k) / 2 + pad, hh = (plaque.h * k) / 2 + pad;
+    const x0 = Math.max(4, px - hw), x1 = Math.min(W - 4, px + hw);
+    const y0 = Math.max(4, py - hh), y1 = Math.min(H - 4, py + hh);
+    const rad = Math.min(hh, (y1 - y0) / 2) * 0.55;
+    const box = (inset, lw) => { g.lineWidth = lw; g.beginPath(); g.roundRect(x0 + inset, y0 + inset, x1 - x0 - 2 * inset, y1 - y0 - 2 * inset, Math.max(2, rad - inset)); g.stroke(); };
+    // clear the engraving under the plaque (and a margin)
+    g.save(); g.globalCompositeOperation = 'destination-out';
+    g.beginPath(); g.roundRect(x0 - pad * 0.5, y0 - pad * 0.5, x1 - x0 + pad, y1 - y0 + pad, rad + pad * 0.5); g.fill();
+    g.restore();
+    // the cartouche: a heavy rule and a fine one inside it
+    box(0, 4); box(pad * 0.45, 1.5);
+    // finials: a ring at each end, its stem reaching back into the frieze
+    const cy = (y0 + y1) / 2, fr = Math.min(pad * 1.1, (y1 - y0) * 0.22);
+    for (const [ex, dir] of [[x0, -1], [x1, 1]]) {
+        const fx = ex + dir * (fr + pad * 0.6);
+        g.lineWidth = 2.5; g.beginPath(); g.arc(fx, cy, fr, 0, Math.PI * 2); g.stroke();
+        g.beginPath(); g.arc(fx, cy, fr * 0.35, 0, Math.PI * 2); g.fill();
+        g.lineWidth = 2; g.beginPath(); g.moveTo(ex, cy); g.lineTo(fx - dir * fr, cy); g.stroke();
+        g.lineWidth = 1.5; g.beginPath(); g.moveTo(fx + dir * fr, cy); g.lineTo(fx + dir * (fr + pad * 1.6), cy); g.stroke();
+    }
 }

@@ -22,6 +22,11 @@ const SOURCE_COLORS = { luma: '#3ccf8e', '19hz': '#4f8cff', ra: '#f2b134', event
 const TYPE_COLORS = { event: '#4fb3ff', item: '#e0a43a', song: '#c86bf0' };
 /** Everything else: a value keeps the same color across reloads (picked by its text). */
 export const PALETTE = ['#4fb3ff', '#3ccf8e', '#f2b134', '#f0643c', '#c86bf0', '#2fd2c9', '#ff7aa8', '#a3d14b', '#8f8cff', '#ffb27a'];
+
+/** A source's own colour (its Source lens colour, its harvester's accents). @param {string} name */
+export function sourceColor(name) {
+    return SOURCE_COLORS[/** @type {keyof typeof SOURCE_COLORS} */ (name)] ?? PALETTE[hash(name) % PALETTE.length];
+}
 /** Object facets: their values are object ids, coloured by the object. */
 const OBJECT_LENSES = new Set(['pillar', 'site', 'contact', 'organization', 'skill']);
 const UNKNOWN_COLOR = '#5b616b';
@@ -71,7 +76,7 @@ export function lensColor(lens, value) {
     if (lens === 'stage') {
         return PHASE_STAGES[/** @type {Phase} */ (value)]?.color ?? REVIEW_STAGES[/** @type {ReviewState} */ (value)]?.color ?? UNKNOWN_COLOR;
     }
-    if (lens === 'source') return SOURCE_COLORS[/** @type {keyof typeof SOURCE_COLORS} */ (value)] ?? PALETTE[hash(value) % PALETTE.length];
+    if (lens === 'source') return sourceColor(value);
     if (OBJECT_LENSES.has(lens)) return objectColor(value);
     if (lens === 'type') return TYPE_COLORS[/** @type {keyof typeof TYPE_COLORS} */ (value)] ?? PALETTE[hash(value) % PALETTE.length];
     return PALETTE[hash(value) % PALETTE.length];

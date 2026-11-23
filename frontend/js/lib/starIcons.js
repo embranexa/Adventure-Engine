@@ -1,5 +1,5 @@
 // Icons for the Nexus's parent stars: a medallion (dark disc, ring) with a line drawing of
-// what the star is: a source, a city, a type, a matter, an object type, the date range,
+// what the star is: a source, a tag, a city / region / metro, a type, a matter, an object type, the date range,
 // the proximity ring, the Hermetic Seal. Drawn white on a canvas so each star tints its
 // own (the disc stays dark under any tint). Pure canvas, no three.js.
 //
@@ -70,13 +70,26 @@ const DRAW = {
         poly(g, [[72, 92], [72, 66], [90, 66], [90, 92]]);
         poly(g, [[30, 92], [98, 92]]);
     },
-    // a ticket with a notch
-    registration(g) {
-        g.beginPath();
-        g.moveTo(34, 46); g.lineTo(94, 46); g.lineTo(94, 58); g.arc(94, 64, 6, -Math.PI / 2, Math.PI / 2, true);
-        g.lineTo(94, 82); g.lineTo(34, 82); g.lineTo(34, 70); g.arc(34, 64, 6, Math.PI / 2, -Math.PI / 2, true); g.closePath();
-        g.stroke();
-        g.setLineDash([4, 5]); poly(g, [[76, 50], [76, 78]]); g.setLineDash([]);
+    // a region: a folded map, three panels
+    region(g) {
+        poly(g, [[32, 44], [52, 36], [76, 44], [96, 36], [96, 84], [76, 92], [52, 84], [32, 92]], true);
+        poly(g, [[52, 36], [52, 84]]);
+        poly(g, [[76, 44], [76, 92]]);
+    },
+    // a metro: a hub with its cities around it
+    metro(g) {
+        g.beginPath(); g.arc(C, C, 9, 0, Math.PI * 2); g.fill();
+        for (let k = 0; k < 5; k++) {
+            const a = (k / 5) * Math.PI * 2 - Math.PI / 2;
+            const x = C + Math.cos(a) * 30, y = C + Math.sin(a) * 30;
+            g.globalAlpha = 0.55; poly(g, [[C + Math.cos(a) * 12, C + Math.sin(a) * 12], [x - Math.cos(a) * 6, y - Math.sin(a) * 6]]);
+            g.globalAlpha = 1; g.beginPath(); g.arc(x, y, 5, 0, Math.PI * 2); g.fill();
+        }
+    },
+    // a tag: a label with its eyelet
+    tag(g) {
+        poly(g, [[36, 40], [70, 40], [94, 64], [70, 88], [36, 88]], true);
+        g.beginPath(); g.arc(72, 64, 6, 0, Math.PI * 2); g.stroke();
     },
     // a flask: matter
     phase(g) { DRAW.flask(g); },

@@ -9,7 +9,7 @@ import { ObjectLinks } from '../ObjectLinks.js';
 // details keys shown in their own rows; any others are listed generically below
 const KNOWN_DETAILS = new Set([
     'free', 'price_cents', 'price_min_cents', 'price_max_cents',
-    'sold_out', 'registration', 'hosts', 'guest_count',
+    'sold_out', 'registration', 'hosts', 'guest_count', 'located',
 ]);
 
 // Alchemical element glyphs (18×18): fire, water, air, earth, aether
@@ -21,9 +21,18 @@ const ELEMENT_PATHS = {
     aether: 'M9 2.5 A6.5 6.5 0 1 1 8.99 2.5 Z M9 7.2 A1.8 1.8 0 1 1 8.99 7.2 Z',
 };
 
+/** Display names of details keys that aren't self-explanatory. */
+const DETAIL_LABELS = /** @type {Record<string, string>} */ ({ price_text: 'price as listed', area: 'area (as listed)' });
+
+/** 'https://www.instagram.com/owl.dtla' -> 'instagram.com/owl.dtla'. @param {string} url */
+function linkLabel(url) {
+    try { const u = new URL(url); return (u.hostname.replace(/^www\./, '') + u.pathname).replace(/\/$/, '').slice(0, 48); } catch { return url; }
+}
+
 /** @param {unknown} value */
 function formatValue(value) {
-    const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    const text = Array.isArray(value) && value.every((v) => typeof v === 'string') ? value.join(', ')
+        : typeof value === 'object' ? JSON.stringify(value) : String(value);
     return text.length > 300 ? text.slice(0, 300) + '…' : text;
 }
 
@@ -108,12 +117,16 @@ function EventRows({ event }) {
         ? `Approximate location${event.city ? ` · ${event.city}` : ''}`
         : [event.venue, event.address].filter(Boolean).join(' — ') || event.city || 'Unknown';
 
-    /** @type {[string, string][]} */
+    /** @type {[string, unknown][]} */
     const rows = [];
     if (kind) rows.push(['Type', `${kind.glyph} ${kind.label}`]);
     if (placed) {
         rows.push(['When', event.start ? formatEventWhen(event) : 'Undated'], ['Where', where]);
-        if (event.lat != null && event.lon != null) rows.push(['Coords', `${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}`]);
+        if (event.lat != null && event.lon != null) {
+            // located by the geocoder (services/geocode.py): say how precisely
+            const by = typeof details.located === 'string' ? ` · by ${details.located}` : '';
+            rows.push(['Coords', `${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}${by}`]);
+        }
     }
     if (price) rows.push(['Price', details.sold_out ? `${price} (sold out)` : price]);
     else if (details.sold_out) rows.push(['Price', 'Sold out']);
@@ -122,7 +135,14 @@ function EventRows({ event }) {
     if (details.registration) rows.push(['Status', String(details.registration)]);
     rows.push(['Source', event.source ?? 'Hand-made']);
     for (const [key, value] of Object.entries(details)) {
-        if (!KNOWN_DETAILS.has(key) && value != null) rows.push([key.replace(/_/g, ' '), formatValue(value)]);
+        if (KNOWN_DETAILS.has(key) || value == null) continue;
+        // links beside the event page (19hz: the organizer's Instagram / Facebook): clickable
+        if (key === 'links' && Array.isArray(value)) {
+            const urls = value.map((v) => safeHttpUrl(String(v))).filter(Boolean);
+            if (urls.length) rows.push(['Other links', html`${urls.map((u, k) => html`${k ? ' · ' : ''}<a key=${u} href=${u} target="_blank" rel="noopener noreferrer">${linkLabel(u)}</a>`)}`]);
+            continue;
+        }
+        rows.push([DETAIL_LABELS[key] ?? key.replace(/_/g, ' '), formatValue(value)]);
     }
 
     return html`
@@ -176,7 +196,7 @@ function ItemActions({ item }) {
     if (item.kind === 'omen') {
         controls = item.review === 'ignored'
             ? html`<button className="btn nc-act" onClick=${() => reviveEvent(item.id)}
-                title="Becomes an adventure again: back where it was killed, else ore">↺ Revive</button>`
+                title="Back into play: its killed adventure returns where it was, else the event goes back to the Centrifuge">↺ Revive</button>`
             : html`
                 <button className="btn nc-act pass" onClick=${() => passEvent(item.id)} title="Becomes an adventure: ore">✦ Pass → Ore</button>
                 <button className="btn nc-act" onClick=${() => ignoreEvent(item.id)} title="Rejected, to dross; can be revived later">✕ Ignore → Dross</button>

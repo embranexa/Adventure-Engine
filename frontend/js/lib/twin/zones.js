@@ -61,10 +61,22 @@ export function buildZones(K, rects, viewers) {
         return g;
     };
 
+    // the glow under each plaque: a blurred rounded bar, brightest in the middle
+    const haloTex = own((() => {
+        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 96;
+        const g = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
+        g.filter = 'blur(14px)'; g.fillStyle = '#fff';
+        g.beginPath(); g.roundRect(34, 30, 188, 36, 18); g.fill();
+        const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+    })());
+
     for (const [zone, r] of Object.entries(rects)) {
         const w = r.x1 - r.x0, d = r.z1 - r.z0;
         // the engraved floor
-        const tex = own(texture(zoneFloor(zone, r, viewers), false));
+        // the plaque lies just inside the near edge; the floor's frame opens around it
+        const px = (r.x0 + r.x1) / 2, pz = r.z1 - 14;
+        const tex = own(texture(zoneFloor(zone, r, viewers, { x: px, z: pz, w: 64, h: 16 }), false));
         const floor = new THREE.Mesh(own(new THREE.PlaneGeometry(w, d)), own(new THREE.MeshBasicMaterial({
             map: tex, color: color.clone().multiplyScalar(0.13), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
         })));
@@ -85,12 +97,17 @@ export function buildZones(K, rects, viewers) {
         for (const [x, cz, ry] of [[r.x0, r.z0, 0], [r.x1, r.z0, -Math.PI / 2], [r.x1, r.z1, Math.PI], [r.x0, r.z1, Math.PI / 2]]) {
             const c = corner(); c.position.set(x, 0, cz); c.rotation.y = ry; group.add(c);
         }
-        // the plaque: an inlay flush with the floor, just inside the near edge
-        const plaque = new THREE.Mesh(own(new THREE.PlaneGeometry(64, 16)), own(new THREE.MeshBasicMaterial({
-            map: own(plaqueTexture(zone, ZONE_NAMES[zone] ?? zone)), color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+        // the plaque: an inlay flush with the floor, just inside the near edge. It glows a
+        // little (brighter than the engravings, on a soft halo) so it reads apart from the floor.
+        const halo = new THREE.Mesh(own(new THREE.PlaneGeometry(84, 30)), own(new THREE.MeshBasicMaterial({
+            map: haloTex, color, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
         })));
-        plaque.rotation.x = -Math.PI / 2; plaque.position.set((r.x0 + r.x1) / 2, 0.06, r.z1 - 14);
-        group.add(plaque);
+        halo.rotation.x = -Math.PI / 2; halo.position.set(px, 0.05, pz);
+        const plaque = new THREE.Mesh(own(new THREE.PlaneGeometry(64, 16)), own(new THREE.MeshBasicMaterial({
+            map: own(plaqueTexture(zone, ZONE_NAMES[zone] ?? zone)), color: color.clone().multiplyScalar(1.5), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+        })));
+        plaque.rotation.x = -Math.PI / 2; plaque.position.set(px, 0.06, pz);
+        group.add(halo, plaque);
     }
     group.traverse((o) => { if (o.isMesh) o.raycast = () => {}; });   // zones are scenery: never picked
     return { group, dispose: () => owned.forEach((x) => x.dispose()) };

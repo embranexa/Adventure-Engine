@@ -9,8 +9,9 @@ Two ways rows get recorded:
    at what changed and adds Transition rows in the same transaction:
        new Adventure                     centrifuge / sump / forge -> its phase's node
        Adventure.phase a -> b            node(a) -> node(b)   (kill, revive, sweeper, by hand)
-       Event.review new -> ignored       centrifuge -> sump   (other review changes are
-                                                               recorded by the adventure)
+       Event.review new -> ignored       centrifuge -> sump
+       Event.review ignored -> new       sump -> centrifuge   (revive; other review changes
+                                                               are recorded by the adventure)
        new AdventureObject               codex -> refinery     (a link)
        deleted AdventureObject           refinery -> codex     (an unlink)
 2. Explicitly, with record() / record_many(), for SQL statements that change rows without
@@ -116,6 +117,8 @@ def _record_orm_changes(session: Session, flush_context, instances) -> None:
             record(session, "adventure", obj.id, PHASE_NODES[change[0]], PHASE_NODES[change[1]])
         elif isinstance(obj, Event) and _change(obj, "review") == ("new", "ignored"):
             record(session, "event", obj.id, CENTRIFUGE_NODE, SUMP_NODE)
+        elif isinstance(obj, Event) and _change(obj, "review") == ("ignored", "new"):
+            record(session, "event", obj.id, SUMP_NODE, CENTRIFUGE_NODE)
 
     for obj in session.deleted:
         if isinstance(obj, AdventureObject):

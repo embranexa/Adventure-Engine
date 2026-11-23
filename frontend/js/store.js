@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as feed from './feed.js';
 import { indexItems, sameList } from './events.js';
-import { DEFAULT_FILTERS, KM_PER_MI, applyFilters, nextMode, setObjectNames } from './filters.js';
+import { DEFAULT_FILTERS, KM_PER_MI, applyFilters, nextMode, passes, setObjectNames } from './filters.js';
 
 /** Radius of a newly placed proximity ring. */
 export const DEFAULT_RING_RADIUS_KM = 5 * KM_PER_MI;
@@ -164,7 +164,18 @@ export function panelInUse(s) {
 }
 
 /** Selections made by clicking an item's card in a panel: they bring up the Refinery. */
-const CARD_CLICK_SOURCES = new Set(['classifier', 'calendar', 'map', 'quests', 'codex']);
+const CARD_CLICK_SOURCES = new Set(['classifier', 'calendar', 'map', 'quests', 'codex', 'ledger']);
+
+/**
+ * Ids of the events in the centrifuge (new) that the filters leave out: what a Discovery
+ * pass-through siphons or purges.
+ * @param {EventRecord[]} rawEvents @param {FilterState} filters @param {number} now @returns {string[]}
+ */
+export function excludedFromCentrifuge(rawEvents, filters, now) {
+    return rawEvents
+        .filter((e) => e.review === 'new' && !passes(/** @type {PoolItem} */ ({ ...e, kind: 'omen' }), filters, 'discovery', now))
+        .map((e) => e.id);
+}
 
 /**
  * The prima materia in the Centrifuge in comb order: earliest first, undated ones last.
@@ -319,6 +330,22 @@ const saveApplied = (get) => scheduleSave('filters', () => get().filters);
 /** @param {() => WorkspaceState} get */
 const saveDraft = (get) => scheduleSave('filters_draft', () => get().draftFilters);
 
+/** How many bulk transfers can be undone. */
+const UNDO_DEPTH = 20;
+
+/**
+ * Remember a bulk transfer (the server's response lists the ids it moved) so it can be
+ * undone, and announce it. `filters`: the filters to restore on undo (a pass-through clears them).
+ * @param {(fn: any) => void} set @param {any} res @param {Omit<TransferRecord, 'ids' | 'at'>} t
+ */
+function pushTransfer(set, res, t) {
+    const ids = Array.isArray(res?.ids) ? res.ids : [];
+    if (!ids.length) return;
+    set((/** @type {WorkspaceState} */ state) => ({
+        undoStack: [...state.undoStack, { ...t, ids, at: Date.now() }].slice(-UNDO_DEPTH),
+    }));
+}
+
 /**
  * Call the API for a triage/phase action. Errors land in `actionError` (shown in the
  * node card); success needs no handling, since the server broadcasts the new pools.
@@ -334,7 +361,7 @@ async function callAction(set, url, method = 'POST', body = undefined) {
             headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
             body: body === undefined ? undefined : JSON.stringify(body),
         });
-        if (res.ok) return true;
+        if (res.ok) return (await res.json().catch(() => null)) || {}; // the response (always truthy)
         const detail = (await res.json().catch(() => null))?.detail;
         set({ actionError: typeof detail === 'string' ? detail : `Request failed (${res.status})` });
     } catch {
@@ -419,6 +446,8 @@ const workspaceStore = (set, get) => ({
 
     // the two pools from the server, and the one currently shown (see poolUpdate)
     rawEvents: [],
+    excludedFate: 'siphon',
+    undoStack: [],
     adventures: [],
     mode: 'adventures',
     showShades: false,
@@ -560,10 +589,51 @@ const workspaceStore = (set, get) => ({
         saveDraft(get);
     },
 
-    passFilters: () => {
+    // In Discovery the centrifuge is narrowed too: the events the filters leave out are
+    // siphoned back to their harvesters, or purged to the Sump (excludedFate), so filters
+    // stack: each pass isolates further, and Feed brings everything back.
+    // Once the transfer is done the filters are cleared (lens, Seal and units stay): what
+    // they selected is now simply what's in the centrifuge. Undo brings both back.
+    passFilters: async () => {
+        const { mode, excludedFate, rawEvents, draftFilters, filters: before } = get();
+        const excluded = mode === 'discovery' && excludedFate !== 'keep'
+            ? excludedFromCentrifuge(rawEvents, draftFilters, Date.now()) : [];
         set((state) => withVisible(state, { filters: { ...state.draftFilters } }));
         saveApplied(get);
+        if (!excluded.length) return;
+        const siphon = excludedFate === 'siphon';
+        const res = await callAction(set, siphon ? '/api/events/siphon' : '/api/events/purge', 'POST', { ids: excluded });
+        if (!res) return;
+        pushTransfer(set, res, {
+            label: `${siphon ? 'Siphoned' : 'Purged'} ${res.moved} left out by the filters`,
+            from: 'new', to: siphon ? 'harvested' : 'ignored',
+            filters: { applied: before, draft: draftFilters },
+        });
+        set((state) => {
+            const clear = (/** @type {FilterState} */ f) => ({ ...f, facets: {}, date_range: null, ring: null });
+            return withVisible(state, { filters: clear(state.filters), draftFilters: clear(state.draftFilters) });
+        });
+        saveApplied(get); saveDraft(get);
     },
+
+    // Step back through bulk transfers: the events still where the transfer put them go back
+    // (any moved on since stay put), and a pass-through's filters return.
+    undoTransfer: async () => {
+        const t = get().undoStack.at(-1);
+        if (!t) return;
+        set((state) => ({ undoStack: state.undoStack.slice(0, -1) }));
+        const res = await callAction(set, '/api/events/move', 'POST', { ids: t.ids, from_review: t.to, to_review: t.from });
+        if (!res) { set((state) => ({ undoStack: [...state.undoStack, t] })); return; }
+        if (t.filters) {
+            set((state) => withVisible(state, {
+                filters: { ...t.filters.applied, lens: state.filters.lens },
+                draftFilters: { ...t.filters.draft, lens: state.draftFilters.lens },
+            }));
+            saveApplied(get); saveDraft(get);
+        }
+    },
+
+    setExcludedFate: (fate) => set({ excludedFate: fate }),
 
     discardDraft: () => {
         set((state) => ({ draftFilters: { ...state.filters } }));
@@ -854,15 +924,18 @@ const workspaceStore = (set, get) => ({
     },
 
     feedSource: async (name) => {
-        await callAction(set, `/api/sources/${encodeURIComponent(name)}/feed`);
+        const res = await callAction(set, `/api/sources/${encodeURIComponent(name)}/feed`);
+        pushTransfer(set, res, { label: `Fed ${res?.moved} from ${name}`, from: 'harvested', to: 'new', filters: null });
     },
 
     siphonSource: async (name) => {
-        await callAction(set, `/api/sources/${encodeURIComponent(name)}/siphon`);
+        const res = await callAction(set, `/api/sources/${encodeURIComponent(name)}/siphon`);
+        pushTransfer(set, res, { label: `Siphoned ${res?.moved} back to ${name}`, from: 'new', to: 'harvested', filters: null });
     },
 
     purgeCentrifuge: async () => {
-        await callAction(set, '/api/events/purge');
+        const res = await callAction(set, '/api/events/purge');
+        pushTransfer(set, res, { label: `Purged ${res?.moved} to the Sump`, from: 'new', to: 'ignored', filters: null });
     },
 
     // Updates the tree immediately; the server PUT is debounced so rapid

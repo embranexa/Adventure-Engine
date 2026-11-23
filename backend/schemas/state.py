@@ -2,14 +2,17 @@
 frontend/types/global.d.ts; the filtering itself happens in the browser (frontend/js/filters.js)."""
 
 from datetime import date
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field, model_validator
 
 FilterMode = Literal["include", "exclude"]
-FacetKey = Literal["source", "city", "registration", "type", "phase", "review", "pillar", "site", "contact", "organization", "skill"]
+FacetKey = Literal["source", "tag", "city", "region", "metro", "type", "phase", "review",
+                   "pillar", "site", "contact", "organization", "skill"]
 # what colors the matter: "stage" (Matter) or a facet (frontend/js/lib/lens.js)
-LensKey = Literal["stage", "source", "city", "registration", "type", "pillar", "site", "contact", "organization", "skill"]
+LensKey = Literal["stage", "source", "tag", "city", "region", "metro", "type",
+                  "pillar", "site", "contact", "organization", "skill"]
+FACET_KEYS, LENS_KEYS = set(get_args(FacetKey)), set(get_args(LensKey))
 
 
 class DateRange(BaseModel):
@@ -45,6 +48,19 @@ class FilterState(BaseModel):
     seal: bool = True  # Hermetic Seal (Adventures mode)
     units: Literal["mi", "km"] = "mi"
     lens: LensKey = "stage"  # applies at once (never pending): it changes colors, not the subset
+
+    @model_validator(mode="before")
+    @classmethod
+    def drop_retired_keys(cls, data: Any) -> Any:
+        """Saved state may name facets or a lens since removed (e.g. registration): drop
+        those filters and fall back to the Matter lens, rather than fail to load."""
+        if isinstance(data, dict):
+            data = dict(data)
+            if isinstance(data.get("facets"), dict):
+                data["facets"] = {k: v for k, v in data["facets"].items() if k in FACET_KEYS}
+            if data.get("lens") is not None and data["lens"] not in LENS_KEYS:
+                data["lens"] = "stage"
+        return data
 
 
 

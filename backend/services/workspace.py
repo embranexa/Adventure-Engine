@@ -41,6 +41,10 @@ PANELS_METADATA = {
         "id": "quests", "kind": "quests", "icon": "scroll",
         "name": "Crucible", "question": "now", "flow": ["alloy", "animus"],
     },
+    "ledger": {
+        "id": "ledger", "kind": "ledger", "icon": "ledger",
+        "name": "Ledger", "question": "what", "flow": ["matter", "list"],
+    },
     "signal_chain": {
         "id": "signal_chain", "kind": "twin", "icon": "gear",
         "name": "Signal Chain", "question": "all", "flow": ["flux", "relic"],
@@ -65,7 +69,7 @@ DEFAULT_LAYOUT_TREE: dict[str, Any] = {
             "direction": "vertical",
             "ratio": 50,
             "first": {"id": "leaf-map", "type": "leaf", "tabs": ["map"], "activeTab": "map"},
-            "second": {"id": "leaf-calendar", "type": "leaf", "tabs": ["calendar"], "activeTab": "calendar"},
+            "second": {"id": "leaf-calendar", "type": "leaf", "tabs": ["calendar", "ledger"], "activeTab": "calendar"},
         },
     },
 }

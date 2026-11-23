@@ -299,7 +299,15 @@ export function CalendarPanel() {
 
             <div className="cal-scroll" ref=${scrollRef} onClick=${() => selectItem(null, 'calendar')}>
                 <div className="cal-grid" style=${{ height: `${(LAST_HOUR - FIRST_HOUR) * HOUR_PX}px` }}>
+                    ${showNow && days.some((d) => sameDay(d.date, now)) && html`
+                        <div className="cal-now-guide" style=${{ top: `${(nowHour - FIRST_HOUR) * HOUR_PX}px` }} />
+                    `}
                     <div className="cal-gutter">
+                        ${showNow && days.some((d) => sameDay(d.date, now)) && html`
+                            <span className="cal-now-tag" style=${{ top: `${(nowHour - FIRST_HOUR) * HOUR_PX - 6}px` }}>
+                                ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                            </span>
+                        `}
                         ${hours.map((h) => html`
                             <span key=${h} style=${{ top: `${(h - FIRST_HOUR) * HOUR_PX + 1}px` }}>${String(h).padStart(2, '0')}</span>
                         `)}

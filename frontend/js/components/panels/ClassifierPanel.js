@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
-import { useWorkspaceStore } from '../../store.js';
+import { excludedFromCentrifuge, useWorkspaceStore } from '../../store.js';
 import { FACETS, facetLabel, formatDistance, parseDay, pendingChanges } from '../../filters.js';
 import { buildModel } from '../../lib/classifierGraph.js';
 import { LENSES } from '../../lib/lens.js';
@@ -35,6 +35,13 @@ function cycleStar(star) {
     }
 }
 
+/** Where a Discovery pass-through sends the centrifuge events the filters leave out. */
+const FATES = /** @type {{ key: ExcludedFate, label: string, title: string }[]} */ ([
+    { key: 'siphon', label: '⟵ Siphon', title: 'Back to their harvesters (Feed brings them back)' },
+    { key: 'purge', label: '↓ Purge', title: 'Into the Sump as dross (each can be revived)' },
+    { key: 'keep', label: 'Keep', title: 'Leave them in the centrifuge (only the calendar and map are filtered)' },
+]);
+
 const fmtDay = (/** @type {string} */ d) => parseDay(d).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
 /**
@@ -54,7 +61,17 @@ function FilterTray({ passCount }) {
     const setRing = useWorkspaceStore((s) => s.setRing);
     const passFilters = useWorkspaceStore((s) => s.passFilters);
     const discardDraft = useWorkspaceStore((s) => s.discardDraft);
+    const rawEvents = useWorkspaceStore((s) => s.rawEvents);
+    const fate = useWorkspaceStore((s) => s.excludedFate);
+    const setFate = useWorkspaceStore((s) => s.setExcludedFate);
     const pending = pendingChanges(draft, applied);
+    // Discovery: the centrifuge events this pass leaves out, and where they'll go
+    const excluded = useMemo(
+        () => (mode === 'discovery' ? excludedFromCentrifuge(rawEvents, draft, Date.now()).length : 0),
+        [mode, rawEvents, draft],
+    );
+    const moving = fate !== 'keep' ? excluded : 0;
+    const canPass = pending > 0 || moving > 0;
 
     const facetChips = FACETS.filter((f) => f.modes.includes(mode)).flatMap((facet) =>
         Object.entries(draft.facets[facet.key] ?? {}).map(([value, fmode]) => ({
@@ -101,9 +118,20 @@ function FilterTray({ passCount }) {
             <span className="tray-spacer"></span>
             <span className="tray-applied">map + calendar show <b>${shown}</b></span>
             ${pending > 0 && html`<button className="btn" onClick=${discardDraft} title="Throw away pending changes">Discard</button>`}
-            <button className="pass-btn" disabled=${pending === 0} onClick=${passFilters}
-                title=${pending ? 'Send this subset to the Calendar and Atlas' : 'Nothing pending'}>
+            ${mode === 'discovery' && html`
+                <span className="fate" title="What Pass through does with the centrifuge events the filters leave out">
+                    <span className="fate-title">Rest ${excluded}</span>
+                    ${FATES.map((f) => html`
+                        <button key=${f.key} className=${`fate-btn ${fate === f.key ? 'on' : ''}`} onClick=${() => setFate(f.key)} title=${f.title}>
+                            ${f.label}
+                        </button>
+                    `)}
+                </span>
+            `}
+            <button className="pass-btn" disabled=${!canPass} onClick=${passFilters}
+                title=${!canPass ? 'Nothing pending' : moving ? `Send this subset to the Calendar and Atlas, and ${fate} the ${moving} left out` : 'Send this subset to the Calendar and Atlas'}>
                 Pass through <span className="arrow">⟶</span> ${passCount}
+                ${moving > 0 && html`<span className="pass-rest">${fate === 'siphon' ? '⟵' : '↓'} ${moving}</span>`}
             </button>
         </div>
     `;
@@ -130,7 +158,11 @@ export function ClassifierPanel() {
     const lens = useWorkspaceStore((s) => s.filters.lens);
     const setLens = useWorkspaceStore((s) => s.setLens);
     const layers = useMemo(() => lensLayers(lens, mode), [lens, mode]);
-    const [collapsed, setCollapsed] = useState(() => new Set(/** @type {string[]} */ ([])));
+    // Which stars are collapsed: all of them (but `except`), or only `except`. A new lens,
+    // mode or applied filter starts again from all collapsed, so a big pool opens tidy.
+    const [fold, setFold] = useState(() => ({ all: true, except: new Set(/** @type {string[]} */ ([])) }));
+    const applied = useWorkspaceStore((s) => s.filters);
+    const isCollapsed = useMemo(() => (/** @type {string} */ id) => fold.all !== fold.except.has(id), [fold]);
     const [tick, setTick] = useState(0); // items become past (sealed) as time passes
 
     useEffect(() => {
@@ -139,9 +171,16 @@ export function ClassifierPanel() {
     }, []);
 
     const model = useMemo(
-        () => buildModel(items, filters, mode, layers, collapsed, Date.now()),
-        [items, filters, mode, layers, collapsed, tick, objects],
+        () => buildModel(items, filters, mode, layers, isCollapsed, Date.now()),
+        [items, filters, mode, layers, isCollapsed, tick, objects],
     );
+
+    // collapse all, and reframe, whenever the lens, the mode or the applied filters change
+    useEffect(() => {
+        setFold({ all: true, except: new Set() });
+        const timer = setTimeout(() => sceneRef.current?.fit(), 120);
+        return () => clearTimeout(timer);
+    }, [applied, mode]);
 
     // Load three.js + the scene only when this panel opens.
     useEffect(() => {
@@ -155,11 +194,11 @@ export function ClassifierPanel() {
                     onStarClick: cycleStar,
                     onStarContext: (/** @type {{ id: string } | undefined} */ star) => {
                         if (!star) return;
-                        setCollapsed((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(star.id)) next.delete(star.id);
-                            else next.add(star.id);
-                            return next;
+                        setFold((prev) => {
+                            const except = new Set(prev.except);
+                            if (except.has(star.id)) except.delete(star.id);
+                            else except.add(star.id);
+                            return { all: prev.all, except };
                         });
                     },
                 });
@@ -188,6 +227,9 @@ export function ClassifierPanel() {
         sceneRef.current?.setHover(hoveredId);
     }, [hoveredId, status]);
 
+    // every shown parent collapsed: the button expands them all, else it collapses them all
+    const allCollapsed = model.stars.length > 0 && model.stars.every((s) => s.collapsed);
+
     // the lenses that mean something in this mode (Matter always does)
     const lenses = LENSES.filter((l) => l.key === 'stage' || FACETS.find((f) => f.key === l.key)?.modes.includes(mode));
 
@@ -206,6 +248,14 @@ export function ClassifierPanel() {
                     `)}
                 </div>
                 <button className="btn view-home" title="Frame everything" onClick=${() => sceneRef.current?.fit()}>⌂</button>
+                <button className="btn view-collapse" disabled=${model.stars.length === 0}
+                    title=${allCollapsed ? 'Expand every parent' : 'Collapse every parent (hides the clusters linked to them)'}
+                    onClick=${() => {
+                        setFold({ all: !allCollapsed, except: new Set() });
+                        setTimeout(() => sceneRef.current?.fit(), 60); // reframe once the scene has the new model
+                    }}>
+                    ${allCollapsed ? '⊕ Expand all' : '⊖ Collapse all'}
+                </button>
                 <div className="cls-hint">
                     Click a parent: include → exclude → off · right-click: collapse · click a cluster to fly in
                 </div>

@@ -36,11 +36,13 @@ async def sync_source(name: str):
 async def feed_source(name: str):
     """Pour the source's harvested events into the centrifuge."""
     with triage_errors():
-        return {"moved": await triage.feed_source(name)}
+        ids = await triage.feed_source(name)
+    return {"moved": len(ids), "ids": ids}
 
 
 @router.post("/{name}/siphon")
 async def siphon_source(name: str):
     """Draw the source's events back out of the centrifuge into its harvester."""
     with triage_errors():
-        return {"moved": await triage.siphon_source(name)}
+        ids = await triage.siphon_source(name)
+    return {"moved": len(ids), "ids": ids}

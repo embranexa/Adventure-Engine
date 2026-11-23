@@ -7,6 +7,7 @@
     objects        virtual objects (pillars, sites, contacts, organizations, skills) that adventures link to (the Codex)
     adventure_objects  links between adventures and objects
     app_state      small JSON settings that must survive restarts (filters)
+    geocache       place lookups (address / venue / city -> coordinates), so each is asked once
     transitions    log of every move between nodes of the signal chain (the twin's packets)
 
 Stage names (Harvester, Centrifuge, Hopper, ...) are only for display: see
@@ -225,6 +226,19 @@ class AppState(Base):
     key: Mapped[str] = mapped_column(String(50), primary_key=True)
     value: Mapped[Any] = mapped_column(JSON)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class GeoCache(Base):
+    """One place lookup (services/geocode.py). lat/lon are null when nothing was found,
+    so a miss isn't asked again either."""
+
+    __tablename__ = "geocache"
+
+    query: Mapped[str] = mapped_column(String(600), primary_key=True)  # level + normalized text
+    lat: Mapped[float | None] = mapped_column(Float)
+    lon: Mapped[float | None] = mapped_column(Float)
+    label: Mapped[str | None] = mapped_column(Text)  # what the geocoder matched
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 # Columns a crawler (a harvester's scraper) fills in; everything else is managed by the app.

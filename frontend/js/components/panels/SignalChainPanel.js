@@ -4,7 +4,7 @@ import { panelInUse, useWorkspaceStore } from '../../store.js';
 import { OBJECT_TYPES, PHASE_NODES, PHASE_STAGES, REVIEW_STAGES } from '../../lifecycle.js';
 import { passes, pendingChanges } from '../../filters.js';
 import { freshMinutes, freshTitle } from '../../lib/harvest.js';
-import { LENSES, lensColor, lensValues } from '../../lib/lens.js';
+import { LENSES, lensColor, lensValues, sourceColor } from '../../lib/lens.js';
 import { eventNode, pipeFlows, twinModel } from '../../lib/twinModel.js';
 import { CENTRIFUGE, CODEX, FORGE, OUTSIDE, SUMP, nodeStage, twinNodes, twinPipes } from '../../lib/twinTopology.js';
 
@@ -20,6 +20,7 @@ const PANEL_MACHINES = {
     codex: [CODEX],
     map: ['atlas'],
     calendar: ['calendar'],
+    ledger: ['ledger'],
 };
 const RECENT = 15;
 const VIEW_KEY = 'signal-chain-view';
@@ -31,7 +32,7 @@ const NODE_COLORS = {
     [FORGE]: '#ff7a3c',
     [CODEX]: '#c8a46a',
     entropy_market: '#c8a46a',
-    nexus: '#9fb4c8', atlas: '#9fb4c8', calendar: '#9fb4c8',
+    nexus: '#9fb4c8', atlas: '#9fb4c8', calendar: '#9fb4c8', ledger: '#9fb4c8',
     ...Object.fromEntries(Object.entries(PHASE_NODES).map(([phase, id]) => [id, PHASE_STAGES[/** @type {Phase} */ (phase)].color])),
 };
 /** @param {string} id */
@@ -355,8 +356,10 @@ export function SignalChainPanel() {
         const scene = sceneRef.current;
         if (!scene || status !== 'ready') { replayed.current = false; return; }
         const colors = Object.fromEntries(nodes.map((n) => [n.id, nodeColor(n.id)]));
+        // harvesters carry their source's colour as accents (their matter stays flux)
+        const accents = Object.fromEntries(nodes.filter((n) => n.kind === 'harvester').map((n) => [n.id, sourceColor(n.label)]));
         scene.update({
-            nodes, pipes, levels: model.levels, codex: model.codex, flows: routed.byPipe, colors, sources, io,
+            nodes, pipes, levels: model.levels, codex: model.codex, flows: routed.byPipe, colors, accents, sources, io,
             centrifugeBySource, stageFilter, light, packetStyle, fresh,
         });
         scene.play(transitions, { replay: !replayed.current });

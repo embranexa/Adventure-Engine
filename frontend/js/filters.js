@@ -5,11 +5,12 @@
 // and Hermetic Seal) combine with AND. The result is the subset every view shows.
 //
 // Most facets have one value per item (its city, its source). Object facets (pillar,
-// site, contact) have several: an item passes an include if ANY of its linked objects is
+// site, contact) and tags have several: an item passes an include if ANY of its values is
 // included, and fails if any is excluded. An item with none counts as UNKNOWN.
 
 import { ADVENTURE_TYPES, OBJECT_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
 import { occursIn, span } from './lib/occurrences.js';
+import { cityName, itemMetro, itemRegion } from './lib/regions.js';
 
 /** @type {FilterState} */
 export const DEFAULT_FILTERS = { facets: {}, date_range: null, ring: null, seal: true, units: 'mi', lens: 'stage' };
@@ -41,18 +42,28 @@ const objectFacet = (type) => ({
     unknown: `No ${OBJECT_TYPES[type].label.toLowerCase()}`,
 });
 
+/** An item's tags (genres from 19hz, ...): trimmed, lowercased, without repeats. @param {PoolItem} item */
+function itemTags(item) {
+    const raw = item.details?.tags;
+    if (!Array.isArray(raw)) return [];
+    return [...new Set(raw.filter((t) => typeof t === 'string').map((t) => t.trim().toLowerCase()).filter(Boolean))];
+}
+
 /**
  * Facets: the parent types. `modes` limits a facet to one pool. `value` gives one value
- * or (object facets) a list; `unknown` labels items that have none.
- * @type {{ key: FacetKey, label: string, modes: PoolMode[], value: (item: PoolItem) => string | string[] | null | undefined, display?: (value: string) => string, unknown?: string }[]}
+ * or (object facets, tags) a list; `unknown` labels items that have none. `starLimit`
+ * caps how many of its values the Nexus shows as stars under the lens (the most common;
+ * filtered values always show), for facets with too many values to draw.
+ * @type {{ key: FacetKey, label: string, modes: PoolMode[], value: (item: PoolItem) => string | string[] | null | undefined, display?: (value: string) => string, unknown?: string, starLimit?: number }[]}
  */
 export const FACETS = [
     { key: 'source', label: 'Source', modes: ['adventures', 'discovery'], value: (i) => i.source },
-    { key: 'city', label: 'City', modes: ['adventures', 'discovery'], value: (i) => i.city },
-    {
-        key: 'registration', label: 'Registration', modes: ['adventures', 'discovery'],
-        value: (i) => (typeof i.details?.registration === 'string' ? i.details.registration : null),
-    },
+    // many-to-many: an event has several tags, a tag many events (like the object facets)
+    { key: 'tag', label: 'Tag', modes: ['adventures', 'discovery'], value: itemTags, unknown: 'No tags', starLimit: 24 },
+    // spatial, finest to coarsest (lib/regions.js derives the coarser levels from the city)
+    { key: 'city', label: 'City', modes: ['adventures', 'discovery'], value: (i) => cityName(i.city), unknown: 'No city' },
+    { key: 'region', label: 'Region', modes: ['adventures', 'discovery'], value: itemRegion, unknown: 'No region' },
+    { key: 'metro', label: 'Metro', modes: ['adventures', 'discovery'], value: itemMetro, unknown: 'No metro' },
     {
         key: 'type', label: 'Type', modes: ['adventures'],
         value: (i) => (i.kind === 'adventure' ? i.type : null),

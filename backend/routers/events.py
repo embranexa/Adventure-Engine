@@ -1,8 +1,11 @@
-"""Raw harvested events and their review: pass, ignore, revive, and purging the centrifuge."""
+"""Raw harvested events and their review: pass, ignore, revive, purging the centrifuge and
+siphoning chosen events back to their harvesters."""
 
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,10 +36,36 @@ async def clear_events(session: AsyncSession = Depends(get_session)):
     return {"deleted": result.rowcount}
 
 
+class EventIds(BaseModel):
+    ids: list[uuid.UUID] = Field(max_length=20000)
+
+
 @router.post("/purge")
-async def purge_centrifuge():
-    """Centrifuge -> Sump: every event still in the centrifuge (new) becomes ignored."""
-    return {"moved": await triage.purge_centrifuge()}
+async def purge_centrifuge(body: EventIds | None = None):
+    """Centrifuge -> Sump: every event still in the centrifuge (new) becomes ignored, or
+    only the given ones."""
+    ids = await (triage.purge_events(body.ids) if body is not None else triage.purge_centrifuge())
+    return {"moved": len(ids), "ids": ids}
+
+
+@router.post("/siphon")
+async def siphon_events(body: EventIds):
+    """Centrifuge -> Harvester: the given events (still new) go back to their sources' harvesters."""
+    ids = await triage.siphon_events(body.ids)
+    return {"moved": len(ids), "ids": ids}
+
+
+class EventMove(EventIds):
+    from_review: Literal["harvested", "new", "ignored"]
+    to_review: Literal["harvested", "new", "ignored"]
+
+
+@router.post("/move")
+async def move_events(body: EventMove):
+    """Chosen events between harvesters, Centrifuge and Sump (undo of a bulk transfer)."""
+    with triage_errors():
+        ids = await triage.move_events(body.ids, body.from_review, body.to_review)
+    return {"moved": len(ids), "ids": ids}
 
 
 @router.post("/{event_id}/pass")

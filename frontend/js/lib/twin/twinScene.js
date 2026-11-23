@@ -8,7 +8,7 @@
  *   NET     foundry floor: harvesters -> centrifuge -> sump; the forge
  *   CORE    raised bench:  hopper -> refinery -> alembic -> crucible -> arena -> treasury
  *           -> archive; necropolis in front (kill manifold), codex cabinet behind
- *   GALLERY back, raised:  nexus, atlas, calendar (the viewers)
+ *   GALLERY back, raised:  nexus, atlas, calendar, ledger (the viewers)
  *
  * Liquid height = rows held (each zone on its own scale). Pipes lie on the floor, dark
  * until a logged transition sends a slug of light along its route (pipes.js).
@@ -18,7 +18,7 @@
  * magic circle on the floor around the selected row's machine, in the row's matter colour
  * (selection.js). Each vessel's base is a button that cycles its stage in the filter.
  *
- *   scene.update({ nodes, pipes, levels, codex, flows, colors, sources, io,
+ *   scene.update({ nodes, pipes, levels, codex, flows, colors, accents, sources, io,
  *                  centrifugeBySource, stageFilter, light, packetStyle, fresh })
  *   scene.setSelection(nodeId, color)     // the old circle closes, the new one opens
  *   scene.setInUse(nodeIds)               // machines whose panel is in use work
@@ -51,7 +51,7 @@ const MACHINE_SCALE = 1.5;
 /** Rows that fill a heart: each zone has its own scale (raw events are bulk, adventures refined). */
 const CAP = { net: 120, core: 12 };
 /** Dynamos name what they work with on their label. */
-const SUB = { forge: 'prima materia', atlas: 'space', calendar: 'time', nexus: 'topology' };
+const SUB = { forge: 'prima materia', atlas: 'space', calendar: 'time', nexus: 'topology', ledger: 'list' };
 const FRUSTUM = 300;
 const VIEW_DIR = new THREE.Vector3(0.55, 0.85, 1.15).normalize();
 
@@ -86,10 +86,14 @@ function layout(nodes) {
         [CENTRIFUGE]: [-210, NET_Y, 0], [SUMP]: [-205, NET_Y, -122], [FORGE]: [-215, NET_Y, 118],
         [CODEX]: [-40, CORE_Y, 104], [ENTROPY_MARKET]: [180, CORE_Y, 104],
         [NECROPOLIS]: [110, CORE_Y, -104],
-        atlas: [-40, GALLERY_Y, -204], nexus: [90, GALLERY_Y, -204], calendar: [220, GALLERY_Y, -204],
     };
     const chainX = [-110, -40, 30, 110, 180, 250, 320];
     MAIN_CHAIN.forEach((id, i) => { fixed[id] = [chainX[i] ?? -110 + i * 70, CORE_Y, 0]; });
+    // the viewers spread evenly over the main chain's span, so the Gallery's side edges
+    // line up with the Core's (both zones pad their outermost machines the same)
+    const viewers = ['atlas', 'nexus', 'calendar', 'ledger'];
+    const [x0, x1] = [chainX[0], chainX.at(-1)];
+    viewers.forEach((id, i) => { fixed[id] = [x0 + (i * (x1 - x0)) / (viewers.length - 1), GALLERY_Y, -204]; });
     for (const id of [...nodes.map((n) => n.id), MANIFOLD]) if (fixed[id]) pos.set(id, new THREE.Vector3(...fixed[id]));
     return pos;
 }
@@ -200,7 +204,7 @@ export class TwinScene {
         if (this.zones) { this.scene.remove(this.zones.group); this.zones.dispose(); }
         const zoneOf = new Map(nodes.map((n) => [n.id, n.zone]));
         zoneOf.set(MANIFOLD, 'net');
-        const viewers = Object.fromEntries(['atlas', 'nexus', 'calendar'].filter((id) => this.positions.has(id)).map((id) => [id, [this.positions.get(id).x, this.positions.get(id).z]]));
+        const viewers = Object.fromEntries(['atlas', 'nexus', 'calendar', 'ledger'].filter((id) => this.positions.has(id)).map((id) => [id, [this.positions.get(id).x, this.positions.get(id).z]]));
         this.zones = buildZones(this.kit, zoneRects(this.positions, zoneOf), viewers);
         this.scene.add(this.zones.group);
     }
@@ -219,6 +223,7 @@ export class TwinScene {
         const rec = { id: node.id, node, color, spin: 0, syncing: false };
         const machine = buildMachine(this.shop, node, {
             color,
+            accent: this.data?.accents?.[node.id],
             working: () => this.inUse.has(node.id),
             spin: () => rec.spin,
             objects: () => this.data?.codex?.total ?? 0,
@@ -303,6 +308,7 @@ export class TwinScene {
     /**
      * @param {{ nodes, pipes, levels, codex, flows, colors, sources }} data
      *   flows: pipeId -> { forward, backward }; colors: nodeId -> css color;
+     *   accents: nodeId -> css color of its trim, where it differs (harvesters: their source);
      *   sources: name -> SourceStatus
      */
     update(data) {

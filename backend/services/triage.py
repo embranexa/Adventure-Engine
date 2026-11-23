@@ -4,9 +4,13 @@ Rules (resources/classifier.md, section 4):
     feed     a source's harvested events -> new (Harvester -> Centrifuge)
     siphon   a source's new events       -> harvested (Centrifuge -> Harvester)
     purge    every new event             -> ignored (Centrifuge -> Sump)
+    siphon / purge by id: the same moves for chosen new events (the ones a Discovery
+             pass-through leaves out: see siphon_events / purge_events)
+    move     chosen events between harvested / new / ignored (undoing a bulk transfer)
     pass     new raw event            -> passed;  new adventure in the Hopper (queued)
     ignore   new raw event            -> ignored (Sump)
-    revive   ignored raw event        -> passed;  its killed adventure is restored, else a new one
+    revive   ignored raw event        -> its killed adventure is restored (passed), else the
+                                         event goes back to the Centrifuge (new) for another look
     kill     adventure (any phase)    -> killed (Necropolis); its raw event -> ignored; data kept
     phase    adventure, by hand       -> any of MANUAL_PHASES, or completed -> decommissioned
     missed   pre-Arena adventure whose event has ended -> killed (automatic, see sweep_missed)
@@ -95,7 +99,7 @@ async def _move(session: AsyncSession, where, review: str, values: dict) -> list
     return ids
 
 
-async def feed_source(name: str) -> int:
+async def feed_source(name: str) -> list[uuid.UUID]:
     """Harvester -> Centrifuge: a source's harvested events become new (shown in Discovery)."""
     async with SessionLocal() as session:
         source_id = await _source_id(session, name)
@@ -104,10 +108,10 @@ async def feed_source(name: str) -> int:
         await session.commit()
     if ids:
         await broadcast_pools()
-    return len(ids)
+    return ids
 
 
-async def siphon_source(name: str) -> int:
+async def siphon_source(name: str) -> list[uuid.UUID]:
     """Centrifuge -> Harvester: a source's new events go back to waiting in its harvester."""
     async with SessionLocal() as session:
         source_id = await _source_id(session, name)
@@ -116,10 +120,10 @@ async def siphon_source(name: str) -> int:
         await session.commit()
     if ids:
         await broadcast_pools()
-    return len(ids)
+    return ids
 
 
-async def purge_centrifuge() -> int:
+async def purge_centrifuge() -> list[uuid.UUID]:
     """Centrifuge -> Sump: every event still new becomes ignored (each can be revived)."""
     async with SessionLocal() as session:
         ids = await _move(session, (Event.review == "new",), "ignored", {"reviewed_at": utcnow()})
@@ -127,7 +131,63 @@ async def purge_centrifuge() -> int:
         await session.commit()
     if ids:
         await broadcast_pools()
-    return len(ids)
+    return ids
+
+
+async def siphon_events(ids: list[uuid.UUID]) -> list[uuid.UUID]:
+    """Centrifuge -> Harvester for chosen events: each still-new one goes back to its
+    own source's harvester (the rest of `ids` is left alone)."""
+    async with SessionLocal() as session:
+        rows = (await session.execute(
+            select(Event.id, EventSource.name).join(EventSource, Event.source_id == EventSource.id)
+            .where(Event.id.in_(ids), Event.review == "new"))).all()
+        if rows:
+            await session.execute(update(Event).where(Event.id.in_([r.id for r in rows])).values(review="harvested"))
+            by_source: dict[str, list[uuid.UUID]] = {}
+            for r in rows:
+                by_source.setdefault(r.name, []).append(r.id)
+            for name, moved in by_source.items():
+                record_many(session, "event", moved, CENTRIFUGE_NODE, harvester_node(name))
+        await session.commit()
+    if rows:
+        await broadcast_pools()
+    return [r.id for r in rows]
+
+
+async def purge_events(ids: list[uuid.UUID]) -> list[uuid.UUID]:
+    """Centrifuge -> Sump for chosen events (only those still new)."""
+    async with SessionLocal() as session:
+        moved = await _move(session, (Event.id.in_(ids), Event.review == "new"), "ignored", {"reviewed_at": utcnow()})
+        record_many(session, "event", moved, CENTRIFUGE_NODE, SUMP_NODE)
+        await session.commit()
+    if moved:
+        await broadcast_pools()
+    return moved
+
+
+# review state -> the node holding events in it (harvested: the source's own harvester)
+_HOLDERS = {"new": lambda src: CENTRIFUGE_NODE, "ignored": lambda src: SUMP_NODE, "harvested": harvester_node}
+
+
+async def move_events(ids: list[uuid.UUID], from_review: str, to_review: str) -> list[uuid.UUID]:
+    """Move chosen events between the harvesters, the Centrifuge and the Sump: those of
+    `ids` still in `from_review` go to `to_review` (others have moved on: left alone).
+    Used to undo a bulk transfer."""
+    if from_review not in _HOLDERS or to_review not in _HOLDERS or from_review == to_review:
+        raise InvalidTransition(f"can't move events from {from_review} to {to_review}")
+    async with SessionLocal() as session:
+        rows = (await session.execute(
+            select(Event.id, EventSource.name).join(EventSource, Event.source_id == EventSource.id)
+            .where(Event.id.in_(ids), Event.review == from_review))).all()
+        if rows:
+            values = {"reviewed_at": utcnow() if to_review == "ignored" else None}
+            await session.execute(update(Event).where(Event.id.in_([r.id for r in rows])).values(review=to_review, **values))
+            for r in rows:
+                record_many(session, "event", [r.id], _HOLDERS[from_review](r.name), _HOLDERS[to_review](r.name))
+        await session.commit()
+    if rows:
+        await broadcast_pools()
+    return [r.id for r in rows]
 
 
 # --- raw events ---
@@ -161,8 +221,9 @@ async def ignore_event(event_id: uuid.UUID) -> None:
     await broadcast_pools()
 
 
-async def revive_event(event_id: uuid.UUID) -> str:
-    """Dross -> passed. Restores its killed adventure, or creates one. Returns its id."""
+async def revive_event(event_id: uuid.UUID) -> str | None:
+    """Dross back into play. If it had an adventure (killed), that is restored and its id
+    returned; otherwise the event returns to the Centrifuge as prima materia (None)."""
     async with SessionLocal() as session:
         event = await _get_event(session, event_id)
         if event.review != "ignored":
@@ -170,12 +231,11 @@ async def revive_event(event_id: uuid.UUID) -> str:
         adventure = await session.scalar(select(Adventure).where(Adventure.event_id == event.id))
         if adventure:
             _restore(adventure)
+            event.review, event.reviewed_at = "passed", utcnow()
         else:
-            adventure = Adventure(event_id=event.id, type="event", phase="queued")
-            session.add(adventure)
-        event.review, event.reviewed_at = "passed", utcnow()
+            event.review, event.reviewed_at = "new", None
         await session.commit()
-        adventure_id = str(adventure.id)
+        adventure_id = str(adventure.id) if adventure else None
     await broadcast_pools()
     return adventure_id
 

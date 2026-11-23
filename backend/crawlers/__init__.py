@@ -10,6 +10,6 @@ To add a source, write a module like luma.py and list it here.
 
 from types import ModuleType
 
-from backend.crawlers import luma
+from backend.crawlers import luma, nineteenhz
 
-CRAWLERS: dict[str, ModuleType] = {m.NAME: m for m in (luma,)}
+CRAWLERS: dict[str, ModuleType] = {m.NAME: m for m in (luma, nineteenhz)}

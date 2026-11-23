@@ -93,6 +93,7 @@ export function twinNodes(sourceNames) {
         node({ id: 'nexus', label: 'Nexus', zone: 'viewer', kind: 'viewer', action: { panel: 'classifier', mode: 'adventures' } }),
         node({ id: 'atlas', label: 'Atlas', zone: 'viewer', kind: 'viewer', action: { panel: 'map' } }),
         node({ id: 'calendar', label: 'Calendar', zone: 'viewer', kind: 'viewer', action: { panel: 'calendar' } }),
+        node({ id: 'ledger', label: 'Ledger', zone: 'viewer', kind: 'viewer', action: { panel: 'ledger' } }),
     ];
 }
 

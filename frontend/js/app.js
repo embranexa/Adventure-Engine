@@ -8,6 +8,7 @@ import { MatterGauge } from './components/MatterGauge.js';
 import { Abyss, WORLDS, saveWorld, savedWorld } from './components/Abyss.js';
 import { Sigil } from './components/PanelTitle.js';
 import { LayoutMenu } from './components/LayoutMenu.js';
+import { UndoToast } from './components/UndoToast.js';
 import { ADVENTURE_TYPES } from './lifecycle.js';
 
 /** Status light for the live connection. @param {FeedStatus} status */
@@ -48,6 +49,7 @@ function App() {
 
     return html`
         <${Abyss} world=${world} />
+        <${UndoToast} />
         <div className="workspace-shell">
             <header className="topbar">
                 <span className="brand"><${Sigil} />Adventure Engine</span>

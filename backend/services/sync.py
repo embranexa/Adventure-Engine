@@ -2,7 +2,7 @@
 
 Flow for one harvest (a "sync" in the API):
     status -> syncing (broadcast)
-    crawler.fetch_events()  -> validate each event -> upsert into `events`
+    crawler.fetch_events()  -> locate from the geocache -> validate each event -> upsert into `events`
         events never seen before go into the source's Harvester ("harvested");
         ones already known are refreshed and keep their review state
     status -> idle | failed (broadcast), then broadcast the full event list
@@ -23,6 +23,7 @@ from backend.db.base import SessionLocal, utcnow
 from backend.db.models import EVENT_FIELDS, OUTSIDE_NODE, Event, EventSource, harvester_node
 from backend.db.queries import get_source
 from backend.schemas.events import EventIn
+from backend.services import geocode
 from backend.services.hub import hub
 from backend.services.transitions import record_many
 from backend.services.triage import broadcast_pools, sweep_missed
@@ -115,6 +116,7 @@ async def sync_source(name: str) -> None:
         try:
             async with httpx.AsyncClient(timeout=20, headers={"User-Agent": USER_AGENT}) as client:
                 raw_events = await crawler.fetch_events(client)
+            raw_events = await geocode.fill_from_cache(raw_events)  # places looked up before
             count, fresh = await _upsert(name, _validate(raw_events, name))
         except Exception as e:  # noqa: BLE001 - any crawler failure becomes a 'failed' status
             log.exception("[%s] sync failed", name)
@@ -127,3 +129,4 @@ async def sync_source(name: str) -> None:
         # (adventures read their event's fields, so they change too)
         await sweep_missed()
         await broadcast_pools()
+        geocode.start()  # look up places not in the cache yet (background)

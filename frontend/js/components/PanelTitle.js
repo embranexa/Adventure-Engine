@@ -7,6 +7,7 @@ const ICON_PATHS = {
     flask: html`<path d="M6 1.5h4M6.8 1.5v4.2L2.6 12.6A1.3 1.3 0 0 0 3.7 14.5h8.6a1.3 1.3 0 0 0 1.1-1.9L9.2 5.7V1.5"></path><path d="M4.4 10h7.2"></path>`,
     compass: html`<circle cx="8" cy="8" r="6.3"></circle><path d="M8 3.6l1.6 4.4L8 12.4 6.4 8z"></path>`,
     clock: html`<circle cx="8" cy="8" r="6.3"></circle><path d="M8 4.3V8l2.6 1.6"></path>`,
+    ledger: html`<path d="M3 2.5h10v11H3z"></path><path d="M5.4 5.5h5.2M5.4 8h5.2M5.4 10.5h3.4"></path>`,
     alembic: html`<circle cx="5.8" cy="10" r="4.2"></circle><path d="M8.4 6.7L14.6 3.6v3.2"></path><path d="M2 10.6h7.6"></path>`,
     quill: html`<path d="M13.8 2.2C9.6 2.6 5.8 5.8 4.6 11.4l-.9 2.4"></path><path d="M13.8 2.2c-.4 4.4-3.6 7.4-8.4 8.6"></path><path d="M7.4 8.6l2.4.2"></path>`,
     codex: html`<path d="M3 2.5h7.5a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2z"></path><path d="M3 11.5a2 2 0 0 1 2-2h7.5"></path><path d="M7.8 4.6l1 1.9-1 1.9-1-1.9z"></path>`,

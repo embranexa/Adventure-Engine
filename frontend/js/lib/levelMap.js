@@ -79,6 +79,8 @@ export class LevelMap {
             orbRadius: 36,        // meters
             orbHover: 70,         // meters between tower top and orb centre
             minTowerHeight: 60,   // tower height for an event with no guests
+            approxScatterM: 1800, // radius over which events at an approximate place are scattered
+            clusterPx: 64,        // events closer than about this many pixels merge into one medallion
             flyToOnSelect: true,
             fitOnFirstData: true, // frame all events the first time any arrive
             ...config,
@@ -94,6 +96,13 @@ export class LevelMap {
         this._hasFrame = false;
         this._compact = null;
         this._fitted = false;
+        // clusters (see _updateClusters): recomputed when the zoom step, selection or events change
+        this._clusters = [];
+        /** @type {Map<string, HTMLElement>} cell key -> medallion */
+        this._clusterEls = new Map();
+        this._clusterKey = '';
+        this._entriesVersion = 0;
+        this._clusterList = null;
         this._styleReady = false;
 
         this._createMap();
@@ -125,12 +134,24 @@ export class LevelMap {
         const guests = Number(raw.details?.guest_count) || 0;
         const height = guests > 0 ? this.config.minTowerHeight + 45 * Math.log10(1 + guests) : 0;
 
+        let lng = raw.lon == null ? NaN : Number(raw.lon); // Number(null) would be 0, not "missing"
+        let lat = raw.lat == null ? NaN : Number(raw.lat);
+        // Approximate places (a city's centre, a hidden address) are shared by many events:
+        // scatter each over a disc around it (stable per event) so they don't stack.
+        if (raw.location_approximate && Number.isFinite(lat) && Number.isFinite(lng)) {
+            const id = String(raw.id ?? index);
+            const angle = (this._hash(id) % 3600) / 3600 * Math.PI * 2;
+            const r = this.config.approxScatterM * Math.sqrt((this._hash(id + '#') % 1000) / 1000);
+            lat += (r * Math.sin(angle)) / 111320;
+            lng += (r * Math.cos(angle)) / (111320 * Math.cos(lat * Math.PI / 180));
+        }
+
         return {
             id: String(raw.id ?? index),
             title: raw.title ?? `Event ${index + 1}`,
             image: raw.cover_url ?? null,
-            lng: raw.lon == null ? NaN : Number(raw.lon), // Number(null) would be 0, not "missing"
-            lat: raw.lat == null ? NaN : Number(raw.lat),
+            lng,
+            lat,
             height,
             guests,
             start: raw.start ? new Date(raw.start) : null,
@@ -520,10 +541,16 @@ export class LevelMap {
         });
 
 
+        this._entriesVersion++;
         this.nodeCount.textContent = String(this.nodes.length);
     }
 
     _clearNodes() {
+        for (const el of this._clusterEls.values()) el.remove();
+        this._clusterEls.clear();
+        this._clusters = [];
+        this._clusterKey = '';
+        this._closeClusterList();
         const S = this.shared;
 
         for (const e of this.entries) {
@@ -641,8 +668,10 @@ export class LevelMap {
         const compact = zoom < 13.6;
         const lift = this.config.orbRadius * 2.5;
         const visible = [];
+        this._updateClusters();
 
         for (const e of this.entries) {
+            if (e.clustered) { e.card.style.visibility = 'hidden'; continue; }
             const z = (e.parts.orb.position.z + lift) * e.m;
             this._v4.set(e.group.position.x, e.group.position.y, z, 1)
                 .applyMatrix4(this.camera.projectionMatrix);
@@ -672,6 +701,17 @@ export class LevelMap {
         // Nearer cards render on top.
         visible.sort((a, b) => b.w - a.w);
         visible.forEach((v, i) => { v.card.style.zIndex = String(i + v.boost); });
+
+        // cluster medallions stand on the ground at their members' centre
+        for (const c of this._clusters) {
+            const el = this._clusterEls.get(c.key);
+            if (!el) continue;
+            this._v4.set(c.x, c.y, 40 * c.m, 1).applyMatrix4(this.camera.projectionMatrix);
+            const w = this._v4.w, nx = this._v4.x / w, ny = this._v4.y / w;
+            if (w <= 0 || Math.abs(nx) > 1.2 || Math.abs(ny) > 1.2) { el.style.visibility = 'hidden'; continue; }
+            el.style.visibility = 'visible';
+            el.style.transform = `translate3d(${((nx * 0.5 + 0.5) * W).toFixed(1)}px,${((1 - (ny * 0.5 + 0.5)) * H).toFixed(1)}px,0) translate(-50%,-50%)`;
+        }
 
         if (compact !== this._compact) {
             this._compact = compact;
@@ -748,6 +788,7 @@ export class LevelMap {
             }
             // a click on a node selects it; anywhere else clears the selection
             // (MapLibre only fires click when the pointer barely moved, so drags don't count)
+            this._closeClusterList();
             const entry = this._pick(event.point);
             this.select(entry ? entry.node.id : null);
         };
@@ -782,8 +823,138 @@ export class LevelMap {
         this.raycaster.ray.origin.copy(near);
         this.raycaster.ray.direction.copy(far).sub(near).normalize();
 
-        const hit = this.raycaster.intersectObjects(this.pickables, false)[0];
+        const hit = this.raycaster.intersectObjects(this.pickables, false).find((h) => !h.object.userData.entry.clustered);
         return hit ? hit.object.userData.entry : null;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Clusters                                                           */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Merge events that would crowd each other: a grid in map space whose cells are about
+     * clusterPx wide at the current zoom step (so panning never regroups), every cell with
+     * two or more events becomes one medallion. The selected event always stands alone.
+     * Events at the same place share a cell at any zoom: a venue's nights stay one stack.
+     */
+    _updateClusters() {
+        const step = Math.round(this.map.getZoom() * 2) / 2;
+        const key = `${step}|${this.selectedId}|${this._entriesVersion}`;
+        if (key === this._clusterKey) return;
+        this._clusterKey = key;
+
+        const cell = this.config.clusterPx / (512 * 2 ** step); // mercator units (the world is 1 wide)
+        /** @type {Map<string, any[]>} */
+        const cells = new Map();
+        for (const e of this.entries) {
+            if (e.selected) continue;
+            const k = `${Math.floor(e.group.position.x / cell)}:${Math.floor(e.group.position.y / cell)}`;
+            if (!cells.has(k)) cells.set(k, []);
+            cells.get(k).push(e);
+        }
+
+        const clusters = [];
+        const inCluster = new Set();
+        for (const [k, members] of cells) {
+            if (members.length < 2) continue;
+            const n = members.length;
+            const sum = (/** @type {(e: any) => number} */ f) => members.reduce((a, e) => a + f(e), 0);
+            const lngs = members.map((e) => e.node.lng), lats = members.map((e) => e.node.lat);
+            const spread = Math.max(Math.max(...lngs) - Math.min(...lngs), Math.max(...lats) - Math.min(...lats));
+            clusters.push({
+                key: k, members,
+                x: sum((e) => e.group.position.x) / n, y: sum((e) => e.group.position.y) / n, m: members[0].m,
+                bounds: [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+                samePlace: spread < 0.0006, // about 50 m: zooming won't split them
+            });
+            for (const e of members) inCluster.add(e);
+        }
+
+        for (const e of this.entries) {
+            const c = inCluster.has(e);
+            if (e.clustered === c) continue;
+            e.clustered = c;
+            e.group.visible = !c;
+        }
+
+        /** @type {Map<string, HTMLElement>} */
+        const next = new Map();
+        for (const c of clusters) {
+            const el = this._clusterEls.get(c.key) ?? this._makeClusterEl();
+            this._fillClusterEl(el, c);
+            next.set(c.key, el);
+        }
+        for (const [k, el] of this._clusterEls) if (!next.has(k)) el.remove();
+        this._clusterEls = next;
+        this._clusters = clusters;
+        this._closeClusterList();
+    }
+
+    _makeClusterEl() {
+        const el = document.createElement('button');
+        el.className = 'lm-cluster';
+        el.style.visibility = 'hidden';
+        el.appendChild(document.createElement('b'));
+        this.labelLayer.appendChild(el);
+        return el;
+    }
+
+    /** Count in the middle; the ring is the members' colours, in proportion. */
+    _fillClusterEl(el, c) {
+        const n = c.members.length;
+        /** @type {Map<string, number>} */
+        const shares = new Map();
+        for (const e of c.members) {
+            const hex = '#' + e.node.color.getHexString();
+            shares.set(hex, (shares.get(hex) ?? 0) + 1);
+        }
+        let at = 0;
+        const stops = [...shares.entries()].sort((a, b) => b[1] - a[1]).map(([hex, k]) => {
+            const from = at; at += (k / n) * 360;
+            return `${hex} ${from.toFixed(1)}deg ${at.toFixed(1)}deg`;
+        });
+        el.style.setProperty('--ring', `conic-gradient(${stops.join(', ')})`);
+        el.style.setProperty('--size', `${Math.round(34 + 9 * Math.log2(n))}px`);
+        el.firstChild.textContent = String(n);
+        el.classList.toggle('same', c.samePlace);
+        const titles = c.members.slice(0, 6).map((e) => e.node.title).join('\n');
+        el.title = `${n} events${c.samePlace ? ' at one place' : ''}\n${titles}${n > 6 ? '\n…' : ''}\n\n${c.samePlace ? 'Click: list them' : 'Click: zoom in'}`;
+        el.onclick = (ev) => {
+            ev.stopPropagation();
+            if (c.samePlace) this._openClusterList(c, el);
+            else this.map.fitBounds(c.bounds, { padding: 90, maxZoom: 18, pitch: this.map.getPitch(), duration: 900 });
+        };
+    }
+
+    /** A venue's stack: pick one of its events from a list. */
+    _openClusterList(c, anchor) {
+        this._closeClusterList();
+        const list = document.createElement('div');
+        list.className = 'lm-cluster-list';
+        const when = (/** @type {any} */ e) => (e.node.start && !Number.isNaN(e.node.start.getTime())
+            ? e.node.start.toLocaleString([], { month: 'short', day: 'numeric', weekday: 'short' }) : '—');
+        const sorted = [...c.members].sort((a, b) => (a.node.start?.getTime() ?? Infinity) - (b.node.start?.getTime() ?? Infinity));
+        for (const e of sorted) {
+            const row = document.createElement('button');
+            row.style.setProperty('--c', '#' + e.node.color.getHexString());
+            const d = document.createElement('span'); d.textContent = when(e);
+            const t = document.createElement('b'); t.textContent = e.node.title; // event data is never parsed as HTML
+            row.append(d, t);
+            row.onclick = (ev) => { ev.stopPropagation(); this._closeClusterList(); this.select(e.node.id); };
+            list.appendChild(row);
+        }
+        const r = anchor.getBoundingClientRect(), host = this.labelLayer.getBoundingClientRect();
+        list.style.left = `${r.left - host.left + r.width / 2}px`;
+        list.style.top = `${r.top - host.top + r.height + 6}px`;
+        list.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+        this.labelLayer.appendChild(list);
+        this._clusterList = list;
+        this.map.once('movestart', () => this._closeClusterList());
+    }
+
+    _closeClusterList() {
+        this._clusterList?.remove();
+        this._clusterList = null;
     }
 
     /**

@@ -25,7 +25,7 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger';
 
 /** Icon names drawn by components/PanelTitle.js. */
 type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear';
@@ -179,7 +179,21 @@ type PoolMode = 'adventures' | 'discovery';
 // --- filters (logic in js/filters.js; persisted via /api/state/filters) ---
 
 type FilterMode = 'include' | 'exclude';
-type FacetKey = 'source' | 'city' | 'registration' | 'type' | 'phase' | 'review';
+/** A bulk transfer of raw events (feed, siphon, purge, a pass-through's), for undo. */
+interface TransferRecord {
+    label: string;
+    ids: string[];
+    from: 'harvested' | 'new' | 'ignored';
+    to: 'harvested' | 'new' | 'ignored';
+    /** Filters before a pass-through (which clears them); restored on undo. */
+    filters: { applied: FilterState; draft: FilterState } | null;
+    at: number;
+}
+
+/** siphon: back to their harvesters · purge: to the Sump · keep: stay in the centrifuge */
+type ExcludedFate = 'siphon' | 'purge' | 'keep';
+
+type FacetKey = 'source' | 'tag' | 'city' | 'region' | 'metro' | 'type' | 'phase' | 'review';
 
 /** Local calendar days, inclusive. */
 interface DateRange { start: string; end: string; mode: FilterMode }
@@ -204,7 +218,7 @@ interface FilterState {
 }
 
 /** "stage" (Matter) or a facet that can color rows. */
-type LensKey = 'stage' | 'source' | 'city' | 'registration' | 'type' | 'pillar' | 'site' | 'contact' | 'organization' | 'skill';
+type LensKey = 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'type' | 'pillar' | 'site' | 'contact' | 'organization' | 'skill';
 
 /** One move between signal chain nodes (backend/services/transitions.py). */
 interface TransitionRecord {
@@ -401,7 +415,13 @@ interface WorkspaceState {
     /** Draft: turn one facet value off. */
     removeFacet(facet: FacetKey, value: string): void;
     /** Apply the draft: the calendar and map switch to its subset. */
-    passFilters(): void;
+    passFilters(): Promise<void>;
+    /** What a Discovery pass-through does with centrifuge events the filters leave out. */
+    excludedFate: ExcludedFate;
+    setExcludedFate(fate: ExcludedFate): void;
+    /** Bulk transfers that can be undone, latest last. */
+    undoStack: TransferRecord[];
+    undoTransfer(): Promise<void>;
     /** Throw away pending draft edits. */
     discardDraft(): void;
     setDateRange(range: DateRange | null): void;

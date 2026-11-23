@@ -6,6 +6,7 @@ import { AlembicPanel } from './AlembicPanel.js';
 import { CalendarPanel } from './CalendarPanel.js';
 import { ClassifierPanel } from './ClassifierPanel.js';
 import { CodexPanel } from './CodexPanel.js';
+import { LedgerPanel } from './LedgerPanel.js';
 import { MapPanel } from './MapPanel.js';
 import { NodeCard } from './NodeCard.js';
 import { QuestsPanel } from './QuestsPanel.js';
@@ -23,4 +24,5 @@ export const PANEL_COMPONENTS = {
     codex: CodexPanel,
     quests: QuestsPanel,
     twin: SignalChainPanel,
+    ledger: LedgerPanel,
 };

@@ -35,7 +35,7 @@ const RIM_COLORS = { include: '#e6ebf2', exclude: '#ff4a3d' };
 const PACE_S = 0.5;          // a mechanism winds up or down in this long
 
 /** Plinth radius per body: the base is sized to the machine. */
-export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, market: 9, nexus: 8, atlas: 7, calendar: 8 };
+export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, market: 9, nexus: 8, atlas: 7, calendar: 8, ledger: 8 };
 
 /** Which body a node gets. */
 export function bodyOf(node) {
@@ -172,7 +172,8 @@ export const lighter = (c) => '#' + new THREE.Color(c).lerp(new THREE.Color('#ff
  * Build one machine.
  * @param {ReturnType<typeof makeShop>} S
  * @param {{ id: string, kind: string, zone: string, locked: boolean, holds: string | null, action: object | null }} node
- * @param {{ color: string, working: () => boolean, spin: () => number, objects: () => number, pending: () => boolean, ports?: number[] }} ctx
+ * @param {{ color: string, accent?: string, working: () => boolean, spin: () => number, objects: () => number, pending: () => boolean, ports?: number[] }} ctx
+ *   accent: the trim's colour, if not the matter colour (a harvester's source colour)
  *   ports: the angles (radians, world frame) where pipes meet the base
  */
 export function buildMachine(S, node, ctx) {
@@ -180,7 +181,7 @@ export function buildMachine(S, node, ctx) {
     const G = () => new THREE.Group();
     const anims = [];
     const a = anims;
-    const color = ctx.color, light = lighter(ctx.color), accent = color;
+    const color = ctx.color, light = lighter(ctx.color), accent = ctx.accent ?? color;
     // pace eases toward 1 while the panel is in use, back to 0 after (smoothstepped)
     let wind = 0, pace = 0;
     const working = () => pace > 0;
@@ -366,20 +367,27 @@ function bubbles(c, r, y0, h, count = 16) {
 
 const BODIES = {
     harvester(c) {
-        const { G, M, node, light, cyl, heart, band, box, curls, lathe, torus, ball, glow, finial, a, ctx } = c;
+        const { G, M, node, accent, cyl, heart, band, box, curls, lathe, torus, ball, glow, finial, gem, additive, CIRCLE, mine, a, ctx } = c;
         const g = G();
         g.add(cyl(6.9, 7.4, 1.2, M.brass, Y, 32), heart(6, 14, Y + 1.2), band(6.3, Y + 2), band(6.3, Y + 14.6));
+        // the source's colour: rings at the foot and on both bands
+        g.add(torus(7.55, 0.3, glow(accent, 0.9), Y + 1.3), torus(6.6, 0.26, glow(accent, 0.9), Y + 2.9), torus(6.6, 0.26, glow(accent, 0.9), Y + 15.5));
         for (let i = 0; i < 6; i++) { const t = (i / 6) * TAU + 0.3; g.add(box(0.5, 14, 0.5, M.brass, Math.cos(t) * 6.6, Y + 1.2, Math.sin(t) * 6.6)); }
         curls(g, 6.8, Y + 8.4, 3, 1.9);
         g.add(lathe([[6.6, Y + 15.2], [6.6, Y + 16], [4.8, Y + 17.2], [2, Y + 18.4], [1.1, Y + 19.2]], M.brass), cyl(0.7, 0.7, 3, M.brass, Y + 19, 12));
         const rotor = G(); rotor.position.y = Y + 22;
         rotor.add(torus(5.6, 0.45, M.gilt, 0));
         for (let i = 0; i < 7; i++) { const b = box(4.6, 0.2, 1.5, M.brass, 2.6, -0.1, 0); b.rotation.x = 0.55; const p = G(); p.rotation.y = (i / 7) * TAU; p.add(b); rotor.add(p); }
-        rotor.add(ball(1, glow(light, 2.2)));
+        rotor.add(torus(5.6, 0.28, glow(accent, 1), 0.55), ball(1, glow(accent, 1.6)));
         g.add(rotor);
+        // a sigil in the source's colour hovers over the rotor, turning against it
+        const sigil = new THREE.Mesh(new THREE.CircleGeometry(6.4, 48), mine(additive(CIRCLE.inner, accent, 0.95)));
+        sigil.rotation.x = -Math.PI / 2; sigil.position.y = Y + 24.4; g.add(sigil);
         const f = finial(0.9); f.position.y = Y + 22.8; g.add(f);
+        const crown = gem(accent, 0.7); crown.position.y = Y + 26.4; g.add(crown);
         if (node.locked) { for (let k = 0; k < 3; k++) { const ch = torus(7, 0.3, M.iron, Y + 5 + k * 3.5); ch.rotation.z = (k - 1) * 0.12; g.add(ch); } g.add(box(2.4, 2.2, 1.2, M.brass, 0, Y + 7.6, 7.2)); }
-        else a.push((dt) => { rotor.rotation.y += dt * ctx.spin(); });   // only while harvesting
+        else a.push((dt) => { rotor.rotation.y += dt * ctx.spin(); sigil.rotation.z -= dt * 0.6 * ctx.spin(); });   // only while harvesting
+        if (node.locked) sigil.visible = false;
         return { group: g, height: Y + 27 };
     },
     centrifuge(c) {
@@ -750,6 +758,39 @@ const BODIES = {
             for (const pl of planets) { if (!k) continue; pl.ph += dt * pl.w * 3 * k; pl.p.position.set(Math.cos(pl.ph) * pl.r, Math.sin(pl.ph) * pl.r * 0.4, Math.sin(pl.ph) * pl.r); }
         });
         return { group: g, height: Y + 24 };
+    },
+    // a lectern with an open book; its pages turn while the Ledger is in use
+    ledger(c) {
+        const { G, M, light, lathe, box, torus, gem, finial, additive, RUNES, mine, pace, a } = c;
+        const g = G();
+        g.add(lathe([[5.4, Y], [5, Y + 0.8], [1.6, Y + 1.8], [1.1, Y + 8], [1.8, Y + 8.6], [2.6, Y + 9.2]], M.brass, 40));
+        g.add(torus(5.2, 0.22, M.gilt, Y + 0.6), torus(1.5, 0.2, M.gilt, Y + 4.4));
+        const desk = G(); desk.position.y = Y + 10.4; desk.rotation.x = -0.5; g.add(desk);
+        desk.add(box(11, 0.6, 7.6, M.iron, 0, -0.6, 0), box(11.4, 0.3, 0.5, M.gilt, 0, -0.1, 3.8));
+        // two open pages, each with glowing ruled lines
+        const pageMat = mine(new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.9, metalness: 0 }));
+        const lines = mine(additive(RUNES, light, 0.6));
+        for (const s of [-1, 1]) {
+            const page = box(4.8, 0.25, 6.6, pageMat, s * 2.55, 0, 0); page.rotation.z = s * -0.08; desk.add(page);
+            const ruled = new THREE.Mesh(new THREE.PlaneGeometry(4, 5.6), lines); ruled.rotation.x = -Math.PI / 2; ruled.position.set(s * 2.55, 0.42, 0); desk.add(ruled);
+        }
+        // the turning leaf, hinged on the spine
+        const hinge = G(); desk.add(hinge);
+        const leaf = box(4.8, 0.12, 6.6, pageMat, 2.5, 0.3, 0); hinge.add(leaf);
+        const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 7, 10), M.gilt); spine.rotation.x = Math.PI / 2; desk.add(spine);
+        const crown = gem(light, 0.7); crown.position.set(0, Y + 16.4, -2.4); g.add(crown);
+        const f = finial(0.4); f.position.set(0, Y + 14.6, -2.4); g.add(f);
+        g.add(box(0.4, 4.2, 0.4, M.brass, 0, Y + 10.6, -2.4));
+        let turn = 0, angle = 0;
+        a.push((dt) => {
+            const k = pace();
+            if (k) turn = (turn + dt * 0.9 * k) % 1;   // about a page a second while in use
+            const target = k ? Math.PI * (0.5 - 0.5 * Math.cos(turn * Math.PI)) : 0;   // eased right -> left
+            angle += (target - angle) * Math.min(1, dt * 8);
+            hinge.rotation.z = angle;
+            crown.rotation.y += dt * 1.2 * k;
+        });
+        return { group: g, height: Y + 18 };
     },
 };
 
