@@ -6,6 +6,7 @@ import { AlembicPanel } from './AlembicPanel.js';
 import { CalendarPanel } from './CalendarPanel.js';
 import { ClassifierPanel } from './ClassifierPanel.js';
 import { CodexPanel } from './CodexPanel.js';
+import { InventoryPanel } from './InventoryPanel.js';
 import { LedgerPanel } from './LedgerPanel.js';
 import { MapPanel } from './MapPanel.js';
 import { NecropolisPanel } from './NecropolisPanel.js';
@@ -29,4 +30,5 @@ export const PANEL_COMPONENTS = {
     ledger: LedgerPanel,
     necropolis: NecropolisPanel,
     treasury: TreasuryPanel,
+    inventory: InventoryPanel,
 };

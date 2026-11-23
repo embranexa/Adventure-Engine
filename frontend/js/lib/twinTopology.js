@@ -102,7 +102,7 @@ export function twinNodes(sourceNames) {
         core('decommissioned', 'vessel', 'Archive'),
         core('killed', 'vessel', 'Necropolis', { panel: 'necropolis' }),
         node({ id: CODEX, label: 'Codex', zone: 'sanctum', kind: 'cabinet', holds: 'entities', action: { panel: 'codex' } }),
-        node({ id: INVENTORY, label: 'Inventory', zone: 'sanctum', kind: 'cabinet', locked: true }),
+        node({ id: INVENTORY, label: 'Inventory', zone: 'sanctum', kind: 'cabinet', action: { panel: 'inventory' } }),
         node({ id: AGORA, label: 'Agora', zone: 'sanctum', kind: 'cabinet', locked: true }),
         node({ id: PANTHEON, label: 'Pantheon', zone: 'sanctum', kind: 'cabinet', locked: true }),
         node({ id: MASTERY, label: 'Mastery', zone: 'sanctum', kind: 'cabinet', locked: true }),

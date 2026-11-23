@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
+import { modelSpec } from '../../lib/items.js';
+import { ModelView } from '../ModelView.js';
 import { centrifugeOrder, useWorkspaceStore } from '../../store.js';
 import { formatEventWhen, formatPrice, safeHttpUrl } from '../../events.js';
 import { ADVENTURE_FLAGS, ADVENTURE_TYPES, MAIN_ROUTE, PHASE_STAGES, hasWhenWhere, stageOf } from '../../lifecycle.js';
@@ -61,6 +63,7 @@ function CardArt({ src }) {
  * @param {{ item: PoolItem }} props
  */
 function TradingCard({ item }) {
+    const spec = useMemo(() => (item.kind === 'adventure' && item.type === 'item' ? modelSpec(item) : null), [item]); // items show their model
     const stage = stageOf(item);
     const stats = item.kind === 'adventure' ? item.stats : undefined;
     const element = /** @type {keyof typeof ELEMENT_PATHS | null} */ (stat(stats, 'element'));
@@ -86,7 +89,9 @@ function TradingCard({ item }) {
                     <span className="tcard-title">${item.title}</span>
                     ${deity && html`<span className="tcard-deity">${deity}</span>`}
                 </div>
-                <${CardArt} key=${item.id} src=${safeHttpUrl(item.cover_url)} />
+                ${spec
+                    ? html`<div className="tcard-art"><${ModelView} key=${item.id} spec=${spec} distance=${132} label=${item.title ?? ''} /></div>`
+                    : html`<${CardArt} key=${item.id} src=${safeHttpUrl(item.cover_url)} />`}
                 <div className="tcard-strip">
                     <span>★ ${stage ? stage.matter : 'unknown'}</span>
                     <span className="pips" title=${difficulty ? `Difficulty ${difficulty} of 5` : 'Difficulty not set'}>

@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.db.models import WHEN_WHERE_TYPES, Adventure, AdventureEntity, Enshrining, Entity, Epitaph, Event, EventSource, Move
+from backend.db.models import WHEN_WHERE_TYPES, Adventure, AdventureEntity, Enshrining, Entity, Epitaph, Event, EventSource, ItemSheet, Move
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -89,6 +89,7 @@ def enshrining_to_dict(r: Enshrining, moves: list[Move]) -> dict[str, Any]:
 def adventure_to_dict(
     a: Adventure, e: Event | None, source_name: str | None, entities: list[Entity] = (),
     epitaph: Epitaph | None = None, enshrining: Enshrining | None = None, moves: list[Move] = (),
+    sheet: ItemSheet | None = None,
 ) -> dict[str, Any]:
     """An adventure, flattened: its own fields over its linked event's (read through).
 
@@ -128,6 +129,7 @@ def adventure_to_dict(
         "phase_before_kill": a.phase_before_kill,
         "phase_changed_at": _iso(a.phase_changed_at),
         "epitaph": {"cause": epitaph.cause, "note": epitaph.note} if epitaph else None,
+        "item": {"purpose": sheet.purpose or "", "effects": sheet.effects or [], "model": sheet.model} if sheet and a.type == "item" else None,
         "enshrining": enshrining_to_dict(enshrining, moves) if enshrining else None,
         "stats": a.stats,
         "flags": a.flags or [],
@@ -165,11 +167,13 @@ async def list_adventures(session: AsyncSession) -> list[dict[str, Any]]:
     )).all():
         links.setdefault(adventure_id, []).append(obj)
     epitaphs = {r.adventure_id: r for r in (await session.scalars(select(Epitaph))).all()}
+    sheets = {r.adventure_id: r for r in (await session.scalars(select(ItemSheet))).all()}
     enshrinings = {r.adventure_id: r for r in (await session.scalars(select(Enshrining))).all()}
     moves: dict[Any, list[Move]] = {}
     for m in (await session.scalars(select(Move).order_by(Move.adventure_id, Move.position))).all():
         moves.setdefault(m.adventure_id, []).append(m)
-    return [adventure_to_dict(a, e, name, links.get(a.id, []), epitaphs.get(a.id), enshrinings.get(a.id), moves.get(a.id, []))
+    return [adventure_to_dict(a, e, name, links.get(a.id, []), epitaphs.get(a.id), enshrinings.get(a.id), moves.get(a.id, []),
+                              sheets.get(a.id))
             for a, e, name in rows.all()]
 
 

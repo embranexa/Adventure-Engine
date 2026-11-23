@@ -24,6 +24,8 @@ import { magicCircleCanvases } from './magicCircle.js';
 import { starIconCanvas, starIconKey } from './starIcons.js';
 import { stageOf } from '../lifecycle.js';
 import { coverSrc } from './covers.js';
+import { modelSpec } from './items.js';
+import { snapshot } from './cabinet/modelViews.js';
 import { deferredResize, isResizing, viewOf } from './resizing.js';
 
 const EXPAND_BASE = 170;     // a galaxy breaks apart when the camera is closer than this (+ size)
@@ -74,6 +76,9 @@ function spherePoints(n, r) {
     }
     return pts;
 }
+
+/** An item with a model shows it on its card, in place of the cover. */
+const hasModel = (item) => item.kind === 'adventure' && item.type === 'item' && Boolean(item.item?.model);
 
 export class ClassifierScene {
     /** @param {HTMLElement} parent @param {any} [callbacks] */
@@ -265,7 +270,8 @@ export class ClassifierScene {
     /** What a card shows; when it changes, the card is drawn again. */
     _cardSig(item) {
         const stage = stageOf(item);
-        return [item.title, item.cover_url, item.color, stage?.matter].join('\u0001');
+        const model = hasModel(item) ? JSON.stringify(modelSpec(item)) : '';
+        return [item.title, item.cover_url, item.color, stage?.matter, model].join('\u0001');
     }
 
     /** Draw (or redraw) a member's card: foil frame, title, cover image, matter strip. */
@@ -312,8 +318,11 @@ export class ClassifierScene {
         const art = { x: 18, y: 18 + bannerH + 8, w: W - 36, h: 170 };
         g.save();
         g.beginPath(); g.roundRect(art.x, art.y, art.w, art.h, 7); g.clip();
-        const cover = this._cover(item.cover_url, m);
-        if (cover?.ready) {
+        const cover = hasModel(item) ? null : this._cover(item.cover_url, m);
+        if (hasModel(item)) {
+            g.fillStyle = '#07080a'; g.fillRect(art.x, art.y, art.w, art.h);
+            g.drawImage(snapshot(modelSpec(item), art.w * 2, art.h * 2), art.x, art.y, art.w, art.h);
+        } else if (cover?.ready) {
             const iw = cover.img.naturalWidth, ih = cover.img.naturalHeight;
             const k = Math.max(art.w / iw, art.h / ih);
             const dw = iw * k, dh = ih * k;

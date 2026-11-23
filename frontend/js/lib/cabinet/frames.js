@@ -75,13 +75,13 @@ export function carcass(K, group, layout, { sealTexture, sealColor }) {
         }
     }
     // the crest
-    const cy = -layout.crestY, top = -layout.groups[0].y;
+    const cy = -layout.crestY;
     mesh(new THREE.CircleGeometry(30, 48), M.pane, group, mid, cy, 2);
     const seal = mesh(new THREE.PlaneGeometry(58, 58), light(sealTexture, sealColor, 0.95), group, mid, cy, 8);
     ring(31, 1.1, M.trim, group, mid, cy, 5, false); ring(34, 0.4, M.steel, group, mid, cy, 3, false);
     const reach = Math.min(w / 2 - 20, 280);
     for (const f of [-1, 1]) {
-        const a = [], base = top + 8;
+        const a = [], base = cy - 35;
         for (let i = 0; i <= 40; i++) { const q = i / 40; a.push(V(mid + f * (32 + q * (reach - 32)), base + (1 - q) ** 2 * 30, 4)); }
         tube(a, 0.95, M.trim, group);
         for (const [q, s] of [[0.12, 10], [0.42, 8], [0.72, 6]]) { const p = a[Math.round(q * 40)]; curl(s, M.bright, group, p.x + f * s * 0.5, p.y + s * 0.55, 5, f, 1.5); }

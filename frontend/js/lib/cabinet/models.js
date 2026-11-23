@@ -3,6 +3,7 @@
 // units tall) and may return { frame(t) } for its own motion.
 
 import * as THREE from 'three';
+import { recipeModel } from './recipe.js';
 import { hash } from './sigil.js';
 import { vessel } from './vessels.js';
 
@@ -31,4 +32,4 @@ function urn(K, group, m) {
     return flames.length ? { frame: (t) => flames.forEach((x, i) => { x.scale.y = 1 + Math.sin(t / 90 + i * 2) * 0.1; }) } : null;
 }
 
-export const MODELS = { urn, vessel };
+export const MODELS = { urn, vessel, recipe: recipeModel };

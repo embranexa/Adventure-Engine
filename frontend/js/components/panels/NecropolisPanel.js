@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { EPITAPH_CAUSES, PHASE_STAGES } from '../../lifecycle.js';
-import { entityColor } from '../../lib/lens.js';
+import { adventureColor } from '../../lib/items.js';
 import { confirmHere } from '../../lib/windows.js';
 import { Cabinet } from '../Cabinet.js';
 
@@ -13,10 +13,7 @@ const EMBER = '#e0744f';
 const LOOK = { shape: 'lancet', sealColor: EMBER, seed: 'necropolis', points: 5, dim: true };
 
 /** @param {AdventureRecord} a */
-const colorOf = (a) => {
-    const deity = a.entities.find((o) => o.type === 'deity');
-    return deity ? entityColor(deity.id) : EMBER;
-};
+const colorOf = (a) => adventureColor(a, EMBER);
 
 /**
  * Write a dead adventure's epitaph: a cause, and a note if you like.

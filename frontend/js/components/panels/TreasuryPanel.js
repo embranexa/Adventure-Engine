@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { accuracy, verdictName, verdictRings } from '../../lib/analysis.js';
-import { coverSrc } from '../../lib/covers.js';
-import { entityColor } from '../../lib/lens.js';
+import { adventureColor, modelSpec, sigilPoints } from '../../lib/items.js';
 import { Cabinet } from '../Cabinet.js';
 import { Ceremony } from '../Ceremony.js';
 import { AnalysisView } from './AnalysisView.js';
@@ -14,12 +13,7 @@ const VIOLET = '#a855f7';
 const LOOK = { shape: 'arch', sealColor: '#b76bff', seed: 'treasury', points: 8 };
 
 /** Its deity's colour, else the artifact's own. @param {AdventureRecord} a */
-const colorOf = (a) => {
-    const deity = a.entities.find((o) => o.type === 'deity');
-    return deity ? entityColor(deity.id) : VIOLET;
-};
-/** Its sigil's points: more for a longer roadmap. @param {AdventureRecord} a */
-const pointsOf = (a) => Math.max(4, Math.min(9, 4 + (a.roadmap?.actions.length ?? 0)));
+const colorOf = (a) => adventureColor(a, VIOLET);
 
 /**
  * The Treasury: every completed adventure as an artifact, unsealed ones first. Opening one
@@ -44,13 +38,10 @@ export function TreasuryPanel() {
 
     const groups = useMemo(() => [{
         items: artifacts.map((a) => {
-            const sealed = !!a.enshrining?.sealed_at;
+            const sealed = !!a.enshrining?.sealed_at, spec = modelSpec(a, { fallback: VIOLET });
             return {
                 id: a.id, label: a.title ?? 'Untitled', sub: sealed ? verdictName(a.enshrining?.verdict) : a.enshrining ? 'Draft' : 'Unsealed',
-                model: {
-                    type: 'vessel', kind: a.type, id: a.id, color: colorOf(a), on: sealed, points: pointsOf(a),
-                    rings: sealed ? verdictRings(a.enshrining?.verdict) : 0, cover: coverSrc(a.cover_url),
-                },
+                model: { ...spec, type: spec.parts ? 'recipe' : 'vessel', on: sealed },
             };
         }),
     }], [artifacts, entities]);
@@ -68,7 +59,7 @@ export function TreasuryPanel() {
         const lines = [['Verdict', verdictName(rec.verdict)]];
         if (acc != null) lines.push(['Accuracy', acc.toFixed(1)]);
         for (const name of discovered) lines.push(['New in the Codex', name]);
-        setCeremony({ title: 'Enshrined', subtitle: a.title ?? 'Untitled', color: colorOf(a), seed: a.id, points: pointsOf(a), rings: verdictRings(rec.verdict), lines });
+        setCeremony({ title: 'Enshrined', subtitle: a.title ?? 'Untitled', color: colorOf(a), seed: a.id, points: sigilPoints(a), rings: verdictRings(rec.verdict), lines });
     };
 
     return html`

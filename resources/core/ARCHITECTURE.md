@@ -214,7 +214,7 @@ Branch `core-zone`. Each stage is usable on its own.
 |---|---|---|
 | 1 | Shared cabinet (`frontend/js/lib/cabinet/`), Necropolis, epitaphs | done (2026-11-23) |
 | 2 | Treasury: vessels, cards, enshrine panel, verdict matrix, sealing | done (2026-11-23) |
-| 3 | Inventory: purpose, effects, model recipes; models in other panels. Items are partitioned by gear set (cabinet groups) **[decided]** | |
+| 3 | Inventory: purpose, effects, model recipes; models in quests, node card and Nexus. Partitioned by gear set **[decided]** | done (2026-11-23) |
 | 4 | Agora: bounty in the Alembic, payouts, ledger | |
 
 - **Abandon** in the Necropolis deletes a dead adventure for good. **[decided]** A crawled one's
@@ -225,3 +225,7 @@ Branch `core-zone`. Each stage is usable on its own.
 - Left for later: favor, skills, gear-set bonuses, locks, open lines, in-app commissions, GLB.
 - A site discovered at an event is added to the Codex but not linked: an event has one site (its
   where). Archiving or killing keeps a seal; moving back out of the Treasury breaks it. **[proposed]**
+- In the Nexus, an item without a model keeps its flat cover (a 3D card inside a card reads poorly);
+  quests and the node card use the default 3D card. **[proposed]**
+- Recipes are checked by `backend/services/items.py` and drawn by `frontend/js/lib/cabinet/recipe.js`.
+  To add one from a session: `PUT /api/adventures/{id}/item` with `{"model": [...]}`.

@@ -25,10 +25,10 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis' | 'treasury';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis' | 'treasury' | 'inventory';
 
 /** Icon names drawn by components/PanelTitle.js. */
-type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb' | 'crown';
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb' | 'crown' | 'satchel';
 
 /** A panel's definition (backend/services/workspace.py). Its title reads:
  *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
@@ -116,6 +116,8 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     /** When it last changed phase (for a killed one: when it died). */
     phase_changed_at: string | null;
     /** Why it died, if written; kept through a revive, so only meaningful while killed. */
+    /** Its sheet (the Inventory): items only. */
+    item: ItemSheet | null;
     /** Its analysis (the Treasury): a draft until sealed. */
     enshrining: (Omit<Analysis, 'link' | 'moves'> & { link: string | null; moves: (Omit<AnalysisMove, 'better'> & { better: string | null })[];
         sealed_at: string | null; amended_at: string | null }) | null;
@@ -133,6 +135,17 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     costs: string | null;
     rewards: string | null;
 }
+
+/** A part of a model recipe (backend/services/items.py checks it; lib/cabinet/recipe.js draws it). */
+interface ModelPart {
+    name: string; shape: string; mat: string; on: boolean; k: number;
+    /** the roadmap action that makes it */
+    act?: string | null;
+    [size: string]: unknown;
+}
+/** `target`: "favor", "other" or a skill entity's id; `amount` in percent. */
+interface ItemEffect { text: string; target: string; amount: number }
+interface ItemSheet { purpose: string; effects: ItemEffect[]; model: ModelPart[] | null }
 
 /** How a move is graded (js/lib/analysis.js GRADES). */
 type MoveGrade = 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'forced' | 'inaccuracy' | 'mistake' | 'miss' | 'blunder';
@@ -433,6 +446,8 @@ interface WorkspaceState {
     /** Write a killed adventure's epitaph. Resolves to an error message, or null. */
     saveEpitaph(adventureId: string, cause: EpitaphCause, note: string): Promise<string | null>;
     clearEpitaph(adventureId: string): Promise<string | null>;
+    /** Set an item's purpose, effects or model. Resolves to an error message, or null. */
+    saveItem(adventureId: string, changes: Partial<ItemSheet>): Promise<string | null>;
     /** Save the draft analysis, or seal (or amend) it. Resolves to the names new to the Codex, or an error message. */
     saveEnshrining(adventureId: string, analysis: Analysis, seal: boolean): Promise<{ discovered: string[] } | string>;
     /** Delete a killed adventure for good. Resolves to an error message, or null. */

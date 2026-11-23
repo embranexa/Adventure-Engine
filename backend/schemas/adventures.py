@@ -1,7 +1,7 @@
 """Request bodies for the adventure endpoints."""
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, Field
 
@@ -45,6 +45,20 @@ class EnshriningPayload(BaseModel):
     discoveries: list[Discovery] = Field(default_factory=list)
     moves: list[MovePayload] = Field(default_factory=list)
     seal: bool = False
+
+
+class Effect(BaseModel):
+    text: str = ""
+    target: str = "other"  # "favor", "other" or a skill entity's id
+    amount: float = 0      # percent; below 0 is a debuff
+
+
+class ItemPayload(BaseModel):
+    """An item's sheet; checked further in services/items.py."""
+
+    purpose: str | None = None
+    effects: list[Effect] | None = None
+    model: list[dict[str, Any]] | None = None
 
 
 class Recurrence(BaseModel):

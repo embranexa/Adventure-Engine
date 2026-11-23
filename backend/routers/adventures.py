@@ -1,5 +1,5 @@
 """Adventures: list, create and edit them, move them between phases, kill and revive, write
-epitaphs, enshrine, edit roadmaps."""
+epitaphs, enshrine, edit item sheets and roadmaps."""
 
 import uuid
 
@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.base import get_session
 from backend.db.queries import list_adventures
 from backend.routers.errors import triage_errors
-from backend.schemas.adventures import AdventureCreate, AdventureUpdate, EnshriningPayload, EpitaphPayload, PhasePayload, RoadmapPayload
-from backend.services import adventures, enshrinings, epitaphs, roadmap, triage
+from backend.schemas.adventures import AdventureCreate, AdventureUpdate, EnshriningPayload, EpitaphPayload, ItemPayload, PhasePayload, RoadmapPayload
+from backend.services import adventures, enshrinings, epitaphs, items, roadmap, triage
 
 router = APIRouter(prefix="/adventures", tags=["adventures"])
 
@@ -113,3 +113,15 @@ async def save_enshrining(adventure_id: uuid.UUID, payload: EnshriningPayload):
             return await enshrinings.save(adventure_id, payload.model_dump(exclude={"seal"}), payload.seal)
         except enshrinings.InvalidEnshrining as e:
             raise HTTPException(422, str(e)) from e
+
+
+@router.put("/{adventure_id}/item")
+async def save_item(adventure_id: uuid.UUID, payload: ItemPayload):
+    """Set an item's purpose, effects or model (only the fields sent). 409 unless it's an
+    item; 422 for an invalid effect or recipe."""
+    with triage_errors():
+        try:
+            await items.save_item(adventure_id, payload.model_dump(exclude_unset=True))
+        except items.InvalidItem as e:
+            raise HTTPException(422, str(e)) from e
+    return {"status": "saved"}

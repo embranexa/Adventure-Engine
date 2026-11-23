@@ -8,6 +8,7 @@
     adventure_entities  links between adventures and entities
     enshrinings    the analysis of a completed adventure (the Treasury), sealed or draft
     moves          the moves of an enshrining, graded like a chess game's
+    item_sheets    an item's purpose, effects and 3D model (the Inventory)
     epitaphs       why a killed adventure died (the Necropolis)
     app_state      small JSON settings that must survive restarts (filters)
     geocache       place lookups (address / venue / city -> coordinates), so each is asked once
@@ -202,6 +203,19 @@ class AdventureEntity(Base):
     entity_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class ItemSheet(Base):
+    """What an item is for, what it does, and its model (see services/items.py)."""
+
+    __tablename__ = "item_sheets"
+
+    adventure_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("adventures.id", ondelete="CASCADE"), primary_key=True)
+    purpose: Mapped[str] = mapped_column(Text, default="")
+    effects: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{text, target, amount}]
+    model: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)  # a recipe: parts
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 # Why an adventure died, in the order offered (labels in frontend/js/lifecycle.js).

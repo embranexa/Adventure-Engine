@@ -63,7 +63,11 @@ function faceTexture(K, m, w, h, round) {
 
 const flat = (map) => new THREE.MeshBasicMaterial({ map, transparent: true, toneMapped: false });
 
-function card(K, group, m, w, h) {
+/** A card's size within a box (portrait, the cover is cropped to it). */
+export const cardSize = (maxW, maxH) => (maxW / maxH > 0.79 ? [maxH * 0.79, maxH] : [maxW, maxW / 0.79]);
+
+/** The cover (or sigil) on a slab, facing +z. */
+export function card(K, group, m, w, h) {
     const { M, mesh } = K;
     mesh(new THREE.ExtrudeGeometry(rounded(w + 2.4, h + 2.4, 3.4), { depth: 1.6, bevelEnabled: true, bevelSize: 0.5, bevelThickness: 0.5, bevelSegments: 2 }), m.on ? M.trim : M.steel, group, 0, 0, -0.8);
     mesh(new THREE.PlaneGeometry(w, h), flat(faceTexture(K, m, w, h, false)), group, 0, 0, 1.45);

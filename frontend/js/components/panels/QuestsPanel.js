@@ -4,6 +4,8 @@ import { useWorkspaceStore } from '../../store.js';
 import { PHASE_STAGES } from '../../lifecycle.js';
 import { analyze, promotionTarget, toggleDone } from '../../lib/roadmap.js';
 import { safeHttpUrl } from '../../events.js';
+import { modelSpec } from '../../lib/items.js';
+import { ModelView } from '../ModelView.js';
 import { PromoteButton } from '../PromoteButton.js';
 
 const DAY_MS = 86_400_000;
@@ -26,13 +28,15 @@ function dueLabel(iso) {
 }
 
 /**
- * An adventure's cover image, down the left side of its card (nothing when it has no
- * cover, or the image won't load).
+ * An item's model, or an adventure's cover image, down the left side of its card (nothing
+ * when it has neither, or the image won't load).
  * @param {{ adventure: AdventureRecord }} props
  */
 function QuestCover({ adventure }) {
     const src = safeHttpUrl(adventure.cover_url);
     const [failed, setFailed] = useState(false);
+    const spec = useMemo(() => (adventure.type === 'item' ? modelSpec(adventure) : null), [adventure]);
+    if (spec) return html`<div className="ql-cover"><${ModelView} spec=${spec} distance=${140} label=${adventure.title ?? ''} /></div>`;
     if (!src || failed) return null;
     return html`
         <div className="ql-cover">

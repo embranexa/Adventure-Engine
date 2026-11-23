@@ -49,6 +49,10 @@ PANELS_METADATA = {
         "id": "treasury", "kind": "treasury", "icon": "crown",
         "name": "Treasury", "question": "how well", "flow": ["animus", "artifact"],
     },
+    "inventory": {
+        "id": "inventory", "kind": "inventory", "icon": "satchel",
+        "name": "Inventory", "question": "with what", "flow": ["artifact", "effects"],
+    },
     "necropolis": {
         "id": "necropolis", "kind": "necropolis", "icon": "tomb",
         "name": "Necropolis", "question": "why not", "flow": ["matter", "vestige"],
