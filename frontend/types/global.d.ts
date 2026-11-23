@@ -122,7 +122,7 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     entities: { id: string; type: EntityType; name: string }[];
     /** Its linked site, if any; a hand-made event takes its where from it. */
     site_id: string | null;
-    /** Free text for now (the Entropy Market later). */
+    /** Free text for now (the Agora later). */
     costs: string | null;
     rewards: string | null;
 }

@@ -9,7 +9,7 @@
 
 import { MAIN_ROUTE, PHASE_NODES, PHASE_STAGES } from '../lifecycle.js';
 
-/** @typedef {'net' | 'core' | 'viewer'} TwinZone */
+/** @typedef {'net' | 'core' | 'sanctum' | 'viewer'} TwinZone */
 /** @typedef {'harvester' | 'processor' | 'vessel' | 'dynamo' | 'cabinet' | 'viewer'} TwinKind */
 /**
  * @typedef {object} TwinNode
@@ -28,8 +28,9 @@ import { MAIN_ROUTE, PHASE_NODES, PHASE_STAGES } from '../lifecycle.js';
  * @typedef {{ panel: PanelId, mode?: PoolMode, shades?: boolean, create?: boolean, firstPrima?: boolean, label?: string }} TwinAction
  */
 /**
- * A pipe. `pipe` carries adventures and events; `conveyor` carries Codex entities; `market`
- * carries the Entropy Market's costs and rewards. Only plain pipes route moves between stages.
+ * A pipe. `pipe` carries adventures and events. `conveyor` (entities) and `market` (costs and
+ * rewards) are drawn by pipes.js but unused: the Sanctum has no pipes yet (its topology is
+ * still open, see resources/core/ARCHITECTURE.md). Only plain pipes route moves between stages.
  * @typedef {{ id: string, a: string, b: string, kind: 'pipe' | 'conveyor' | 'market' }} TwinPipe
  */
 
@@ -39,7 +40,12 @@ export const SUMP = 'sump';
 export const FORGE = 'forge';
 export const CODEX = 'codex';
 export const MANIFOLD = 'manifold';
-export const ENTROPY_MARKET = 'entropy_market';
+export const INVENTORY = 'inventory';
+export const AGORA = 'agora';
+export const PANTHEON = 'pantheon';
+export const MASTERY = 'mastery';
+/** The Sanctum: machines for what isn't primary matter, left to right. They have no pipes yet. */
+export const SANCTUM = [CODEX, INVENTORY, AGORA, PANTHEON, MASTERY];
 /** Fills in what harvested events lack (cover, exact place, end time): not built yet. */
 export const ENRICHER = 'enricher';
 /** The autonomous filter: a tunable chain of rules between the harvesters and the Centrifuge: not built yet. */
@@ -95,8 +101,11 @@ export function twinNodes(sourceNames) {
         core('completed', 'vessel', 'Treasury'),
         core('decommissioned', 'vessel', 'Archive'),
         core('killed', 'vessel', 'Necropolis'),
-        node({ id: CODEX, label: 'Codex', zone: 'core', kind: 'cabinet', holds: 'entities', action: { panel: 'codex' } }),
-        node({ id: ENTROPY_MARKET, label: 'Entropy Market', zone: 'core', kind: 'dynamo', locked: true }),
+        node({ id: CODEX, label: 'Codex', zone: 'sanctum', kind: 'cabinet', holds: 'entities', action: { panel: 'codex' } }),
+        node({ id: INVENTORY, label: 'Inventory', zone: 'sanctum', kind: 'cabinet', locked: true }),
+        node({ id: AGORA, label: 'Agora', zone: 'sanctum', kind: 'cabinet', locked: true }),
+        node({ id: PANTHEON, label: 'Pantheon', zone: 'sanctum', kind: 'cabinet', locked: true }),
+        node({ id: MASTERY, label: 'Mastery', zone: 'sanctum', kind: 'cabinet', locked: true }),
         node({ id: 'nexus', label: 'Nexus', zone: 'viewer', kind: 'viewer', action: { panel: 'classifier', mode: 'adventures' } }),
         node({ id: 'atlas', label: 'Atlas', zone: 'viewer', kind: 'viewer', action: { panel: 'map' } }),
         node({ id: 'calendar', label: 'Calendar', zone: 'viewer', kind: 'viewer', action: { panel: 'calendar' } }),
@@ -125,10 +134,6 @@ export function twinPipes(sourceNames) {
         pipe(FORGE, MAIN_CHAIN[0]),
         ...MAIN_CHAIN.slice(1).map((b, i) => pipe(MAIN_CHAIN[i], b)),
         pipe(CRUCIBLE, NECROPOLIS),
-        pipe(CODEX, REFINERY, 'conveyor'),
-        pipe(ENTROPY_MARKET, CRUCIBLE, 'market'),
-        pipe(ENTROPY_MARKET, ARENA, 'market'),
-        pipe(ENTROPY_MARKET, TREASURY, 'market'),
     ];
 }
 
@@ -137,14 +142,15 @@ export function twinPipes(sourceNames) {
  * the shortest way along plain pipes (a phase set by hand can skip stages; a kill runs to
  * the crucible and on; a revive from the sump runs through the centrifuge). Conveyors and
  * market pipes only carry moves between their own two ends. Moves from or to the outside
- * (harvest arrivals) have no pipe: an empty route, drawn and counted nowhere. Null when
+ * (harvest arrivals), and entity links (the Sanctum has no pipes yet), have no pipe: an
+ * empty route, drawn and counted nowhere. Null when
  * there's no way at all.
  * @param {Map<string, TwinPipe>} pipesByEnds  from pipeIndex()
  * @param {string} from @param {string} to
  * @returns {{ pipe: TwinPipe, forward: boolean }[] | null}
  */
 export function route(pipesByEnds, from, to) {
-    if (from === OUTSIDE || to === OUTSIDE) return [];
+    if (from === OUTSIDE || to === OUTSIDE || SANCTUM.includes(from) || SANCTUM.includes(to)) return [];
     const direct = pipesByEnds.get(`${from}~${to}`) ?? pipesByEnds.get(`${to}~${from}`);
     if (direct) return [{ pipe: direct, forward: direct.a === from }];
     // breadth-first over plain pipes, so the shortest way wins (ties: pipe order)

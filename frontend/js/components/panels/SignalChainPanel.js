@@ -8,7 +8,7 @@ import { LENSES, byMatter, lensColor, lensRuns, lensValues, sourceColor } from '
 import { eventNode, pipeFlows, twinModel } from '../../lib/twinModel.js';
 import { CENTRIFUGE, CODEX, FORGE, OUTSIDE, SUMP, nodeStage, twinNodes, twinPipes } from '../../lib/twinTopology.js';
 
-const ZONE_LABELS = { net: 'Net · events', core: 'Core · adventures', viewer: 'Viewers' };
+const ZONE_LABELS = { net: 'Net · events', core: 'Core · adventures', sanctum: 'Sanctum', viewer: 'Viewers' };
 
 /** The machines that work while a panel is in use (PHASE7_PLAN.md, stage 7d). @type {Partial<Record<PanelId, string[]>>} */
 const PANEL_MACHINES = {
@@ -31,7 +31,7 @@ const NODE_COLORS = {
     [SUMP]: REVIEW_STAGES.ignored.color,
     [FORGE]: '#ff7a3c',
     [CODEX]: '#c8a46a',
-    entropy_market: '#c8a46a',
+    inventory: '#cfd3da', agora: '#e9b949', pantheon: '#c86bf0', mastery: '#ff8f6b',
     enricher: '#c8a46a',
     sieve: '#c8a46a',
     nexus: '#9fb4c8', atlas: '#9fb4c8', calendar: '#9fb4c8', ledger: '#9fb4c8',
@@ -115,7 +115,7 @@ function Bands({ level }) {
  *           io: Record<string, { in: number, out: number }>, transitions: TransitionRecord[], titleOf: Map<string, string> }} props
  */
 function TwinTable({ nodes, pipes, model, routed, io, transitions, titleOf }) {
-    const zones = /** @type {const} */ (['net', 'core', 'viewer']);
+    const zones = /** @type {const} */ (['net', 'core', 'sanctum', 'viewer']);
     const busyPipes = pipes.filter((p) => routed.byPipe[p.id].forward || routed.byPipe[p.id].backward);
     return html`
         <div className="sc-scroll">

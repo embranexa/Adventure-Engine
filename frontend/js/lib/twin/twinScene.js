@@ -3,11 +3,12 @@
 // Machines: machines.js; zones: zones.js; textures: textures.js (phase 7, PHASE7_PLAN.md).
 
 /**
- * TwinScene — the signal chain as machines in three zones (BUILD_PLAN.md, phase 3):
+ * TwinScene — the signal chain as machines in four zones (BUILD_PLAN.md, phase 3):
  *
  *   NET     foundry floor: harvesters -> centrifuge -> sump; the forge
  *   CORE    raised bench:  hopper -> refinery -> alembic -> crucible -> arena -> treasury
- *           -> archive; necropolis in front (kill manifold), codex cabinet behind
+ *           -> archive; necropolis behind (kill manifold)
+ *   SANCTUM front: codex, inventory, agora, pantheon, mastery (no pipes yet)
  *   GALLERY back, raised:  nexus, atlas, calendar, ledger (the viewers)
  *
  * Liquid height = rows held (each zone on its own scale). Pipes lie on the floor, dark
@@ -36,7 +37,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { deferredResize, isResizing, viewOf } from '../resizing.js';
-import { CENTRIFUGE, CODEX, ENRICHER, ENTROPY_MARKET, FORGE, SIEVE, MAIN_CHAIN, MANIFOLD, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from '../twinTopology.js';
+import { CENTRIFUGE, ENRICHER, FORGE, SANCTUM, SIEVE, MAIN_CHAIN, MANIFOLD, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from '../twinTopology.js';
 import { makeMaterials } from './materials.js';
 import { buildZones, zoneRects } from './zones.js';
 import { FOOT, bodyOf, buildMachine, lighter, makeShop } from './machines.js';
@@ -72,7 +73,7 @@ function el(tag, cls, text) {
 
 /**
  * Where each machine stands (PHASE7_PLAN.md: the approved prototype's layout). The camera
- * looks from +z, so +z is the near side: the forge, codex and entropy market stand there;
+ * looks from +z, so +z is the near side: the forge and the Sanctum stand there;
  * the sump and necropolis on the far side. The manifold is the harvesters' pipe junction.
  * @param {{ id: string, zone: string, kind: string }[]} nodes
  */
@@ -86,11 +87,12 @@ function layout(nodes) {
         [CENTRIFUGE]: [-210, NET_Y, 0], [SUMP]: [-205, NET_Y, -122], [FORGE]: [-215, NET_Y, 118],
         [ENRICHER]: [-295, NET_Y, 118],   // front, between the harvesters and the Forge
         [SIEVE]: [-272, NET_Y, -104],     // back, between the harvesters and the Centrifuge
-        [CODEX]: [-40, CORE_Y, 104], [ENTROPY_MARKET]: [180, CORE_Y, 104],
         [NECROPOLIS]: [110, CORE_Y, -104],
     };
     const chainX = [-110, -40, 30, 110, 180, 250, 320];
     MAIN_CHAIN.forEach((id, i) => { fixed[id] = [chainX[i] ?? -110 + i * 70, CORE_Y, 0]; });
+    // the Sanctum stands in front of the Core, as the Gallery stands behind it: same span, evenly spread
+    SANCTUM.forEach((id, i) => { fixed[id] = [chainX[0] + (i * (chainX.at(-1) - chainX[0])) / (SANCTUM.length - 1), CORE_Y, 104]; });
     // the viewers spread evenly over the main chain's span, so the Gallery's side edges
     // line up with the Core's (both zones pad their outermost machines the same)
     const viewers = ['atlas', 'nexus', 'calendar', 'ledger'];

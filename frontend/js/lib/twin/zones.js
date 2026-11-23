@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { SILVER, V } from './materials.js';
 import { plaqueTexture, texture, zoneFloor } from './textures.js';
 
-const ZONE_NAMES = { net: 'Net', core: 'Core', viewer: 'Gallery' };
+const ZONE_NAMES = { net: 'Net', core: 'Core', sanctum: 'Sanctum', viewer: 'Gallery' };
 const PAD = 46;            // a zone reaches this far past its outermost machines
 const WALL_H = 26;
 
@@ -19,7 +19,7 @@ const wallFrag = 'uniform vec3 uColor; varying vec2 vUv; void main(){ float y = 
 /**
  * Each zone's rectangle on the floor, from where its machines stand.
  * @param {Map<string, THREE.Vector3>} positions  node id -> position
- * @param {Map<string, string>} zoneOf            node id -> 'net' | 'core' | 'viewer'
+ * @param {Map<string, string>} zoneOf            node id -> 'net' | 'core' | 'sanctum' | 'viewer'
  */
 export function zoneRects(positions, zoneOf) {
     const rects = {};

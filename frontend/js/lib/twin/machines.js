@@ -35,13 +35,12 @@ const RIM_COLORS = { include: '#e6ebf2', exclude: '#ff4a3d' };
 const PACE_S = 0.5;          // a mechanism winds up or down in this long
 
 /** Plinth radius per body: the base is sized to the machine. */
-export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, market: 9, nexus: 8, atlas: 7, calendar: 8, ledger: 8, enricher: 8, sieve: 8 };
+export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, agora: 9, inventory: 9, pantheon: 10, mastery: 8, nexus: 8, atlas: 7, calendar: 8, ledger: 8, enricher: 8, sieve: 8 };
 
 /** Which body a node gets. */
 export function bodyOf(node) {
     if (node.kind === 'harvester') return 'harvester';
-    if (node.id === 'entropy_market') return 'market';
-    return FOOT[node.id] ? node.id : 'market';
+    return FOOT[node.id] ? node.id : 'agora';
 }
 
 const std = (o) => new THREE.MeshStandardMaterial({ envMapIntensity: 1, ...o });
@@ -338,6 +337,12 @@ export function buildMachine(S, node, ctx) {
 /* ---------------------------------------------------------------------- */
 /*  Bodies: each returns { group, height }; animations go in c.a            */
 /* ---------------------------------------------------------------------- */
+
+/** Chains and a padlock round a machine that isn't built yet. */
+function chain({ M, torus, box }, g, r, n = 3) {
+    for (let k = 0; k < n; k++) { const ch = torus(r, 0.3, M.iron, Y + 3 + k * 3.2); ch.rotation.z = (k - 1) * 0.1; g.add(ch); }
+    g.add(box(2.4, 2.2, 1.2, M.brass, 0, Y + 5, r));
+}
 
 const gearCache = new Map();
 function gearGeo(r, teeth, depth) {
@@ -714,14 +719,65 @@ const BODIES = {
         if (node.locked) { for (let k = 0; k < 3; k++) { const ch = torus(7, 0.3, M.iron, Y + 1.6 + k * 2.4); ch.rotation.z = (k - 1) * 0.12; g.add(ch); } g.add(box(2.4, 2.2, 1.2, M.brass, 0, Y + 3.4, 6.9)); }
         return { group: g, height: Y + 19 };
     },
-    market(c) {
-        const { G, M, cyl, torus, box } = c;
+    // the Sanctum's machines not built yet: chained shut, like the Net's
+    // a round colonnade over an amphora
+    agora(c) {
+        const { G, M, cyl, lathe, box, torus, tube, node } = c;
         const g = G();
-        g.add(cyl(6.5, 6.5, 10, M.dark, Y, 6), new THREE.Mesh(new THREE.CylinderGeometry(0, 8.5, 4, 6), M.iron).translateY(Y + 12));
-        for (let k = 0; k < 3; k++) { const ch = torus(6.9, 0.3, M.iron, Y + 2.6 + k * 3); ch.rotation.z = (k - 1) * 0.1; g.add(ch); }
-        for (let i = 0; i < 5; i++) g.add(cyl(1.2, 1.2, 0.35, M.gilt, Y + 10 + i * 0.36, 20).translateX(3.2).translateZ(3.2));
-        g.add(box(2.4, 2.4, 1.2, M.brass, 0, Y + 4, 6.6));
-        return { group: g, height: Y + 16 };
+        for (let i = 0; i < 8; i++) { const t = (i / 8) * TAU; g.add(cyl(0.5, 0.6, 13, M.stone, Y, 12).translateX(Math.cos(t) * 7).translateZ(Math.sin(t) * 7)); }
+        g.add(torus(7, 0.5, M.gilt, Y + 13.2), torus(7, 0.3, M.gilt, Y + 14.2), torus(7.4, 0.25, M.iron, Y + 0.3));
+        g.add(lathe([[0, Y], [2, Y], [1.6, Y + 1], [3.4, Y + 4.4], [3.6, Y + 6.6], [1.7, Y + 9.6], [1.3, Y + 11.4], [2, Y + 12.2]], M.brass, 40));
+        for (const s of [-1, 1]) g.add(tube([V(s * 1.4, Y + 11, 0), V(s * 3.6, Y + 11.4, 0), V(s * 4.2, Y + 8.6, 0), V(s * 3.4, Y + 6.8, 0)], 0.28, M.gilt, 24));
+        if (node.locked) chain(c, g, 7.6);
+        return { group: g, height: Y + 15 };
+    },
+    // a glass case of shelves, a gear over it
+    inventory(c) {
+        const { G, M, box, cyl, gear, gem, node } = c;
+        const g = G();
+        for (const x of [-5.6, 5.6]) for (const z of [-3, 3]) g.add(cyl(0.3, 0.3, 17, M.silver, Y, 10).translateX(x).translateZ(z));
+        g.add(box(11.4, 16.6, 0.2, M.glass, 0, Y + 0.2, 3), box(11.4, 16.6, 0.2, M.glass, 0, Y + 0.2, -3));
+        for (let s = 0; s < 3; s++) {
+            g.add(box(11.6, 0.3, 6.4, M.silver, 0, Y + 0.6 + s * 5.5, 0));
+            for (let j = 0; j < 3; j++) {
+                const x = -3.6 + j * 3.6, y = Y + 2.8 + s * 5.5;
+                const thing = (s + j) % 3 === 0 ? gem('#cfd6e0', 1.2) : (s + j) % 3 === 1 ? gear(1.3, 10) : box(2, 2, 2, M.brass, 0, -1, 0);
+                thing.position.x += x; thing.position.y += y; g.add(thing);
+            }
+        }
+        g.add(box(12.4, 0.6, 7, M.silver, 0, Y + 17, 0));
+        const top = gear(2.4, 14); top.position.set(0, Y + 20.4, 0); g.add(top);
+        if (node.locked) chain(c, g, 7.2);
+        return { group: g, height: Y + 23 };
+    },
+    // a domed rotunda with an open eye
+    pantheon(c) {
+        const { G, M, cyl, torus, lathe, gem, node } = c;
+        const g = G();
+        g.add(cyl(8, 8.4, 0.8, M.stone, Y, 40), cyl(7.4, 7.6, 0.8, M.stone, Y + 0.8, 40));
+        for (let i = 0; i < 10; i++) { const t = (i / 10) * TAU; g.add(cyl(0.45, 0.55, 10, M.stone, Y + 1.6, 12).translateX(Math.cos(t) * 6.6).translateZ(Math.sin(t) * 6.6)); }
+        g.add(cyl(7.4, 7.4, 1.2, M.stone, Y + 11.6, 40));
+        const dome = [];
+        for (let i = 0; i <= 14; i++) { const t = (i / 14) * 1.32; dome.push([Math.cos(t) * 7, Y + 12.8 + Math.sin(t) * 5.4]); }
+        g.add(lathe(dome, M.silver, 48), torus(1.75, 0.3, M.gilt, Y + 18.1));
+        const eye = gem('#f2f3f5', 1.3); eye.position.y = Y + 20.6; g.add(eye);
+        if (node.locked) chain(c, g, 7.8);
+        return { group: g, height: Y + 22 };
+    },
+    // a tree whose branches end in gems
+    mastery(c) {
+        const { G, M, tube, gem, torus, node } = c;
+        const g = G();
+        g.add(tube([V(0, Y, 0), V(0.4, Y + 3, 0), V(-0.3, Y + 6, 0), V(0, Y + 9, 0)], 0.9, M.brass, 32), torus(5, 0.25, M.gilt, Y + 0.3));
+        for (let i = 0; i < 7; i++) {
+            const t = (i / 7) * TAU, up = i % 2 ? 17 : 14, out = i % 2 ? 4.4 : 6.4;
+            const end = V(Math.cos(t) * out, Y + up, Math.sin(t) * out);
+            g.add(tube([V(0, Y + 6 + (i % 3), 0), V(Math.cos(t) * out * 0.4, Y + 9.5, Math.sin(t) * out * 0.4), V(Math.cos(t) * out * 0.9, Y + up - 3, Math.sin(t) * out * 0.9), end], 0.32, M.brass, 28));
+            const gm = gem('#ffffff', 1); gm.position.copy(end).setY(end.y + 1); g.add(gm);
+        }
+        const crown = gem('#ffffff', 1.5); crown.position.y = Y + 20; g.add(tube([V(0, Y + 8, 0), V(0.3, Y + 14, 0), V(0, Y + 18.6, 0)], 0.4, M.brass, 24), crown);
+        if (node.locked) chain(c, g, 5.6, 2);
+        return { group: g, height: Y + 22 };
     },
     nexus(c) {
         const { G, M, color, light, lathe, band, tube, torus, finial, additive, RUNES, mine, busy, ctx, a } = c;

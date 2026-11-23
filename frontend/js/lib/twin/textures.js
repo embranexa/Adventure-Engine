@@ -44,7 +44,7 @@ export function runeStrip() {
     return t;
 }
 
-/** Each zone's sigil, for its plaque: a sieve (Net), an athanor (Core), an eye in a lens (Gallery). */
+/** Each zone's sigil, for its plaque: a sieve (Net), an athanor (Core), a temple front (Sanctum), an eye in a lens (Gallery). */
 const SIGIL = {
     net(g, s) {
         g.lineWidth = s * 0.05; g.beginPath(); g.arc(0, 0, s, 0, TAU); g.stroke();
@@ -58,6 +58,13 @@ const SIGIL = {
         g.beginPath(); g.moveTo(0, -s * 0.7); g.lineTo(0, -s); g.stroke();
         g.beginPath(); g.moveTo(-s * 0.18, s * 0.75); g.quadraticCurveTo(-s * 0.3, s * 0.35, 0, s * 0.15); g.quadraticCurveTo(s * 0.3, s * 0.35, s * 0.18, s * 0.75); g.stroke();
         g.beginPath(); g.arc(0, -s * 0.15, s * 0.18, 0, TAU); g.stroke();
+    },
+    sanctum(g, s) {
+        g.lineWidth = s * 0.06;
+        g.beginPath(); g.moveTo(-s, -s * 0.3); g.lineTo(0, -s); g.lineTo(s, -s * 0.3); g.closePath(); g.stroke();
+        for (const x of [-0.75, -0.25, 0.25, 0.75]) { g.beginPath(); g.moveTo(x * s, -s * 0.15); g.lineTo(x * s, s * 0.7); g.stroke(); }
+        g.beginPath(); g.moveTo(-s, s * 0.85); g.lineTo(s, s * 0.85); g.stroke();
+        g.beginPath(); g.arc(0, -s * 0.52, s * 0.13, 0, TAU); g.fill();
     },
     viewer(g, s) {
         g.lineWidth = s * 0.06;
@@ -82,7 +89,7 @@ export function plaqueTexture(zone, name) {
  * A zone's engraved floor: a rune frieze around the rectangle, then one composition
  * spanning it. Net: a web-and-sieve oval. Core: an oval of seven interlocking circles for
  * the metals. Gallery: a compass rose, a web of nodes and the zodiac under the viewers.
- * @param {'net' | 'core' | 'viewer'} zone
+ * @param {'net' | 'core' | 'sanctum' | 'viewer'} zone
  * @param {{ x0: number, x1: number, z0: number, z1: number }} r  the zone's rectangle (world units)
  * @param {Record<string, [number, number]>} viewers  atlas / nexus / calendar positions (x, z)
  * @param {{ x: number, z: number, w: number, h: number } | null} [plaque]  where the plaque lies
@@ -137,6 +144,20 @@ export function zoneFloor(zone, r, viewers = {}, plaque = null) {
             // salt and mercury at the two foci
             const f = Math.sqrt(Math.abs(IY * IY - IX * IX)) * 0.82, alongY = IY > IX;
             [[-1, '⊖'], [1, '☿']].forEach(([sg, sym]) => { const x = cx + (alongY ? 0 : sg * f), y = cy + (alongY ? sg * f : 0), rr = C * 0.42; blackDisc(x, y, rr); ring(x, y, rr, 3); ring(x, y, rr * 0.85, 1.2); glyphs(x, y, 0, [sym], rr); });
+        } else if (zone === 'sanctum') {
+            // five medallions, one under each machine (evenly spread, 46 units in from the sides),
+            // threaded by two weaving lines; each holds a polygram with one more point than the last
+            const x0 = 46 * k, step = (W - 2 * x0) / 4, rr = Math.min(IY * 0.92, step * 0.42);
+            for (const s of [1, -1]) {
+                g.lineWidth = 1.6; g.beginPath();
+                for (let i = 0; i <= 160; i++) { const u = i / 160, x = x0 + u * (W - 2 * x0), y = cy + s * Math.sin(u * 4 * Math.PI) * rr * 0.62; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+                g.stroke();
+            }
+            for (let i = 0; i < 5; i++) {
+                const x = x0 + i * step, n = 5 + i;
+                blackDisc(x, cy, rr); medallion(x, cy, rr);
+                poly(x, cy, rr * 0.76, n, 2, -Math.PI / 2, 2); ring(x, cy, rr * 0.3, 1.5);
+            }
         } else {
             // the great work: seven interlocking circles for the seven metals along the oval, the heptagram at the centre
             const rc = IY * 0.46, span = IX - rc * 1.05, metals = ['♄', '♃', '♂', '☉', '♀', '☿', '☽'];

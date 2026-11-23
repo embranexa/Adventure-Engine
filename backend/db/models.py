@@ -146,7 +146,7 @@ class Adventure(Base):
     lon: Mapped[float | None] = mapped_column(Float)
     url: Mapped[str | None] = mapped_column(Text)
     cover_url: Mapped[str | None] = mapped_column(Text)
-    costs: Mapped[str | None] = mapped_column(Text)    # free text for now (the Entropy Market later)
+    costs: Mapped[str | None] = mapped_column(Text)    # free text for now (the Agora later)
     rewards: Mapped[str | None] = mapped_column(Text)
     phase: Mapped[str] = mapped_column(String(20), default="queued")
     phase_before_kill: Mapped[str | None] = mapped_column(String(20))  # restored on revive
