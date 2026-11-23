@@ -815,7 +815,27 @@ const workspaceStore = (set, get) => ({
         actAndAdvance(get, eventId, () => callAction(set, `/api/events/${eventId}/revive`)),
 
     killAdventure: async (adventureId) => {
-        await callAction(set, `/api/adventures/${adventureId}/kill`);
+        if (!await callAction(set, `/api/adventures/${adventureId}/kill`)) return;
+        const title = get().adventures.find((a) => a.id === adventureId)?.title ?? 'it';
+        set({ epitaphPrompt: { adventureId, title, at: Date.now() } });
+    },
+
+    epitaphPrompt: null,
+    dismissEpitaphPrompt: () => set({ epitaphPrompt: null }),
+
+    saveEpitaph: async (adventureId, cause, note) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/epitaph`, 'PUT', { cause, note });
+        return typeof res === 'string' ? res : null;
+    },
+
+    abandonAdventure: async (adventureId) => {
+        const res = await sendJson(`/api/adventures/${adventureId}`, 'DELETE');
+        return typeof res === 'string' ? res : null;
+    },
+
+    clearEpitaph: async (adventureId) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/epitaph`, 'DELETE');
+        return typeof res === 'string' ? res : null;
     },
 
     reviveAdventure: async (adventureId) => {

@@ -8,6 +8,7 @@ import { ClassifierPanel } from './ClassifierPanel.js';
 import { CodexPanel } from './CodexPanel.js';
 import { LedgerPanel } from './LedgerPanel.js';
 import { MapPanel } from './MapPanel.js';
+import { NecropolisPanel } from './NecropolisPanel.js';
 import { NodeCard } from './NodeCard.js';
 import { QuestsPanel } from './QuestsPanel.js';
 import { ScripterPanel } from './ScripterPanel.js';
@@ -25,4 +26,5 @@ export const PANEL_COMPONENTS = {
     quests: QuestsPanel,
     twin: SignalChainPanel,
     ledger: LedgerPanel,
+    necropolis: NecropolisPanel,
 };

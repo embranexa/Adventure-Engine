@@ -10,6 +10,11 @@ class PhasePayload(BaseModel):
     phase: str  # checked against the allowed transitions in services/triage.py
 
 
+class EpitaphPayload(BaseModel):
+    cause: str  # checked in services/epitaphs.py
+    note: str | None = None
+
+
 class Recurrence(BaseModel):
     """Weekly for now: on these weekdays (Monday = 0), until a day (inclusive) or forever."""
 

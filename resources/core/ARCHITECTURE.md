@@ -206,12 +206,20 @@ performance. A performance can have a date and place (a gig) or none (a song) **
 built: code still refuses a when/where on performances]**. The transitions log's `entity` column became `subject`, so *entity* only ever
 means a Codex entity.
 
-## Build order **[proposed]**
+## Build order **[decided]**
 
-1. Treasury: enshrining, surveys, gallery prototypes; epitaphs
-2. Codex pipe and discoveries
-3. Ledger, bounties, payout lever
-4. Vault
-5. Equipment, gear sets, locks
-6. Skills, XP, trials, crowning
-7. Deity ranks; Nexus fog
+Branch `core-zone`. Each stage is usable on its own.
+
+| Stage | Builds | Status |
+|---|---|---|
+| 1 | Shared cabinet (`frontend/js/lib/cabinet/`), Necropolis, epitaphs | done (2026-11-23) |
+| 2 | Treasury: vessels, cards, enshrine panel, verdict matrix, sealing | |
+| 3 | Inventory: purpose, effects, model recipes; models in other panels. Items are partitioned by gear set (cabinet groups) **[decided]** | |
+| 4 | Agora: bounty in the Alembic, payouts, ledger | |
+
+- **Abandon** in the Necropolis deletes a dead adventure for good. **[decided]** A crawled one's
+  event stays as dross in the Sump, so it can be reviewed again.
+- Epitaph toast after a kill, optional; the sweeper writes *missed*. **[decided]**
+- Discovered entities are created on seal. **[decided]** Sealed records can be amended;
+  payouts never change. **[decided]** Old completions earn no ambrosia. **[decided]**
+- Left for later: favor, skills, gear-set bonuses, locks, open lines, in-app commissions, GLB.

@@ -13,7 +13,8 @@ Rules (resources/classifier.md, section 4):
                                          event goes back to the Centrifuge (new) for another look
     kill     adventure (any phase)    -> killed (Necropolis); its raw event -> ignored; data kept
     phase    adventure, by hand       -> any of MANUAL_PHASES, or completed -> decommissioned
-    missed   pre-Arena adventure whose event has ended -> killed (automatic, see sweep_missed)
+    missed   pre-Arena adventure whose event has ended -> killed (automatic, see sweep_missed),
+             with the epitaph "missed"
 
 Every change is followed by a broadcast of the updated lists. Moves are logged as
 transitions: automatically for single rows, explicitly for the bulk ones (feed, siphon,
@@ -30,8 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import (
-    CENTRIFUGE_NODE, MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure, Event,
-    EventSource, harvester_node,
+    CENTRIFUGE_NODE, MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure, Epitaph,
+    Event, EventSource, harvester_node,
 )
 from backend.db.queries import list_adventures, list_events
 from backend.services.hub import hub
@@ -332,6 +333,8 @@ async def sweep_missed() -> int:
             event = await session.get(Event, adventure.event_id) if adventure.event_id else None
             if event:
                 event.review, event.reviewed_at = "ignored", now
+            if await session.get(Epitaph, adventure.id) is None:  # one written by hand stays
+                session.add(Epitaph(adventure_id=adventure.id, cause="missed"))
         await session.commit()
     if missed:
         log.info("moved %d missed adventure(s) to the Necropolis", len(missed))

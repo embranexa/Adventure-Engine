@@ -1,4 +1,5 @@
-"""Adventures: list, create and edit them, move them between phases, kill and revive, edit roadmaps."""
+"""Adventures: list, create and edit them, move them between phases, kill and revive, write
+epitaphs, edit roadmaps."""
 
 import uuid
 
@@ -8,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.base import get_session
 from backend.db.queries import list_adventures
 from backend.routers.errors import triage_errors
-from backend.schemas.adventures import AdventureCreate, AdventureUpdate, PhasePayload, RoadmapPayload
-from backend.services import adventures, roadmap, triage
+from backend.schemas.adventures import AdventureCreate, AdventureUpdate, EpitaphPayload, PhasePayload, RoadmapPayload
+from backend.services import adventures, epitaphs, roadmap, triage
 
 router = APIRouter(prefix="/adventures", tags=["adventures"])
 
@@ -74,3 +75,30 @@ async def revive_adventure(adventure_id: uuid.UUID):
     with triage_errors():
         await triage.revive_adventure(adventure_id)
     return {"status": "revived"}
+
+
+@router.delete("/{adventure_id}")
+async def abandon_adventure(adventure_id: uuid.UUID):
+    """Delete a killed adventure for good. 409 unless it's killed."""
+    with triage_errors():
+        await adventures.abandon_adventure(adventure_id)
+    return {"status": "abandoned"}
+
+
+@router.put("/{adventure_id}/epitaph")
+async def set_epitaph(adventure_id: uuid.UUID, payload: EpitaphPayload):
+    """Why it died. 409 unless it's killed; 422 for an unknown cause."""
+    with triage_errors():
+        try:
+            await epitaphs.set_epitaph(adventure_id, payload.cause, payload.note)
+        except epitaphs.InvalidEpitaph as e:
+            raise HTTPException(422, str(e)) from e
+    return {"status": "carved"}
+
+
+@router.delete("/{adventure_id}/epitaph")
+async def clear_epitaph(adventure_id: uuid.UUID):
+    """Remove the epitaph. 409 unless it's killed."""
+    with triage_errors():
+        await epitaphs.clear_epitaph(adventure_id)
+    return {"status": "cleared"}

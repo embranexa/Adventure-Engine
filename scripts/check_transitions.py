@@ -90,7 +90,8 @@ async def step(label: str, action, expect: dict[tuple[str, str], int] | None = N
             continue  # entities aren't rows: links don't change levels
         if t.from_node not in SOURCE_NODES:
             replayed[t.from_node] -= 1
-        replayed[t.to_node] += 1
+        if t.to_node != "outside":  # abandoned: gone from the chain
+            replayed[t.to_node] += 1
     after = await node_counts()
     assert +replayed == after, f"{label}: replay {dict(+replayed)} != actual {dict(after)}"
     edges = Counter((t.from_node, t.to_node) for t in new)

@@ -25,10 +25,10 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis';
 
 /** Icon names drawn by components/PanelTitle.js. */
-type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear';
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb';
 
 /** A panel's definition (backend/services/workspace.py). Its title reads:
  *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
@@ -113,6 +113,10 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     own: AdventureOwnFields;
     phase: Phase;
     phase_before_kill: Phase | null;
+    /** When it last changed phase (for a killed one: when it died). */
+    phase_changed_at: string | null;
+    /** Why it died, if written; kept through a revive, so only meaningful while killed. */
+    epitaph: { cause: EpitaphCause; note: string | null } | null;
     stats: Record<string, unknown>;
     /** Set by hand (js/lifecycle.js ADVENTURE_FLAGS). */
     flags: AdventureFlag[];
@@ -126,6 +130,9 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     costs: string | null;
     rewards: string | null;
 }
+
+/** Why an adventure died (js/lifecycle.js EPITAPH_CAUSES). */
+type EpitaphCause = 'lost_interest' | 'no_time' | 'too_costly' | 'blocked' | 'superseded' | 'outside_control' | 'missed';
 
 /** event | item | performance; only events have a when/where (js/lifecycle.js ADVENTURE_TYPES). */
 type AdventureType = 'event' | 'item' | 'performance';
@@ -400,6 +407,14 @@ interface WorkspaceState {
     reviveEvent(eventId: string): Promise<void>;
     killAdventure(adventureId: string): Promise<void>;
     reviveAdventure(adventureId: string): Promise<void>;
+    /** The adventure just killed, for the toast that asks why; null otherwise. */
+    epitaphPrompt: { adventureId: string; title: string; at: number } | null;
+    dismissEpitaphPrompt(): void;
+    /** Write a killed adventure's epitaph. Resolves to an error message, or null. */
+    saveEpitaph(adventureId: string, cause: EpitaphCause, note: string): Promise<string | null>;
+    clearEpitaph(adventureId: string): Promise<string | null>;
+    /** Delete a killed adventure for good. Resolves to an error message, or null. */
+    abandonAdventure(adventureId: string): Promise<string | null>;
     setPhase(adventureId: string, phase: Phase): Promise<void>;
     /** Make a hand-made adventure (in ore), switch to Adventures and select it for editing. */
     createAdventure(type: AdventureType): Promise<void>;

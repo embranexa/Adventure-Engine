@@ -52,6 +52,17 @@ export const ADVENTURE_FLAGS = {
     waiting: { label: 'Waiting', glyph: '⧗', color: '#2fd2c9' },
 };
 
+/** Why an adventure died, in the order offered (backend.db.models.EPITAPH_CAUSES). @type {Record<EpitaphCause, string>} */
+export const EPITAPH_CAUSES = {
+    lost_interest: 'Lost interest',
+    no_time: 'No time',
+    too_costly: 'Too costly',
+    blocked: 'Blocked',
+    superseded: 'Superseded',
+    outside_control: 'Outside my control',
+    missed: 'Missed',
+};
+
 /**
  * Virtual entity types (the Codex). Only sites have a location. Same list in
  * backend/db/models.py.

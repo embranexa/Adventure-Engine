@@ -6,6 +6,7 @@
                    and an optional action roadmap
     entities        entities (deities, sites, contacts, organizations, skills) that adventures link to (the Codex)
     adventure_entities  links between adventures and entities
+    epitaphs       why a killed adventure died (the Necropolis)
     app_state      small JSON settings that must survive restarts (filters)
     geocache       place lookups (address / venue / city -> coordinates), so each is asked once
     transitions    log of every move between nodes of the signal chain (the twin's packets)
@@ -199,6 +200,24 @@ class AdventureEntity(Base):
     entity_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+# Why an adventure died, in the order offered (labels in frontend/js/lifecycle.js).
+# "missed" is also set by the sweeper (services/triage.py).
+EPITAPH_CAUSES = ("lost_interest", "no_time", "too_costly", "blocked", "superseded", "outside_control", "missed")
+
+
+class Epitaph(Base):
+    """Why a killed adventure died (see services/epitaphs.py). Kept through a revive."""
+
+    __tablename__ = "epitaphs"
+
+    adventure_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("adventures.id", ondelete="CASCADE"), primary_key=True)
+    cause: Mapped[str] = mapped_column(String(20))  # EPITAPH_CAUSES
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
 
 class Transition(Base):

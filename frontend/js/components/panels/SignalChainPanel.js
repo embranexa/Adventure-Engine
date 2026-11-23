@@ -21,6 +21,7 @@ const PANEL_MACHINES = {
     map: ['atlas'],
     calendar: ['calendar'],
     ledger: ['ledger'],
+    necropolis: [PHASE_NODES.killed],
 };
 const RECENT = 15;
 const VIEW_KEY = 'signal-chain-view';

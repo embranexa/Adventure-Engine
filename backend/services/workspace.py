@@ -45,6 +45,10 @@ PANELS_METADATA = {
         "id": "ledger", "kind": "ledger", "icon": "ledger",
         "name": "Ledger", "question": "what", "flow": ["matter", "list"],
     },
+    "necropolis": {
+        "id": "necropolis", "kind": "necropolis", "icon": "tomb",
+        "name": "Necropolis", "question": "why not", "flow": ["matter", "vestige"],
+    },
     "signal_chain": {
         "id": "signal_chain", "kind": "twin", "icon": "gear",
         "name": "Signal Chain", "question": "all", "flow": ["flux", "relic"],

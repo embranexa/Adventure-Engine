@@ -92,7 +92,7 @@ function layout(nodes) {
     const chainX = [-110, -40, 30, 110, 180, 250, 320];
     MAIN_CHAIN.forEach((id, i) => { fixed[id] = [chainX[i] ?? -110 + i * 70, CORE_Y, 0]; });
     // the Sanctum stands in front of the Core, as the Gallery stands behind it: same span, evenly spread
-    SANCTUM.forEach((id, i) => { fixed[id] = [chainX[0] + (i * (chainX.at(-1) - chainX[0])) / (SANCTUM.length - 1), CORE_Y, 104]; });
+    SANCTUM.forEach((id, i) => { fixed[id] = [chainX[0] + (i * (chainX.at(-1) - chainX[0])) / (SANCTUM.length - 1), CORE_Y, 204]; });
     // the viewers spread evenly over the main chain's span, so the Gallery's side edges
     // line up with the Core's (both zones pad their outermost machines the same)
     const viewers = ['atlas', 'nexus', 'calendar', 'ledger'];

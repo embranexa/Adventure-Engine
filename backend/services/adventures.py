@@ -4,6 +4,8 @@
     update   set or clear the adventure's own fields (see models.Adventure); on a crawled
              adventure these win over the event's values, and clearing one shows the
              event's again
+    abandon  delete a killed adventure for good, with its links and epitaph (a crawled one's
+             raw event stays, as dross in the Sump)
 
 Items and performances have no when/where: those fields are refused for them, and cleared when
 a hand-made adventure becomes one.
@@ -14,10 +16,15 @@ from typing import Any
 from urllib.parse import urlparse
 
 from backend.db.base import SessionLocal
-from backend.db.models import ADVENTURE_FLAGS, ADVENTURE_TYPES, WHEN_WHERE_TYPES, Adventure
+from backend.db.models import (
+    ADVENTURE_FLAGS, ADVENTURE_TYPES, OUTSIDE_NODE, PHASE_NODES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure,
+    AdventureEntity, Epitaph,
+)
 from backend.db.queries import list_adventures
+from backend.services.entities import _delete_links
 from backend.services.hub import hub
-from backend.services.triage import _get_adventure
+from backend.services.transitions import record
+from backend.services.triage import InvalidTransition, _get_adventure, broadcast_pools
 
 TEXT_LIMITS = {"title": 500, "venue": 500, "address": 500, "city": 200, "timezone": 64, "description": 20_000,
                "costs": 5_000, "rewards": 5_000}
@@ -151,4 +158,27 @@ async def update_adventure(adventure_id: uuid.UUID, changes: dict[str, Any]) -> 
     return await _broadcast(adventure_id)
 
 
-__all__ = ["InvalidAdventure", "create_adventure", "update_adventure"]
+async def abandon_adventure(adventure_id: uuid.UUID) -> None:
+    """Delete a killed adventure for good. There is no undo.
+
+    Its raw event, if any, was already ignored by the kill: without an adventure it counts
+    as dross in the Sump. Logged as leaving the chain (necropolis -> outside) and, for a
+    crawled one, its event appearing in the Sump, so the twin's counts still replay.
+    """
+    async with SessionLocal() as session:
+        adventure = await _get_adventure(session, adventure_id)
+        if adventure.phase != "killed":
+            raise InvalidTransition("only vestiges (killed adventures) can be abandoned")
+        await _delete_links(session, AdventureEntity.adventure_id == adventure_id)
+        epitaph = await session.get(Epitaph, adventure_id)
+        if epitaph:
+            await session.delete(epitaph)
+        record(session, "adventure", adventure_id, PHASE_NODES["killed"], OUTSIDE_NODE)
+        if adventure.event_id:
+            record(session, "event", adventure.event_id, OUTSIDE_NODE, SUMP_NODE)
+        await session.delete(adventure)
+        await session.commit()
+    await broadcast_pools()
+
+
+__all__ = ["InvalidAdventure", "abandon_adventure", "create_adventure", "update_adventure"]

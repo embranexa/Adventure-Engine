@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.db.models import WHEN_WHERE_TYPES, Adventure, AdventureEntity, Event, EventSource, Entity
+from backend.db.models import WHEN_WHERE_TYPES, Adventure, AdventureEntity, Entity, Epitaph, Event, EventSource
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -78,6 +78,7 @@ async def list_entities(session: AsyncSession) -> list[dict[str, Any]]:
 
 def adventure_to_dict(
     a: Adventure, e: Event | None, source_name: str | None, entities: list[Entity] = (),
+    epitaph: Epitaph | None = None,
 ) -> dict[str, Any]:
     """An adventure, flattened: its own fields over its linked event's (read through).
 
@@ -115,6 +116,8 @@ def adventure_to_dict(
         "type": a.type,
         "phase": a.phase,
         "phase_before_kill": a.phase_before_kill,
+        "phase_changed_at": _iso(a.phase_changed_at),
+        "epitaph": {"cause": epitaph.cause, "note": epitaph.note} if epitaph else None,
         "stats": a.stats,
         "flags": a.flags or [],
         "roadmap": a.roadmap,
@@ -150,7 +153,8 @@ async def list_adventures(session: AsyncSession) -> list[dict[str, Any]]:
         .order_by(Entity.type, func.lower(Entity.name))
     )).all():
         links.setdefault(adventure_id, []).append(obj)
-    return [adventure_to_dict(a, e, name, links.get(a.id, [])) for a, e, name in rows.all()]
+    epitaphs = {r.adventure_id: r for r in (await session.scalars(select(Epitaph))).all()}
+    return [adventure_to_dict(a, e, name, links.get(a.id, []), epitaphs.get(a.id)) for a, e, name in rows.all()]
 
 
 async def list_sources(session: AsyncSession) -> list[dict[str, Any]]:

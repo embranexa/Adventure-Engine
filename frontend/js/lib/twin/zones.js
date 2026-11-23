@@ -30,6 +30,8 @@ export function zoneRects(positions, zoneOf) {
         r.x0 = Math.min(r.x0, p.x - PAD); r.x1 = Math.max(r.x1, p.x + PAD);
         r.z0 = Math.min(r.z0, p.z - PAD); r.z1 = Math.max(r.z1, p.z + PAD);
     }
+    // the Core's chain runs along z = 0: as much floor in front of it as behind (the Necropolis)
+    if (rects.core) { const half = Math.max(-rects.core.z0, rects.core.z1); rects.core.z0 = -half; rects.core.z1 = half; }
     return rects;
 }
 
