@@ -13,6 +13,7 @@ Rules (resources/classifier.md, section 4):
                                          event goes back to the Centrifuge (new) for another look
     kill     adventure (any phase)    -> killed (Necropolis); its raw event -> ignored; data kept
     phase    adventure, by hand       -> any of MANUAL_PHASES, or completed -> decommissioned
+                                         (moving back out of the Treasury unseals its enshrining)
     missed   pre-Arena adventure whose event has ended -> killed (automatic, see sweep_missed),
              with the epitaph "missed"
 
@@ -31,7 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import (
-    CENTRIFUGE_NODE, MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure, Epitaph,
+    CENTRIFUGE_NODE, MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure, Enshrining, Epitaph,
     Event, EventSource, harvester_node,
 )
 from backend.db.queries import list_adventures, list_events
@@ -290,6 +291,10 @@ async def set_phase(adventure_id: uuid.UUID, phase: str) -> None:
             raise InvalidTransition("only artifacts (completed adventures) can be decommissioned")
         if phase not in MANUAL_PHASES and phase != "decommissioned":
             raise InvalidTransition(f"can't move to {phase} by hand")
+        if adventure.phase in ("completed", "decommissioned") and phase not in ("completed", "decommissioned"):
+            record = await session.get(Enshrining, adventure_id)  # un-completed: its analysis is a draft again
+            if record:
+                record.sealed_at = record.amended_at = None
         _set_phase(adventure, phase)
         # animus or later by hand: the roadmap counts as finished (services/roadmap.py)
         if phase in ("consuming", "completed", "decommissioned") and adventure.roadmap and adventure.roadmap.get("actions"):

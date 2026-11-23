@@ -828,6 +828,11 @@ const workspaceStore = (set, get) => ({
         return typeof res === 'string' ? res : null;
     },
 
+    saveEnshrining: async (adventureId, analysis, seal) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/enshrining`, 'PUT', { ...analysis, seal });
+        return typeof res === 'string' ? res : /** @type {{ discovered: string[] }} */ (res);
+    },
+
     abandonAdventure: async (adventureId) => {
         const res = await sendJson(`/api/adventures/${adventureId}`, 'DELETE');
         return typeof res === 'string' ? res : null;

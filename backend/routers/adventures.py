@@ -1,5 +1,5 @@
 """Adventures: list, create and edit them, move them between phases, kill and revive, write
-epitaphs, edit roadmaps."""
+epitaphs, enshrine, edit roadmaps."""
 
 import uuid
 
@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.base import get_session
 from backend.db.queries import list_adventures
 from backend.routers.errors import triage_errors
-from backend.schemas.adventures import AdventureCreate, AdventureUpdate, EpitaphPayload, PhasePayload, RoadmapPayload
-from backend.services import adventures, epitaphs, roadmap, triage
+from backend.schemas.adventures import AdventureCreate, AdventureUpdate, EnshriningPayload, EpitaphPayload, PhasePayload, RoadmapPayload
+from backend.services import adventures, enshrinings, epitaphs, roadmap, triage
 
 router = APIRouter(prefix="/adventures", tags=["adventures"])
 
@@ -102,3 +102,14 @@ async def clear_epitaph(adventure_id: uuid.UUID):
     with triage_errors():
         await epitaphs.clear_epitaph(adventure_id)
     return {"status": "cleared"}
+
+
+@router.put("/{adventure_id}/enshrining")
+async def save_enshrining(adventure_id: uuid.UUID, payload: EnshriningPayload):
+    """Save the draft analysis, or (seal: true) seal or amend it. 409 unless it's completed,
+    or when a draft is saved over a sealed one; 422 if a field is invalid."""
+    with triage_errors():
+        try:
+            return await enshrinings.save(adventure_id, payload.model_dump(exclude={"seal"}), payload.seal)
+        except enshrinings.InvalidEnshrining as e:
+            raise HTTPException(422, str(e)) from e

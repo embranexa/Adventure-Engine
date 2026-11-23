@@ -213,7 +213,7 @@ Branch `core-zone`. Each stage is usable on its own.
 | Stage | Builds | Status |
 |---|---|---|
 | 1 | Shared cabinet (`frontend/js/lib/cabinet/`), Necropolis, epitaphs | done (2026-11-23) |
-| 2 | Treasury: vessels, cards, enshrine panel, verdict matrix, sealing | |
+| 2 | Treasury: vessels, cards, enshrine panel, verdict matrix, sealing | done (2026-11-23) |
 | 3 | Inventory: purpose, effects, model recipes; models in other panels. Items are partitioned by gear set (cabinet groups) **[decided]** | |
 | 4 | Agora: bounty in the Alembic, payouts, ledger | |
 
@@ -223,3 +223,5 @@ Branch `core-zone`. Each stage is usable on its own.
 - Discovered entities are created on seal. **[decided]** Sealed records can be amended;
   payouts never change. **[decided]** Old completions earn no ambrosia. **[decided]**
 - Left for later: favor, skills, gear-set bonuses, locks, open lines, in-app commissions, GLB.
+- A site discovered at an event is added to the Codex but not linked: an event has one site (its
+  where). Archiving or killing keeps a seal; moving back out of the Treasury breaks it. **[proposed]**

@@ -1462,3 +1462,82 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .epitaph-head span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .epitaph-head b { color: var(--text-bright); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .epitaph-toast { animation: none; } }
+
+/* ═════════ The Treasury: cabinet, analysis, ceremony ═════════ */
+.treasury { padding: 0; container-type: inline-size; }
+.ana { position: absolute; inset: 0; overflow-y: auto; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+.ana-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.ana-head > div { flex: 1 1 180px; min-width: 0; }
+.ana-head h3 { margin: 0; font: 600 20px/1.15 var(--font-display); letter-spacing: 0.04em; color: var(--text-bright); overflow-wrap: anywhere; }
+.ana-head small, .ana-status { color: var(--text-muted); font: 500 11px var(--font-mono); }
+.ana-head .btn { padding: 4px 12px; font-size: 11px; border-radius: 5px; }
+.ana-cols { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.ana-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ana h4 { margin: 0; font: 600 12px var(--font-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); }
+.ana h4.spoils { color: #7fd6a0; } .ana h4.tithes { color: #e58d6a; margin-top: 6px; }
+.ana-row { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; }
+.ana-score { font: 500 11.5px var(--font-mono); color: var(--text); }
+.ana-graph { position: relative; height: 112px; border-radius: 5px; overflow: hidden; background: #1b1d21; }
+.ana-graph svg { display: block; width: 100%; height: 100%; }
+.ana-graph span { position: absolute; transform: translate(-50%, -50%); }
+.grade-icon { display: block; flex: none; }
+.ana-counts { display: flex; flex-wrap: wrap; gap: 5px 14px; }
+.ana-counts span { display: flex; align-items: center; gap: 5px; font: 500 12px var(--font-mono); }
+.ana input[type=text], .ana input[type=url], .ana select, .ana-notes {
+    width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--steel-3); border-radius: 5px;
+    background: rgba(0, 0, 0, 0.4); color: var(--text-bright); font: 400 13px/1.4 var(--font-body); user-select: text;
+}
+.ana input:focus, .ana select:focus, .ana-notes:focus { border-color: var(--steel-5); outline: none; }
+.ana select option { background: #0c0d10; }
+.ana-notes { resize: vertical; }
+.ana-move { display: grid; grid-template-columns: 24px minmax(0, 1.5fr) 132px minmax(0, 1.3fr) auto; gap: 6px 8px; align-items: center; padding: 9px 0; border-top: 1px solid var(--steel-2); }
+.ana-n { font: 600 15px var(--font-display); color: var(--g); text-align: center; }
+.ana-grade { display: flex; align-items: center; gap: 7px; padding: 3px 10px 3px 4px; border: 1px solid var(--steel-3); border-radius: 99px; background: rgba(0, 0, 0, 0.3); color: var(--g); cursor: pointer; font: 600 12.5px var(--font-body); }
+.ana-grade:hover { border-color: var(--steel-5); }
+.ana-palette, .ana-skills { grid-column: 2 / -1; }
+.ana-palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 4px; padding: 7px; border-radius: 6px; background: #08090b; box-shadow: inset 0 0 0 1px var(--steel-2); }
+.ana-palette button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--text); cursor: pointer; font: 500 11.5px var(--font-body); }
+.ana-palette button:hover { background: rgba(255, 255, 255, 0.05); }
+.ana-palette button[aria-pressed=true] { border-color: var(--steel-4); background: rgba(255, 255, 255, 0.07); }
+.ana-skills { display: flex; flex-wrap: wrap; gap: 5px; }
+.ana-move.read { grid-template-columns: 24px auto minmax(0, 1fr) auto; align-items: start; }
+.ana-move.read > b { color: var(--g); font: 600 12.5px var(--font-body); }
+.ana-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font: 400 13.5px/1.45 var(--font-body); overflow-wrap: anywhere; }
+.ana-text, .ana-read, .ana-notes-read { user-select: text; } .ana-text * { user-select: text; }
+.ana-text em { color: var(--text-muted); font-style: normal; } .ana-text small { color: var(--text-dim); }
+.ana-verdict { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 4px; align-items: center; }
+.ana-verdict span { font: 600 10.5px var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); text-align: center; }
+.ana-verdict span.y { text-align: right; padding-right: 5px; }
+.ana-verdict button { height: 48px; padding: 2px; border: 1px solid var(--steel-2); border-radius: 4px; cursor: pointer; color: var(--text-muted); font: 600 12.5px/1.1 var(--font-display); letter-spacing: 0.04em; background: color-mix(in srgb, var(--m-artifact) var(--k), #08090b); }
+.ana-verdict button:hover:not(:disabled) { border-color: var(--steel-5); color: var(--text-bright); }
+.ana-verdict button[aria-pressed=true] { border-color: var(--m-artifact); color: #fff; box-shadow: inset 0 0 14px color-mix(in srgb, var(--m-artifact) 55%, transparent), 0 0 12px color-mix(in srgb, var(--m-artifact) 35%, transparent); }
+.ana-verdict button:disabled { cursor: default; } .ana-verdict button:disabled:not([aria-pressed=true]) { opacity: 0.4; }
+.ana-field { display: flex; flex-direction: column; gap: 4px; } .ana-field span { color: var(--text-muted); font: 400 12px var(--font-body); }
+.ana a.cls-layer { text-decoration: none; align-self: flex-start; }
+.ana-line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 5px; align-items: center; }
+.ana-line .qty { width: 68px; } .ana-line select { width: auto; } .ana-line small { grid-column: 1 / -1; color: var(--text-dim); font-size: 11.5px; }
+.ana-read { display: flex; justify-content: space-between; gap: 10px; font: 400 13px var(--font-body); overflow-wrap: anywhere; } .ana-read b { font: 500 12px var(--font-mono); color: var(--text-muted); flex: none; }
+.ana-notes-read { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 13.5px/1.5 var(--font-body); }
+.ana .btn.ana-seal { border-color: color-mix(in srgb, var(--m-artifact) 65%, var(--steel-3)); color: #e6ccff; }
+.ana .btn.ana-seal:hover { border-color: var(--m-artifact); box-shadow: 0 0 12px color-mix(in srgb, var(--m-artifact) 35%, transparent); }
+@container (max-width: 820px) {
+    .ana-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 520px) {
+    .ana-move:not(.read) { grid-template-columns: 22px minmax(0, 1fr) auto; }
+    .ana-move:not(.read) .ana-did, .ana-move:not(.read) .ana-better { grid-column: 2 / -1; }
+    .ana-move:not(.read) .ana-grade { grid-column: 2; justify-self: start; }
+    .ana-move:not(.read) .pclose { grid-column: 3; grid-row: 2; }
+    .ana-move:not(.read) .ana-better { grid-row: 3; }
+}
+.ceremony {
+    position: absolute; inset: 0; z-index: 20; overflow-y: auto; padding: 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; background: rgba(1, 2, 3, 0.9);
+}
+.ceremony canvas { width: min(340px, 100%); height: auto; margin-top: auto; flex: none; }
+.ceremony h3 { margin: 0; font: 600 32px var(--font-display); letter-spacing: 0.12em; text-transform: uppercase; }
+.ceremony p { margin: 0; font: 400 14px var(--font-body); overflow-wrap: anywhere; }
+.ceremony dl { margin: 0; width: min(320px, 100%); }
+.ceremony dl > div { display: flex; justify-content: space-between; gap: 14px; padding: 7px 0; border-bottom: 1px solid var(--steel-2); font: 400 13px var(--font-body); }
+.ceremony dt { color: var(--text-muted); } .ceremony dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.ceremony .btn { margin-bottom: auto; }

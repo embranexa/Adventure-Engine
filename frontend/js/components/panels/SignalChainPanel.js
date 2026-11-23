@@ -22,6 +22,7 @@ const PANEL_MACHINES = {
     calendar: ['calendar'],
     ledger: ['ledger'],
     necropolis: [PHASE_NODES.killed],
+    treasury: [PHASE_NODES.completed],
 };
 const RECENT = 15;
 const VIEW_KEY = 'signal-chain-view';

@@ -6,6 +6,8 @@
                    and an optional action roadmap
     entities        entities (deities, sites, contacts, organizations, skills) that adventures link to (the Codex)
     adventure_entities  links between adventures and entities
+    enshrinings    the analysis of a completed adventure (the Treasury), sealed or draft
+    moves          the moves of an enshrining, graded like a chess game's
     epitaphs       why a killed adventure died (the Necropolis)
     app_state      small JSON settings that must survive restarts (filters)
     geocache       place lookups (address / venue / city -> coordinates), so each is asked once
@@ -218,6 +220,46 @@ class Epitaph(Base):
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+# How a move is graded: chess.com's classes (icons and meanings in frontend/js/lib/analysis.js)
+MOVE_GRADES = ("brilliant", "great", "best", "excellent", "good", "book", "forced",
+               "inaccuracy", "mistake", "miss", "blunder")
+
+
+class Enshrining(Base):
+    """What a completed adventure meant (see services/enshrinings.py). A draft until sealed."""
+
+    __tablename__ = "enshrinings"
+
+    adventure_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("adventures.id", ondelete="CASCADE"), primary_key=True)
+    # the verdict: outcome 0 defeat .. 2 success, thrill 0 boring .. 2 exciting
+    outcome: Mapped[int | None] = mapped_column(Integer)
+    thrill: Mapped[int | None] = mapped_column(Integer)
+    link: Mapped[str | None] = mapped_column(Text)  # to the performance
+    notes: Mapped[str] = mapped_column(Text, default="")
+    gains: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)   # spoils: [{name, qty, unit}]
+    losses: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # tithes
+    discoveries: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{type, name, entity_id}]
+    sealed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    amended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Move(Base):
+    """One move of an enshrining. A table, so better lines can be found by skill later."""
+
+    __tablename__ = "moves"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    adventure_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("adventures.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    grade: Mapped[str] = mapped_column(String(12))  # MOVE_GRADES
+    better: Mapped[str | None] = mapped_column(Text)  # the better line, if there was one
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list)  # ids of skill entities
 
 
 class Transition(Base):

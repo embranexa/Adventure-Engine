@@ -2,7 +2,7 @@
 // adventures share one. Drawn in white (a material tints it). See also ../magicCircle.js.
 
 const TAU = Math.PI * 2;
-const RUNES = [
+export const RUNES = [
     [[0, -1, 0, 1], [-0.6, -0.3, 0.6, -0.3]],
     [[-0.6, 1, 0, -1], [0, -1, 0.6, 1]],
     [[-0.5, -1, -0.5, 1], [-0.5, 0, 0.5, -1], [-0.5, 0, 0.5, 1]],

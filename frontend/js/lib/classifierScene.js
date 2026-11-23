@@ -23,6 +23,7 @@ import { REGION_R, ROLE_COLORS, galaxyRadius, layout } from './classifierGraph.j
 import { magicCircleCanvases } from './magicCircle.js';
 import { starIconCanvas, starIconKey } from './starIcons.js';
 import { stageOf } from '../lifecycle.js';
+import { coverSrc } from './covers.js';
 import { deferredResize, isResizing, viewOf } from './resizing.js';
 
 const EXPAND_BASE = 170;     // a galaxy breaks apart when the camera is closer than this (+ size)
@@ -32,18 +33,6 @@ const BURST_S = 0.55;        // a cluster bursts into its cards (or gathers them
 const CARD_W = 8, CARD_H = 11.3;   // a card's size in the scene
 const CARD_PX = [240, 340];        // its canvas
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-
-/** A cover image's same-origin URL (http(s) covers only; WebGL needs same-origin images). */
-function coverSrc(link) {
-    if (typeof link !== 'string' || !link) return null;
-    try {
-        const u = new URL(link, window.location.href);
-        if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-        return u.origin === window.location.origin ? u.href : `/api/cover?url=${encodeURIComponent(u.href)}`;
-    } catch {
-        return null;
-    }
-}
 
 /** Wrap text into at most `lines` lines that fit `width` (the last one ellipsized). */
 function wrapText(g, text, width, lines) {

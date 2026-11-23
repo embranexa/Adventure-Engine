@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.db.models import WHEN_WHERE_TYPES, Adventure, AdventureEntity, Entity, Epitaph, Event, EventSource
+from backend.db.models import WHEN_WHERE_TYPES, Adventure, AdventureEntity, Enshrining, Entity, Epitaph, Event, EventSource, Move
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -76,9 +76,19 @@ async def list_entities(session: AsyncSession) -> list[dict[str, Any]]:
     return [entity_to_dict(o) for o in rows.all()]
 
 
+def enshrining_to_dict(r: Enshrining, moves: list[Move]) -> dict[str, Any]:
+    return {
+        "verdict": [r.outcome, r.thrill] if r.outcome is not None and r.thrill is not None else None,
+        "link": r.link, "notes": r.notes or "", "gains": r.gains or [], "losses": r.losses or [],
+        "discoveries": r.discoveries or [],
+        "moves": [{"text": m.text, "grade": m.grade, "better": m.better, "skills": m.skills or []} for m in moves],
+        "sealed_at": _iso(r.sealed_at), "amended_at": _iso(r.amended_at),
+    }
+
+
 def adventure_to_dict(
     a: Adventure, e: Event | None, source_name: str | None, entities: list[Entity] = (),
-    epitaph: Epitaph | None = None,
+    epitaph: Epitaph | None = None, enshrining: Enshrining | None = None, moves: list[Move] = (),
 ) -> dict[str, Any]:
     """An adventure, flattened: its own fields over its linked event's (read through).
 
@@ -118,6 +128,7 @@ def adventure_to_dict(
         "phase_before_kill": a.phase_before_kill,
         "phase_changed_at": _iso(a.phase_changed_at),
         "epitaph": {"cause": epitaph.cause, "note": epitaph.note} if epitaph else None,
+        "enshrining": enshrining_to_dict(enshrining, moves) if enshrining else None,
         "stats": a.stats,
         "flags": a.flags or [],
         "roadmap": a.roadmap,
@@ -154,7 +165,12 @@ async def list_adventures(session: AsyncSession) -> list[dict[str, Any]]:
     )).all():
         links.setdefault(adventure_id, []).append(obj)
     epitaphs = {r.adventure_id: r for r in (await session.scalars(select(Epitaph))).all()}
-    return [adventure_to_dict(a, e, name, links.get(a.id, []), epitaphs.get(a.id)) for a, e, name in rows.all()]
+    enshrinings = {r.adventure_id: r for r in (await session.scalars(select(Enshrining))).all()}
+    moves: dict[Any, list[Move]] = {}
+    for m in (await session.scalars(select(Move).order_by(Move.adventure_id, Move.position))).all():
+        moves.setdefault(m.adventure_id, []).append(m)
+    return [adventure_to_dict(a, e, name, links.get(a.id, []), epitaphs.get(a.id), enshrinings.get(a.id), moves.get(a.id, []))
+            for a, e, name in rows.all()]
 
 
 async def list_sources(session: AsyncSession) -> list[dict[str, Any]]:

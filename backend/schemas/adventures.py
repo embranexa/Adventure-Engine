@@ -15,6 +15,38 @@ class EpitaphPayload(BaseModel):
     note: str | None = None
 
 
+class Line(BaseModel):
+    name: str = ""
+    qty: str = ""
+    unit: str = ""
+
+
+class Discovery(BaseModel):
+    type: str
+    name: str = ""
+    entity_id: str | None = None
+
+
+class MovePayload(BaseModel):
+    text: str = ""
+    grade: str = "good"
+    better: str | None = None
+    skills: list[str] = Field(default_factory=list)
+
+
+class EnshriningPayload(BaseModel):
+    """The whole analysis; checked further in services/enshrinings.py."""
+
+    verdict: list[int] | None = None  # [outcome 0-2, thrill 0-2]
+    link: str | None = None
+    notes: str = ""
+    gains: list[Line] = Field(default_factory=list)
+    losses: list[Line] = Field(default_factory=list)
+    discoveries: list[Discovery] = Field(default_factory=list)
+    moves: list[MovePayload] = Field(default_factory=list)
+    seal: bool = False
+
+
 class Recurrence(BaseModel):
     """Weekly for now: on these weekdays (Monday = 0), until a day (inclusive) or forever."""
 

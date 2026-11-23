@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { hash } from './sigil.js';
+import { vessel } from './vessels.js';
 
 /** A dead adventure: one of three monuments between two candles, lit once it has an epitaph. */
 function urn(K, group, m) {
@@ -30,4 +31,4 @@ function urn(K, group, m) {
     return flames.length ? { frame: (t) => flames.forEach((x, i) => { x.scale.y = 1 + Math.sin(t / 90 + i * 2) * 0.1; }) } : null;
 }
 
-export const MODELS = { urn };
+export const MODELS = { urn, vessel };

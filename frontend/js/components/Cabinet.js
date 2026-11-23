@@ -10,6 +10,7 @@ import { deferredResize, viewOf } from '../lib/resizing.js';
  * @property {string} color    of its circles, beam and glow
  * @property {boolean} on      lit (finished) or dim
  * @property {number} [points] @property {number} [rings] @property {boolean} [lit]
+ * @property {AdventureType} [kind] @property {string | null} [cover]   a vessel's
  */
 /** @typedef {{ id: string, label: string, sub: any, model: CabinetModel }} CabinetItem */
 /** @typedef {{ shape: 'arch' | 'lancet' | 'octagon', sealColor: string, seed: string, points?: number, dim?: boolean }} CabinetStyle */

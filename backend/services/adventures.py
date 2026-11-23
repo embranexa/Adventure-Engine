@@ -4,7 +4,7 @@
     update   set or clear the adventure's own fields (see models.Adventure); on a crawled
              adventure these win over the event's values, and clearing one shows the
              event's again
-    abandon  delete a killed adventure for good, with its links and epitaph (a crawled one's
+    abandon  delete a killed adventure for good, with its links, epitaph and enshrining (a crawled one's
              raw event stays, as dross in the Sump)
 
 Items and performances have no when/where: those fields are refused for them, and cleared when
@@ -15,10 +15,12 @@ import uuid
 from typing import Any
 from urllib.parse import urlparse
 
+from sqlalchemy import delete
+
 from backend.db.base import SessionLocal
 from backend.db.models import (
     ADVENTURE_FLAGS, ADVENTURE_TYPES, OUTSIDE_NODE, PHASE_NODES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure,
-    AdventureEntity, Epitaph,
+    AdventureEntity, Enshrining, Epitaph, Move,
 )
 from backend.db.queries import list_adventures
 from backend.services.entities import _delete_links
@@ -170,9 +172,8 @@ async def abandon_adventure(adventure_id: uuid.UUID) -> None:
         if adventure.phase != "killed":
             raise InvalidTransition("only vestiges (killed adventures) can be abandoned")
         await _delete_links(session, AdventureEntity.adventure_id == adventure_id)
-        epitaph = await session.get(Epitaph, adventure_id)
-        if epitaph:
-            await session.delete(epitaph)
+        for table in (Epitaph, Enshrining, Move):
+            await session.execute(delete(table).where(table.adventure_id == adventure_id))
         record(session, "adventure", adventure_id, PHASE_NODES["killed"], OUTSIDE_NODE)
         if adventure.event_id:
             record(session, "event", adventure.event_id, OUTSIDE_NODE, SUMP_NODE)

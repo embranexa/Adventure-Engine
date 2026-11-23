@@ -98,7 +98,7 @@ export function twinNodes(sourceNames) {
         core('decomposing', 'processor', 'Alembic', { panel: 'alembic', mode: 'adventures' }),
         core('constructing', 'processor', 'Crucible', { panel: 'quests', mode: 'adventures' }),
         core('consuming', 'processor', 'Arena'),
-        core('completed', 'vessel', 'Treasury'),
+        core('completed', 'vessel', 'Treasury', { panel: 'treasury' }),
         core('decommissioned', 'vessel', 'Archive'),
         core('killed', 'vessel', 'Necropolis', { panel: 'necropolis' }),
         node({ id: CODEX, label: 'Codex', zone: 'sanctum', kind: 'cabinet', holds: 'entities', action: { panel: 'codex' } }),
