@@ -25,13 +25,13 @@ const CREST_H = 98, FOOT_H = 22, TITLE_H = 44;
  * has one; its last row is filled up with empty alcoves.
  * @param {number} width  of the panel's content
  * @param {{ title?: string | null, ids: string[] }[]} groups
- * @param {{ minW?: number, cellH?: number, minCols?: number }} [options]
+ * @param {{ minW?: number, cellH?: number, minCols?: number, maxCols?: number }} [options]
  * @returns {CabinetLayout}
  */
-export function cabinetLayout(width, groups, { minW = 176, cellH = 246, minCols = 2 } = {}) {
+export function cabinetLayout(width, groups, { minW = 176, cellH = 246, minCols = 2, maxCols = Infinity } = {}) {
     const pad = width < 520 ? 14 : 30;
     const inner = Math.max(1, width - 2 * pad);
-    const n = Math.max(minCols, Math.floor(inner / minW));
+    const n = Math.min(maxCols, Math.max(minCols, Math.floor(inner / minW)));
     const cellW = inner / n;
     /** @type {CabinetCell[]} */
     const cells = [];

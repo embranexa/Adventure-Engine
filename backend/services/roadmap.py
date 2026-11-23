@@ -26,8 +26,9 @@ from typing import Any
 
 from backend.db.base import SessionLocal
 from backend.db.queries import list_adventures
+from backend.services import ledger
 from backend.services.hub import hub
-from backend.services.triage import NotFound, _get_adventure, _set_phase
+from backend.services.triage import NotFound, _get_adventure, _leave_treasury, _set_phase
 
 MAX_ACTIONS = 200
 # phases whose adventure the roadmap moves (see phase_for)
@@ -150,10 +151,14 @@ async def save_roadmap(adventure_id: uuid.UUID, raw: dict[str, Any] | None) -> d
         adventure.roadmap = roadmap
         target = phase_for(adventure.phase, roadmap)
         if target != adventure.phase:
+            await _leave_treasury(session, adventure, target)
             _set_phase(adventure, target)  # logged as a transition like any phase change
+        paid = await ledger.settle(session, adventure)
         await session.commit()
         adventures = await list_adventures(session)
     await hub.broadcast("adventures", adventures=adventures)
+    if paid:
+        await ledger.broadcast()
     return roadmap
 
 

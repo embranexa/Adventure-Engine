@@ -11,6 +11,7 @@ import { deferredResize, viewOf } from '../lib/resizing.js';
  * @property {boolean} on      lit (finished) or dim
  * @property {number} [points] @property {number} [rings] @property {boolean} [lit]
  * @property {AdventureType} [kind] @property {string | null} [cover]   a vessel's
+ * @property {number} [level] @property {number} [marks]   an amphora's
  * @property {any} [parts]   a recipe's
  */
 /** @typedef {{ id: string, label: string, sub: any, model: CabinetModel }} CabinetItem */
@@ -20,9 +21,10 @@ import { deferredResize, viewOf } from '../lib/resizing.js';
  * A 3D cabinet: a scrolling grid of alcoves, each a button, with the cabinet drawn behind
  * them (lib/cabinet/cabinetScene.js). `children` follow the cabinet and scroll with it.
  * @param {{ groups: { title?: string | null, items: CabinetItem[] }[], look: CabinetStyle, selectedId: string | null,
- *           onSelect: (id: string) => void, label: string, children?: any }} props  `look` is read once
+ *           onSelect: (id: string) => void, label: string, options?: Parameters<typeof cabinetLayout>[2], children?: any }} props
+ *   `look` is read once; `options` (the layout's) should be a constant
  */
-export function Cabinet({ groups, look, selectedId, onSelect, label, children }) {
+export function Cabinet({ groups, look, selectedId, onSelect, label, options, children }) {
     const rootRef = useRef(/** @type {HTMLDivElement | null} */ (null));
     const hostRef = useRef(/** @type {HTMLDivElement | null} */ (null));
     const scrollRef = useRef(/** @type {HTMLDivElement | null} */ (null));
@@ -33,8 +35,8 @@ export function Cabinet({ groups, look, selectedId, onSelect, label, children })
     const items = useMemo(() => groups.flatMap((g) => g.items), [groups]);
     const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
     const layout = useMemo(
-        () => (width ? cabinetLayout(width, groups.map((g) => ({ title: g.title, ids: g.items.map((i) => i.id) }))) : null),
-        [width, groups],
+        () => (width ? cabinetLayout(width, groups.map((g) => ({ title: g.title, ids: g.items.map((i) => i.id) })), options) : null),
+        [width, groups, options],
     );
 
     // the scroller's width (without its scrollbar) sets the columns

@@ -207,6 +207,7 @@ function startFeed(get) {
     feed.on('events', (msg) => get().setRawEvents(msg.events));
     feed.on('adventures', (msg) => get().setAdventures(msg.adventures));
     feed.on('entities', (msg) => get().setEntities(msg.entities));
+    feed.on('ambrosia', (msg) => get().setAmbrosia(msg.ambrosia));
     feed.on('source_status', (msg) => get().setSourceStatus(msg.source));
     feed.on('transitions', (msg) => get().addTransitions(msg.transitions));
 }
@@ -825,6 +826,29 @@ const workspaceStore = (set, get) => ({
 
     saveEpitaph: async (adventureId, cause, note) => {
         const res = await sendJson(`/api/adventures/${adventureId}/epitaph`, 'PUT', { cause, note });
+        return typeof res === 'string' ? res : null;
+    },
+
+    ambrosia: { balance: 0, entries: [], by_kind: {} },
+    setAmbrosia: (ambrosia) => set({ ambrosia }),
+
+    saveBounty: async (adventureId, bounty) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/bounty`, 'PUT', bounty ? { effort: bounty.effort, resistance: bounty.resistance, ratio: bounty.ratio } : undefined);
+        return typeof res === 'string' ? res : null;
+    },
+
+    forgeModel: async (adventureId, text) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/forge`, 'POST', { text });
+        return typeof res === 'string' ? res : null;
+    },
+
+    acceptModel: async (adventureId) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/forge/accept`, 'POST');
+        return typeof res === 'string' ? res : null;
+    },
+
+    dismissModel: async (adventureId) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/forge`, 'DELETE');
         return typeof res === 'string' ? res : null;
     },
 

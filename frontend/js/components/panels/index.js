@@ -2,6 +2,7 @@
 // to the component that renders its body. To add a panel type, add a component
 // here and give a panel that kind on the server.
 
+import { AgoraPanel } from './AgoraPanel.js';
 import { AlembicPanel } from './AlembicPanel.js';
 import { CalendarPanel } from './CalendarPanel.js';
 import { ClassifierPanel } from './ClassifierPanel.js';
@@ -31,4 +32,5 @@ export const PANEL_COMPONENTS = {
     necropolis: NecropolisPanel,
     treasury: TreasuryPanel,
     inventory: InventoryPanel,
+    agora: AgoraPanel,
 };

@@ -215,17 +215,28 @@ Branch `core-zone`. Each stage is usable on its own.
 | 1 | Shared cabinet (`frontend/js/lib/cabinet/`), Necropolis, epitaphs | done (2026-11-23) |
 | 2 | Treasury: vessels, cards, enshrine panel, verdict matrix, sealing | done (2026-11-23) |
 | 3 | Inventory: purpose, effects, model recipes; models in quests, node card and Nexus. Partitioned by gear set **[decided]** | done (2026-11-23) |
-| 4 | Agora: bounty in the Alembic, payouts, ledger | |
+| 3b | The Forge: describe an item and Claude models it, in the app | done (2026-11-23) |
+| 4 | Agora: bounty in the Alembic, payouts, ledger | done (2026-11-23) |
 
 - **Abandon** in the Necropolis deletes a dead adventure for good. **[decided]** A crawled one's
   event stays as dross in the Sump, so it can be reviewed again.
 - Epitaph toast after a kill, optional; the sweeper writes *missed*. **[decided]**
 - Discovered entities are created on seal. **[decided]** Sealed records can be amended;
   payouts never change. **[decided]** Old completions earn no ambrosia. **[decided]**
-- Left for later: favor, skills, gear-set bonuses, locks, open lines, in-app commissions, GLB.
+- Left for later: favor, skills, gear-set bonuses, locks, open lines, GLB.
 - A site discovered at an event is added to the Codex but not linked: an event has one site (its
   where). Archiving or killing keeps a seal; moving back out of the Treasury breaks it. **[proposed]**
 - In the Nexus, an item without a model keeps its flat cover (a 3D card inside a card reads poorly);
   quests and the node card use the default 3D card. **[proposed]**
 - Recipes are checked by `backend/services/items.py` and drawn by `frontend/js/lib/cabinet/recipe.js`.
   To add one from a session: `PUT /api/adventures/{id}/item` with `{"model": [...]}`.
+- **The Forge** **[decided]** (`backend/services/forge.py`) runs `claude -p` with no tools, settings or
+  session; the reply must pass the recipe checks (one retry with the error). It's a proposal until
+  accepted. `FORGE_MODEL` (default opus) and `CLAUDE_BIN` are environment settings. Nothing needs it.
+  Not built: letting it see its own render and correct it.
+- Models keep turning; only covers sway. **[decided]**
+- **Ledger rules** (`backend/services/ledger.py`) **[proposed]**: a bounty is settable up to the Alembic and
+  locks at the Crucible; `settle` pays the difference between what's due and what's in the ledger, so it
+  can run after any change. Un-ticking an action and breaking a seal reverse; killing and abandoning keep.
+  Elixir and nectar are shown locked; nothing spends ambrosia yet.
+- Un-ticking an action of a sealed artifact also breaks its seal (it goes back to the Crucible).

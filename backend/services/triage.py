@@ -36,6 +36,7 @@ from backend.db.models import (
     Event, EventSource, harvester_node,
 )
 from backend.db.queries import list_adventures, list_events
+from backend.services import ledger
 from backend.services.hub import hub
 from backend.services.transitions import record_many
 
@@ -76,6 +77,15 @@ async def _get_adventure(session: AsyncSession, adventure_id: uuid.UUID) -> Adve
 def _set_phase(adventure: Adventure, phase: str) -> None:
     adventure.phase = phase
     adventure.phase_changed_at = utcnow()
+
+
+async def _leave_treasury(session: AsyncSession, adventure: Adventure, phase: str) -> None:
+    """Before moving an artifact back out of the Treasury: its seal breaks, and its analysis
+    is a draft again. (Archiving it, or killing it, keeps the seal.)"""
+    if adventure.phase in ("completed", "decommissioned") and phase not in ("completed", "decommissioned", "killed"):
+        record = await session.get(Enshrining, adventure.id)
+        if record:
+            record.sealed_at = record.amended_at = None
 
 
 def _restore(adventure: Adventure) -> None:
@@ -291,16 +301,16 @@ async def set_phase(adventure_id: uuid.UUID, phase: str) -> None:
             raise InvalidTransition("only artifacts (completed adventures) can be decommissioned")
         if phase not in MANUAL_PHASES and phase != "decommissioned":
             raise InvalidTransition(f"can't move to {phase} by hand")
-        if adventure.phase in ("completed", "decommissioned") and phase not in ("completed", "decommissioned"):
-            record = await session.get(Enshrining, adventure_id)  # un-completed: its analysis is a draft again
-            if record:
-                record.sealed_at = record.amended_at = None
+        await _leave_treasury(session, adventure, phase)
         _set_phase(adventure, phase)
         # animus or later by hand: the roadmap counts as finished (services/roadmap.py)
         if phase in ("consuming", "completed", "decommissioned") and adventure.roadmap and adventure.roadmap.get("actions"):
             adventure.roadmap = {**adventure.roadmap, "done": [a["id"] for a in adventure.roadmap["actions"]]}
+        paid = await ledger.settle(session, adventure)
         await session.commit()
     await broadcast_pools()
+    if paid:
+        await ledger.broadcast()
 
 
 # --- automatic ---

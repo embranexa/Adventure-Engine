@@ -51,13 +51,14 @@ export function TreasuryPanel() {
         if (mode === 'adventures') selectItem(id, 'treasury');
     };
 
-    /** @param {AdventureRecord} a @param {Analysis} rec @param {string[]} discovered @param {boolean} amended */
-    const sealed = (a, rec, discovered, amended) => {
+    /** @param {AdventureRecord} a @param {Analysis} rec @param {string[]} discovered @param {boolean} amended @param {number} pay */
+    const sealed = (a, rec, discovered, amended, pay) => {
         if (amended) return;
         const acc = accuracy(rec.moves);
         /** @type {[string, string][]} */
         const lines = [['Verdict', verdictName(rec.verdict)]];
         if (acc != null) lines.push(['Accuracy', acc.toFixed(1)]);
+        if (pay) lines.push(['Ambrosia', `+${pay}`]);
         for (const name of discovered) lines.push(['New in the Codex', name]);
         setCeremony({ title: 'Enshrined', subtitle: a.title ?? 'Untitled', color: colorOf(a), seed: a.id, points: sigilPoints(a), rings: verdictRings(rec.verdict), lines });
     };
@@ -66,7 +67,7 @@ export function TreasuryPanel() {
         <div className="panel-body treasury">
             ${open
                 ? html`<${AnalysisView} key=${open.id} adventure=${open} onBack=${() => setOpenId(null)}
-                    onSealed=${(/** @type {Analysis} */ rec, /** @type {string[]} */ found, /** @type {boolean} */ amended) => sealed(open, rec, found, amended)} />`
+                    onSealed=${(/** @type {Analysis} */ rec, /** @type {string[]} */ found, /** @type {boolean} */ amended, /** @type {number} */ pay) => sealed(open, rec, found, amended, pay)} />`
                 : artifacts.length
                     ? html`<${Cabinet} groups=${groups} look=${LOOK} selectedId=${null} onSelect=${pick} label="Artifacts" />`
                     : html`<div className="nc-empty">Nothing here yet<small>Adventures you complete arrive as artifacts</small></div>`}

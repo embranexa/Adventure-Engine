@@ -5,6 +5,7 @@ import { ADVENTURE_TYPES, ENTITY_TYPES } from '../../lifecycle.js';
 import {
     GRADES, GRADE_KEYS, accuracy, blankAnalysis, gradeCounts, played, turningPoint, verdictName, winLine,
 } from '../../lib/analysis.js';
+import { remaining } from '../../lib/bounty.js';
 import { confirmHere } from '../../lib/windows.js';
 import { safeHttpUrl } from '../../events.js';
 import { GradeIcon } from '../GradeIcon.js';
@@ -114,7 +115,7 @@ function MoveRow({ move, n, editing, skills, open, onOpen, onChange, onRemove })
 /**
  * A completed adventure's analysis: edited as a draft (saved as you type) until it's sealed,
  * then read; Amend opens it again and reseals it.
- * @param {{ adventure: AdventureRecord, onBack: () => void, onSealed: (a: Analysis, discovered: string[], amended: boolean) => void }} props
+ * @param {{ adventure: AdventureRecord, onBack: () => void, onSealed: (a: Analysis, discovered: string[], amended: boolean, pay: number) => void }} props
  */
 export function AnalysisView({ adventure, onBack, onSealed }) {
     const entities = useWorkspaceStore((s) => s.entities);
@@ -162,11 +163,12 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
         clearTimeout(timer.current);
         pending.current = null;
         setBusy(true);
+        const pay = remaining(adventure); // what sealing it now pays
         const res = await saveEnshrining(adventure.id, rec, true);
         setBusy(false);
         if (typeof res === 'string') { setError(res); pending.current = sealed ? null : rec; return; }
         setError(null); setAmending(false); setStatus('');
-        onSealed(rec, res.discovered, !!sealed);
+        onSealed(rec, res.discovered, !!sealed, pay);
     };
     const uncomplete = async () => {
         if (!confirmHere(`Return “${adventure.title ?? 'Untitled'}” to the Arena? Its seal is broken; everything you wrote stays as a draft.`)) return;
@@ -252,6 +254,7 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
                             ? html`<textarea className="ana-notes" rows=${4} maxLength=${20000} value=${rec.notes} aria-label="Notes" onInput=${(/** @type {any} */ e) => change({ notes: e.target.value })}></textarea>`
                             : html`<p className="ana-notes-read">${rec.notes || 'None'}</p>`}
                     </section>
+                    ${!sealed && remaining(adventure) > 0 && html`<p className="ql-pay"><i className="amb"></i>${remaining(adventure)} ambrosia on sealing</p>`}
                     ${error && html`<div className="nc-error" role="alert">${error}</div>`}
                     <div className="nec-actions">
                         ${editing && html`<button className="btn ana-seal" disabled=${busy} onClick=${seal}>${sealed ? 'Reseal' : 'Seal and enshrine'}</button>`}

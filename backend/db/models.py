@@ -8,6 +8,7 @@
     adventure_entities  links between adventures and entities
     enshrinings    the analysis of a completed adventure (the Treasury), sealed or draft
     moves          the moves of an enshrining, graded like a chess game's
+    ambrosia       the Agora's ledger: every amount earned or taken back
     item_sheets    an item's purpose, effects and 3D model (the Inventory)
     epitaphs       why a killed adventure died (the Necropolis)
     app_state      small JSON settings that must survive restarts (filters)
@@ -155,6 +156,8 @@ class Adventure(Base):
     phase: Mapped[str] = mapped_column(String(20), default="queued")
     phase_before_kill: Mapped[str | None] = mapped_column(String(20))  # restored on revive
     stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # set by hand (HP, ATK, ...)
+    # what it's worth: {effort, resistance, ratio, locked_at}; see services/bounty.py, ledger.py
+    bounty: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     flags: Mapped[list[str] | None] = mapped_column(JSON, default=list)  # ADVENTURE_FLAGS, set by hand
     # action roadmap (Alembic): {actions, edges, done}; see backend/services/roadmap.py
     roadmap: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
@@ -205,6 +208,21 @@ class AdventureEntity(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class Ambrosia(Base):
+    """One entry of the Agora's ledger (see services/ledger.py). Append-only; no foreign key,
+    so what an abandoned adventure earned stays."""
+
+    __tablename__ = "ambrosia"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    adventure_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
+    kind: Mapped[str] = mapped_column(String(12))  # action | enshrined | reversal
+    ref: Mapped[str] = mapped_column(String(60))   # the action's id, or "seal"
+    amount: Mapped[int] = mapped_column(Integer)
+    label: Mapped[str] = mapped_column(Text)       # as it read then (titles change)
+
+
 class ItemSheet(Base):
     """What an item is for, what it does, and its model (see services/items.py)."""
 
@@ -215,6 +233,8 @@ class ItemSheet(Base):
     purpose: Mapped[str] = mapped_column(Text, default="")
     effects: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{text, target, amount}]
     model: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)  # a recipe: parts
+    # the Forge's work on it: {status: forging | ready | failed, text, at, proposal, error}
+    forge: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

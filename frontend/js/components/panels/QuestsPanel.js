@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../../store.js';
 import { PHASE_STAGES } from '../../lifecycle.js';
 import { analyze, promotionTarget, toggleDone } from '../../lib/roadmap.js';
 import { safeHttpUrl } from '../../events.js';
+import { nextActionPay, remaining } from '../../lib/bounty.js';
 import { modelSpec } from '../../lib/items.js';
 import { ModelView } from '../ModelView.js';
 import { PromoteButton } from '../PromoteButton.js';
@@ -108,6 +109,7 @@ export function QuestsPanel() {
                     const due = dueLabel(adventure.start);
                     const target = promotionTarget(adventure.phase);
                     const pct = analysis.total ? Math.round((analysis.doneCount / analysis.total) * 100) : 0;
+                    const pay = nextActionPay(adventure), left = remaining(adventure);
                     const pooled = inPool(adventure.id);
                     const className = ['ql-group', pooled && 'pooled', adventure.id === selectedId && 'selected',
                         adventure.id === hoveredId && 'hovered'].filter(Boolean).join(' ');
@@ -124,6 +126,7 @@ export function QuestsPanel() {
                             <div className="ql-body">
                             <div className="ql-adventure">
                                 <span className="ql-title">${adventure.title}</span>
+                                ${left > 0 && html`<span className="ql-pay" title="Ambrosia still to be earned"><i className="amb"></i>${left}</span>`}
                                 ${due && html`<span className="ql-due">${due}</span>`}
                             </div>
                             ${analysis.total > 0 && html`
@@ -148,6 +151,7 @@ export function QuestsPanel() {
                                             <span className="ql-quest-title">${quest.title}</span>
                                             ${quest.notes && html`<span className="ql-quest-notes">${quest.notes}</span>`}
                                         </span>
+                                        ${pay > 0 && html`<span className="ql-pay" title="Ambrosia for the next action">+${pay}</span>`}
                                         <span className="ql-quest-id">${quest.id}</span>
                                     </div>
                                 `;

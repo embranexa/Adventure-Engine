@@ -25,10 +25,10 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis' | 'treasury' | 'inventory';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis' | 'treasury' | 'inventory' | 'agora';
 
 /** Icon names drawn by components/PanelTitle.js. */
-type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb' | 'crown' | 'satchel';
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb' | 'crown' | 'satchel' | 'amphora';
 
 /** A panel's definition (backend/services/workspace.py). Its title reads:
  *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
@@ -116,6 +116,9 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     /** When it last changed phase (for a killed one: when it died). */
     phase_changed_at: string | null;
     /** Why it died, if written; kept through a revive, so only meaningful while killed. */
+    /** What it's worth in ambrosia; null without a bounty. */
+    bounty: { effort: number; resistance: number; ratio: number; locked_at: string | null;
+        total: number; action_share: number; paid_actions: number; paid_seal: number } | null;
     /** Its sheet (the Inventory): items only. */
     item: ItemSheet | null;
     /** Its analysis (the Treasury): a draft until sealed. */
@@ -136,6 +139,12 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     rewards: string | null;
 }
 
+interface AmbrosiaLedger {
+    balance: number;
+    entries: { id: number; at: string; adventure_id: string; kind: 'action' | 'enshrined' | 'reversal'; amount: number; label: string; balance: number }[];
+    by_kind: Record<string, number>;
+}
+
 /** A part of a model recipe (backend/services/items.py checks it; lib/cabinet/recipe.js draws it). */
 interface ModelPart {
     name: string; shape: string; mat: string; on: boolean; k: number;
@@ -145,7 +154,9 @@ interface ModelPart {
 }
 /** `target`: "favor", "other" or a skill entity's id; `amount` in percent. */
 interface ItemEffect { text: string; target: string; amount: number }
-interface ItemSheet { purpose: string; effects: ItemEffect[]; model: ModelPart[] | null }
+interface ItemSheet { purpose: string; effects: ItemEffect[]; model: ModelPart[] | null; forge: ForgeState | null }
+/** Claude's work on an item's model (backend/services/forge.py). */
+interface ForgeState { status: 'forging' | 'ready' | 'failed'; text: string; at: string; proposal: ModelPart[] | null; error?: string | null }
 
 /** How a move is graded (js/lib/analysis.js GRADES). */
 type MoveGrade = 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'forced' | 'inaccuracy' | 'mistake' | 'miss' | 'blunder';
@@ -446,6 +457,15 @@ interface WorkspaceState {
     /** Write a killed adventure's epitaph. Resolves to an error message, or null. */
     saveEpitaph(adventureId: string, cause: EpitaphCause, note: string): Promise<string | null>;
     clearEpitaph(adventureId: string): Promise<string | null>;
+    /** The Agora's ledger (backend/services/ledger.py), newest first. */
+    ambrosia: AmbrosiaLedger;
+    setAmbrosia(ambrosia: AmbrosiaLedger): void;
+    /** Set what an adventure is worth; null clears it. Resolves to an error message, or null. */
+    saveBounty(adventureId: string, bounty: { effort: number; resistance: number; ratio: number } | null): Promise<string | null>;
+    /** Ask Claude for an item's model, or changes to it. These resolve to an error message, or null. */
+    forgeModel(adventureId: string, text: string): Promise<string | null>;
+    acceptModel(adventureId: string): Promise<string | null>;
+    dismissModel(adventureId: string): Promise<string | null>;
     /** Set an item's purpose, effects or model. Resolves to an error message, or null. */
     saveItem(adventureId: string, changes: Partial<ItemSheet>): Promise<string | null>;
     /** Save the draft analysis, or seal (or amend) it. Resolves to the names new to the Codex, or an error message. */

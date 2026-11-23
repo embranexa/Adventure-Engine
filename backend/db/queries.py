@@ -6,7 +6,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.db.models import WHEN_WHERE_TYPES, Adventure, AdventureEntity, Enshrining, Entity, Epitaph, Event, EventSource, ItemSheet, Move
+from backend.services import bounty
+from backend.db.models import WHEN_WHERE_TYPES, Adventure, AdventureEntity, Ambrosia, Enshrining, Entity, Epitaph, Event, EventSource, ItemSheet, Move
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -76,6 +77,12 @@ async def list_entities(session: AsyncSession) -> list[dict[str, Any]]:
     return [entity_to_dict(o) for o in rows.all()]
 
 
+def bounty_to_dict(b: dict[str, Any], paid: dict[bool, int]) -> dict[str, Any]:
+    """`paid`: net ambrosia so far, for its seal (True) and its actions (False)."""
+    return {**b, "total": bounty.total(b), "action_share": bounty.action_share(b),
+            "paid_actions": paid.get(False, 0), "paid_seal": paid.get(True, 0)}
+
+
 def enshrining_to_dict(r: Enshrining, moves: list[Move]) -> dict[str, Any]:
     return {
         "verdict": [r.outcome, r.thrill] if r.outcome is not None and r.thrill is not None else None,
@@ -89,7 +96,7 @@ def enshrining_to_dict(r: Enshrining, moves: list[Move]) -> dict[str, Any]:
 def adventure_to_dict(
     a: Adventure, e: Event | None, source_name: str | None, entities: list[Entity] = (),
     epitaph: Epitaph | None = None, enshrining: Enshrining | None = None, moves: list[Move] = (),
-    sheet: ItemSheet | None = None,
+    sheet: ItemSheet | None = None, paid: dict[bool, int] | None = None,
 ) -> dict[str, Any]:
     """An adventure, flattened: its own fields over its linked event's (read through).
 
@@ -129,7 +136,8 @@ def adventure_to_dict(
         "phase_before_kill": a.phase_before_kill,
         "phase_changed_at": _iso(a.phase_changed_at),
         "epitaph": {"cause": epitaph.cause, "note": epitaph.note} if epitaph else None,
-        "item": {"purpose": sheet.purpose or "", "effects": sheet.effects or [], "model": sheet.model} if sheet and a.type == "item" else None,
+        "bounty": bounty_to_dict(a.bounty, paid or {}) if a.bounty else None,
+        "item": {"purpose": sheet.purpose or "", "effects": sheet.effects or [], "model": sheet.model, "forge": sheet.forge} if sheet and a.type == "item" else None,
         "enshrining": enshrining_to_dict(enshrining, moves) if enshrining else None,
         "stats": a.stats,
         "flags": a.flags or [],
@@ -167,13 +175,18 @@ async def list_adventures(session: AsyncSession) -> list[dict[str, Any]]:
     )).all():
         links.setdefault(adventure_id, []).append(obj)
     epitaphs = {r.adventure_id: r for r in (await session.scalars(select(Epitaph))).all()}
+    paid: dict[Any, dict[bool, int]] = {}
+    for adventure_id, ref, amount in (await session.execute(
+        select(Ambrosia.adventure_id, Ambrosia.ref, func.sum(Ambrosia.amount)).group_by(Ambrosia.adventure_id, Ambrosia.ref))).all():
+        sums = paid.setdefault(adventure_id, {})
+        sums[ref == "seal"] = sums.get(ref == "seal", 0) + amount
     sheets = {r.adventure_id: r for r in (await session.scalars(select(ItemSheet))).all()}
     enshrinings = {r.adventure_id: r for r in (await session.scalars(select(Enshrining))).all()}
     moves: dict[Any, list[Move]] = {}
     for m in (await session.scalars(select(Move).order_by(Move.adventure_id, Move.position))).all():
         moves.setdefault(m.adventure_id, []).append(m)
     return [adventure_to_dict(a, e, name, links.get(a.id, []), epitaphs.get(a.id), enshrinings.get(a.id), moves.get(a.id, []),
-                              sheets.get(a.id))
+                              sheets.get(a.id), paid.get(a.id))
             for a, e, name in rows.all()]
 
 

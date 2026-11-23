@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../../store.js';
 import {
     addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, roadmapColors, setNotes, toggleDone, toggleLink,
 } from '../../lib/roadmap.js';
+import { BountyControl } from '../BountyControl.js';
 import { PromoteButton } from '../PromoteButton.js';
 import { focusedWindow } from '../../lib/windows.js';
 
@@ -228,6 +229,7 @@ export function AlembicPanel() {
                     `}
                     <button className="cls-layer" onClick=${() => add(null)} title="Add an action that doesn't depend on anything">+ Action</button>
                     <button className="cls-layer" onClick=${() => showPanel('scripter')} title="Edit the roadmap as text in the Scripter">Script ⟶</button>
+                    <${BountyControl} key=${adventure.id} adventure=${adventure} />
                 </div>
 
                 ${analysis.total === 0 && html`

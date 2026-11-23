@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.base import get_session
 from backend.db.queries import list_adventures
 from backend.routers.errors import triage_errors
-from backend.schemas.adventures import AdventureCreate, AdventureUpdate, EnshriningPayload, EpitaphPayload, ItemPayload, PhasePayload, RoadmapPayload
-from backend.services import adventures, enshrinings, epitaphs, items, roadmap, triage
+from backend.schemas.adventures import AdventureCreate, AdventureUpdate, BountyPayload, EnshriningPayload, EpitaphPayload, ForgePayload, ItemPayload, PhasePayload, RoadmapPayload
+from backend.services import adventures, enshrinings, epitaphs, forge, items, ledger, roadmap, triage
 
 router = APIRouter(prefix="/adventures", tags=["adventures"])
 
@@ -125,3 +125,42 @@ async def save_item(adventure_id: uuid.UUID, payload: ItemPayload):
         except items.InvalidItem as e:
             raise HTTPException(422, str(e)) from e
     return {"status": "saved"}
+
+
+@router.post("/{adventure_id}/forge")
+async def request_model(adventure_id: uuid.UUID, payload: ForgePayload):
+    """Ask Claude for the item's model, or for changes to it. The result arrives as a
+    proposal on the item (an `adventures` message). 409 if it can't start; 422 without text."""
+    with triage_errors():
+        try:
+            await forge.request(adventure_id, payload.text)
+        except items.InvalidItem as e:
+            raise HTTPException(422, str(e)) from e
+    return {"status": "forging"}
+
+
+@router.post("/{adventure_id}/forge/accept")
+async def accept_model(adventure_id: uuid.UUID):
+    """The proposal becomes the item's model."""
+    with triage_errors():
+        await forge.accept(adventure_id)
+    return {"status": "accepted"}
+
+
+@router.delete("/{adventure_id}/forge")
+async def dismiss_model(adventure_id: uuid.UUID):
+    """Drop the proposal, or stop the work."""
+    with triage_errors():
+        await forge.dismiss(adventure_id)
+    return {"status": "dismissed"}
+
+
+@router.put("/{adventure_id}/bounty")
+async def set_bounty(adventure_id: uuid.UUID, payload: BountyPayload | None = None):
+    """What it's worth (no body clears it). 409 once it's locked; 422 out of range."""
+    with triage_errors():
+        try:
+            await ledger.set_bounty(adventure_id, payload.model_dump() if payload else None)
+        except ledger.InvalidBounty as e:
+            raise HTTPException(422, str(e)) from e
+    return {"status": "set" if payload else "cleared"}

@@ -4,6 +4,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from backend.db.base import SessionLocal
 from backend.db.queries import list_adventures, list_events, list_entities, list_sources
+from backend.services import ledger
 from backend.services.hub import hub
 
 router = APIRouter(tags=["live"])
@@ -18,6 +19,7 @@ async def live_socket(websocket: WebSocket):
             await hub.send(websocket, "events", events=await list_events(session))
             await hub.send(websocket, "adventures", adventures=await list_adventures(session))
             await hub.send(websocket, "entities", entities=await list_entities(session))
+            await hub.send(websocket, "ambrosia", ambrosia=await ledger.read(session))
             for source in await list_sources(session):
                 await hub.send(websocket, "source_status", source=source)
         while True:

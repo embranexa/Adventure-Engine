@@ -53,6 +53,16 @@ class Effect(BaseModel):
     amount: float = 0      # percent; below 0 is a debuff
 
 
+class BountyPayload(BaseModel):
+    effort: int
+    resistance: int
+    ratio: int
+
+
+class ForgePayload(BaseModel):
+    text: str = Field(max_length=4000)
+
+
 class ItemPayload(BaseModel):
     """An item's sheet; checked further in services/items.py."""
 

@@ -24,6 +24,7 @@ from backend.db.models import (
     ENTITY_TYPES, MOVE_GRADES, WHEN_WHERE_TYPES, Adventure, AdventureEntity, Enshrining, Entity, Move,
 )
 from backend.db.queries import list_entities
+from backend.services import ledger
 from backend.services.hub import hub
 from backend.services.triage import InvalidTransition, _get_adventure, broadcast_pools
 
@@ -125,10 +126,14 @@ async def save(adventure_id: uuid.UUID, fields: dict[str, Any], seal: bool = Fal
                 row.amended_at = utcnow()
         await session.execute(delete(Move).where(Move.adventure_id == adventure_id))
         session.add_all(Move(adventure_id=adventure_id, position=i, **m) for i, m in enumerate(moves))
+        await session.flush()
+        paid = await ledger.settle(session, adventure)
         await session.commit()
         if new:
             await hub.broadcast("entities", entities=await list_entities(session))
     await broadcast_pools()
+    if paid:
+        await ledger.broadcast()
     return {"discovered": new}
 
 
