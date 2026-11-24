@@ -74,7 +74,7 @@ async def settle(session: AsyncSession, adventure: Adventure) -> bool:
         actions, done = roadmap.get("actions") or [], set(roadmap.get("done") or [])
         names = {a["id"]: a["title"] for a in actions}
         for ref in [r for r, n in net.items() if r != SEAL and n and r not in done]:
-            add("reversal", ref, -net[ref], f"{title}: {names.get(ref, 'an action')} undone")
+            add("reversal", ref, -net[ref], f"{title}: {names.get(ref, 'a quest')} undone")
         # what the done actions should have earned together, so small shares don't round away
         ticked = [a for a in actions if a["id"] in done]
         due = bounty.round_half_up(bounty.action_share(b) * len(ticked) / len(actions)) if actions else 0

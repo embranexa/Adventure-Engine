@@ -298,7 +298,7 @@ export function parseScript(text, previous = null) {
     const actions = [...titles]
         .map(([id, title]) => (notes.has(id) ? { id, title: title || id, notes: notes.get(id) } : { id, title: title || id }))
         .sort((a, b) => (order.get(a.id) ?? Infinity) - (order.get(b.id) ?? Infinity));
-    if (actions.length > 200) return { roadmap: null, error: 'At most 200 actions' };
+    if (actions.length > 200) return { roadmap: null, error: 'At most 200 quests' };
     const cycle = findCycle(actions.map((a) => a.id), edges);
     if (cycle) return { roadmap: null, error: `Cycle: ${cycle.join(' --> ')}` };
     const keep = new Set(previous?.done ?? []);

@@ -8,7 +8,7 @@ import { Cabinet } from '../Cabinet.js';
 /** @type {import('../Cabinet.js').CabinetStyle} */
 const LOOK = { shape: 'arch', sealColor: '#f2c230', seed: 'agora', points: 8 };
 const LAYOUT = { minCols: 3, maxCols: 3, cellH: 330 };
-const KINDS = { action: 'Actions', enshrined: 'Enshrinings', reversal: 'Reversals' };
+const KINDS = { action: 'Quests', enshrined: 'Enshrinings', reversal: 'Reversals' };
 
 /** The vessel grows with what it holds: the next hundred above the balance, at least 200. @param {number} balance */
 const capacity = (balance) => Math.max(200, Math.ceil((balance + 1) / 100) * 100);
@@ -49,7 +49,7 @@ export function AgoraPanel() {
                         ${note && html`<p className="nec-dim" role="status">${note}</p>`}
                         <div className="ag-total"><b>${balance}</b><span>ambrosia held · the vessel holds ${cap}</span></div>
                         <h4>Ledger</h4>
-                        ${!entries.length && html`<p className="nec-dim">Nothing earned yet. Set a bounty in the Alembic: its actions pay as you finish them, and enshrining pays the rest.</p>`}
+                        ${!entries.length && html`<p className="nec-dim">Nothing earned yet. Set a bounty in the Alembic: its quests pay as you finish them, and enshrining pays the rest.</p>`}
                         <div className="ag-ledger">
                             ${entries.map((e) => html`
                                 <div key=${e.id} className="ag-row">

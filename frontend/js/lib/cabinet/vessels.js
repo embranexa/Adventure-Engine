@@ -5,6 +5,7 @@
 // the rest are grey. The card only sways, so the cover stays readable.
 
 import * as THREE from 'three';
+import { drawRecipe } from './recipe.js';
 import { sigilCanvas } from './sigil.js';
 
 const SWAY = 0.38;                 // radians each way (about 22 degrees)
@@ -91,12 +92,14 @@ export function vessel(K, group, m) {
     ring(23.4, 0.7, M.trim, group, 0, 6.6); ring(27, 0.6, M.trim, group, 0, 1);
     const hold = new THREE.Group(); hold.position.y = 48; group.add(hold);
     let spin = null;
+    // its model, if it shows one, in place of the card or record
+    const model = (k) => { drawRecipe(K, hold, m.parts, m.color); hold.scale.setScalar(k); };
     if (m.kind === 'performance') {
         ring(34, 1.4, trim, group, 0, 48, 0, false);
         for (const z of [3, -3]) mesh(new THREE.CircleGeometry(33, 48), glass(0.05), group, 0, 48, z);
         for (const f of [-1, 1]) tube([V(f * 8, 8), V(f * 20, 10), V(f * 27, 18), V(f * 28, 27)], 1.1, trim, group);
         gem(3, lit(), group, 0, 85, 0, 1);
-        spin = new THREE.Group(); hold.add(spin); record(K, spin, m);
+        if (m.parts) model(0.78); else { spin = new THREE.Group(); hold.add(spin); record(K, spin, m); }
     } else if (m.kind === 'battle') {
         ring(34, 1.2, trim, group, 0, 48, 0, false);
         for (const s of [-1, 1]) {   // two blades crossed behind the card
@@ -105,14 +108,14 @@ export function vessel(K, group, m) {
             mesh(new THREE.BoxGeometry(15, 1.6, 2.4), M.trim, b, 0, -27); mesh(new THREE.CylinderGeometry(1.2, 1.2, 11, 10), M.steel, b, 0, -33); ball(1.9, M.trim, b, 0, -39);
         }
         gem(3, lit(), group, 0, 86, 0, 1);
-        card(K, hold, m, 30, 38);
+        if (m.parts) model(0.66); else card(K, hold, m, 30, 38);
     } else if (m.kind === 'event') {
         mesh(new THREE.CylinderGeometry(33, 33, 70, 48, 1, true), glass(0.09), group, 0, 48, 0);
         for (const y of [13, 83]) { ring(33, 1.1, trim, group, 0, y); ring(30, 0.5, M.steel, group, 0, y); }
         for (let q = 0; q < 4; q++) { const a = (q / 4) * Math.PI * 2 + 0.78; mesh(new THREE.CylinderGeometry(0.6, 0.6, 70, 6), trim, group, Math.cos(a) * 33, 48, Math.sin(a) * 33); }
         lathe([[33, 83], [26, 87], [12, 90], [0, 91]], glass(0.12), group);
         gem(3, lit(), group, 0, 94, 0, 1);
-        card(K, hold, m, 43, 54);
+        if (m.parts) model(0.74); else card(K, hold, m, 43, 54);
     } else {
         lathe([[32, 12], [32, 52], [29, 68], [21, 80], [9, 87], [0, 88]], glass(0.09), group);
         ring(32, 1, trim, group, 0, 12); ball(2.2, trim, group, 0, 89.5);
@@ -121,6 +124,7 @@ export function vessel(K, group, m) {
     const phase = (m.id.charCodeAt(0) + m.id.charCodeAt(1)) % 9;
     return {
         frame(t, hover) {
+            if (m.parts) { hold.rotation.y = t / 3300 + phase; return; }
             hold.rotation.y = Math.sin(t / 1700 + phase) * (spin ? 0.2 : SWAY) * (1 - 0.7 * hover);
             if (spin) spin.rotation.z = -t / 1400;
         },

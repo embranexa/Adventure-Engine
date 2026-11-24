@@ -2,9 +2,8 @@ import { useMemo, useRef, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { ENTITY_TYPES, UNLINKABLE } from '../lifecycle.js';
+import { keepInView, matchesByType } from '../lib/entityOptions.js';
 import { PartyRoster } from './PartyRoster.js';
-
-const MAX_SUGGESTIONS = 8;
 
 /**
  * The adventure's links to entities (the Codex), in the Refinery: chips grouped by
@@ -32,10 +31,8 @@ export function EntityLinks({ adventure }) {
     /** Options: matching unlinked entities, then "create" for each type. */
     const options = useMemo(() => {
         /** @type {({ kind: 'link', obj: Entity } | { kind: 'create', type: EntityType })[]} */
-        const list = entities
-            .filter((o) => !UNLINKABLE.includes(o.type) && !linkedIds.has(o.id) && (!q || o.name.toLowerCase().includes(q)))
-            .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name))
-            .slice(0, MAX_SUGGESTIONS)
+        const list = matchesByType(entities
+            .filter((o) => !UNLINKABLE.includes(o.type) && !linkedIds.has(o.id)), q)
             .map((obj) => ({ kind: /** @type {const} */ ('link'), obj }));
         const exact = entities.some((o) => !UNLINKABLE.includes(o.type) && o.name.toLowerCase() === q);
         if (q && !exact) {
@@ -104,10 +101,13 @@ export function EntityLinks({ adventure }) {
                 />
                 ${open && options.length > 0 && html`
                     <div className="ol-menu" role="listbox">
-                        ${options.map((option, i) => html`
-                            <button
+                        ${options.map((option, i) => {
+                            const group = option.kind === 'link' ? ENTITY_TYPES[option.obj.type].plural : 'New';
+                            const before = options[i - 1], last = before && (before.kind === 'link' ? ENTITY_TYPES[before.obj.type].plural : 'New');
+                            return html`${group !== last && html`<div key=${`g-${group}`} className="ol-group">${group}</div>`}<button
                                 key=${option.kind === 'link' ? option.obj.id : `new-${option.type}`}
                                 role="option"
+                                ref=${i === active ? keepInView : undefined}
                                 aria-selected=${i === active}
                                 className=${`ol-option ${i === active ? 'active' : ''} ${option.kind}`}
                                 onMouseDown=${(/** @type {Event} */ e) => e.preventDefault()}
@@ -115,10 +115,10 @@ export function EntityLinks({ adventure }) {
                                 onMouseEnter=${() => setActive(i)}
                             >
                                 ${option.kind === 'link'
-                                    ? html`<i>${ENTITY_TYPES[option.obj.type].glyph}</i><span>${option.obj.name}</span><em>${ENTITY_TYPES[option.obj.type].label}</em>`
+                                    ? html`<i>${ENTITY_TYPES[option.obj.type].glyph}</i><span>${option.obj.name}</span>`
                                     : html`<i>✦</i><span>New ${ENTITY_TYPES[option.type].label.toLowerCase()} “${query.trim()}”</span>`}
-                            </button>
-                        `)}
+                            </button>`;
+                        })}
                     </div>
                 `}
             </div>

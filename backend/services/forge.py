@@ -1,12 +1,12 @@
-"""The Forge: asks Claude for an item's 3D model.
+"""The Forge: asks Claude for an adventure's 3D model.
 
 It runs the Claude command line (`claude -p`) with no tools, no settings and no session, so
 all it can do is reply with text. The reply must be a recipe that passes services/items.py;
-one that doesn't goes back once with its error. The result is a proposal on the item's sheet
+one that doesn't goes back once with its error. The result is a proposal on its sheet
 until it's accepted.
 
 One model is made at a time. Nothing else needs this: without Claude, the request fails with
-a reason and the item keeps its card.
+a reason and the adventure keeps its cover.
 """
 
 import asyncio
@@ -42,6 +42,13 @@ IMAGE_TYPES = ("image/png", "image/jpeg", "image/gif", "image/webp")
 IMAGE_MAX = 4 * 1024 * 1024
 MODEL = os.environ.get("FORGE_MODEL", "opus")
 
+# what the model is of, by adventure type
+KINDS = {
+    "item": "Object",
+    "event": "Event (model one emblem of it, or a small scene on a round base)",
+    "performance": "Performance (model its instrument or prop, or a small stage image on a round base)",
+    "battle": "Battle (model the contest as one image, or its trophy)",
+}
 _one_at_a_time = asyncio.Lock()
 _tasks: dict[uuid.UUID, asyncio.Task] = {}
 
@@ -68,8 +75,6 @@ async def request(adventure_id: uuid.UUID, text: str) -> None:
         raise InvalidTransition("Claude's command line isn't installed here")
     async with SessionLocal() as session:
         adventure = await _get_adventure(session, adventure_id)
-        if adventure.type != "item":
-            raise InvalidTransition("only items have a model")
         sheet = await session.get(ItemSheet, adventure_id)
         if sheet is None:
             sheet = ItemSheet(adventure_id=adventure_id, purpose="", effects=[])
@@ -84,13 +89,14 @@ async def request(adventure_id: uuid.UUID, text: str) -> None:
 
 
 async def accept(adventure_id: uuid.UUID) -> None:
-    """The proposal becomes the item's model."""
+    """The proposal becomes the model, and is what shows."""
     async with SessionLocal() as session:
         sheet = await _sheet(session, adventure_id)
         proposal = (sheet.forge or {}).get("proposal")
         if not proposal:
             raise InvalidTransition("there's no proposal to accept")
         sheet.model, sheet.forge, sheet.updated_at = proposal, None, utcnow()
+        sheet.face = "model"
         await session.commit()
     _stop(adventure_id)
     await _broadcast()
@@ -170,13 +176,13 @@ async def _brief(session: AsyncSession, adventure_id: uuid.UUID) -> tuple[str | 
         return None, None
     roadmap = adventure.roadmap or {}
     base = sheet.forge.get("proposal") or sheet.model
-    lines = [f"Object: {adventure.title or 'Untitled'}"]
+    lines = [f"{KINDS[adventure.type]}: {adventure.title or 'Untitled'}"]
     if sheet.purpose:
         lines.append(f"Purpose: {sheet.purpose}")
     if adventure.description:
         lines.append(f"Notes: {adventure.description[:2000]}")
     if roadmap.get("actions"):
-        lines.append("Roadmap actions (id: title): " + "; ".join(f"{a['id']}: {a['title']}" for a in roadmap["actions"]))
+        lines.append("Roadmap quests, called actions here (id: title): " + "; ".join(f"{a['id']}: {a['title']}" for a in roadmap["actions"]))
     if base:
         lines += ["", "The recipe so far:", json.dumps(base, separators=(",", ":")), "", f"Change this: {sheet.forge['text']}"]
     else:
@@ -187,7 +193,7 @@ async def _brief(session: AsyncSession, adventure_id: uuid.UUID) -> tuple[str | 
             body, ctype = await covers.fetch(adventure.cover_url)
             if ctype in IMAGE_TYPES and len(body) <= IMAGE_MAX:
                 image = (ctype, base64.b64encode(body).decode())
-                lines.insert(1, "The picture is the item's cover: a reference for its look, not necessarily the object itself.")
+                lines.insert(1, "The picture is its cover: a reference for the look, not necessarily what to model.")
         except covers.CoverError:
             pass
     return "\n".join(lines), image

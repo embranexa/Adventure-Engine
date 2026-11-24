@@ -24,7 +24,7 @@ import { magicCircleCanvases } from './magicCircle.js';
 import { starIconCanvas, starIconKey } from './starIcons.js';
 import { stageOf } from '../lifecycle.js';
 import { coverSrc } from './covers.js';
-import { modelSpec } from './items.js';
+import { modelSpec, showsModel } from './items.js';
 import { snapshot } from './cabinet/modelViews.js';
 import { deferredResize, isResizing, viewOf } from './resizing.js';
 
@@ -78,7 +78,7 @@ function spherePoints(n, r) {
 }
 
 /** An item with a model shows it on its card, in place of the cover. */
-const hasModel = (item) => item.kind === 'adventure' && item.type === 'item' && Boolean(item.item?.model);
+const hasModel = (item) => item.kind === 'adventure' && showsModel(item);
 
 export class ClassifierScene {
     /** @param {HTMLElement} parent @param {any} [callbacks] */

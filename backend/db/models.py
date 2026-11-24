@@ -12,7 +12,7 @@
     enshrinings    the analysis of a completed adventure (the Treasury), sealed or draft
     moves          the moves of an enshrining, graded like a chess game's
     ambrosia       the Agora's ledger: every amount earned or taken back
-    item_sheets    an item's purpose, effects and 3D model (the Inventory)
+    item_sheets    an adventure's 3D model; an item's purpose and effects (the Inventory)
     epitaphs       why a killed adventure died (the Necropolis)
     app_state      small JSON settings that must survive restarts (filters)
     geocache       place lookups (address / venue / city -> coordinates), so each is asked once
@@ -302,7 +302,7 @@ class Ambrosia(Base):
 
 
 class ItemSheet(Base):
-    """What an item is for, what it does, and its model (see services/items.py)."""
+    """An adventure's model, of any type; and what an item is for and does (see services/items.py)."""
 
     __tablename__ = "item_sheets"
 
@@ -311,6 +311,8 @@ class ItemSheet(Base):
     purpose: Mapped[str] = mapped_column(Text, default="")
     effects: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{skill, rating, text}]
     model: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)  # a recipe: parts
+    # cover | model: which one shows when it has both (null: the model; items always show it)
+    face: Mapped[str | None] = mapped_column(String(8), nullable=True)
     # the Forge's work on it: {status: forging | ready | failed, text, at, proposal, error}
     forge: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

@@ -244,8 +244,9 @@ Branch `core-zone`. Each stage is usable on its own.
 
 From `resources/upgrades.md`. Check: `scripts/check_upgrades.py` (on a database copy).
 
-- **On the anvil** (the Crucible): pinned ready actions from any adventure, in your order (app state `anvil`).
-  Done ones leave it; locked ones can't be pinned.
+- **Targets** (the Crucible): ready quests from any adventure, in your order (app state `anvil`). Done ones leave;
+  locked ones can't be targeted. Targeting one makes its adventure alloy (the build begins); dropping the last
+  target before any quest is done makes it distillate again.
 - **Objectives** on any adventure: primary or bonus; open, achieved or failed. Set in the Refinery, ticked in
   the Arena and Treasury. All primary ones settled suggest an outcome; they never set the verdict or bounty.
 - **Battle**: like a performance, plus adversaries (players, organizations, or anything named). No link needed
@@ -261,3 +262,8 @@ From `resources/upgrades.md`. Check: `scripts/check_upgrades.py` (on a database 
 - **Idols** (the Cohort): a statue and a card per archetype, editable description, skills (app state `idols`).
   Suggested skills become Codex skills only when clicked.
 - The **Combinator** (was the Complex panel and machine; id still `complex`; adventure -> collaboration) is a Core machine before the Refinery, with no pipes. The Sanctum's floor follows its machine count.
+- **Models for every adventure type** (reverses "only items have models"): forged in the Refinery, under the card's
+  Cover / Model switch (saved per adventure; items always show theirs). They show in the Refinery, Crucible, Arena,
+  Nexus cards, inside the Treasury's vessels, and standing on the Atlas in place of the tower (`lib/mapModels.js`).
+  Parts not tied to a quest are always solid, except an item's.
+- **Quests**: the Alembic's actions, in the interface. A title is a verb (mandatory) and a subject.

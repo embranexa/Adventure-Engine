@@ -1,4 +1,4 @@
-"""Plus Codes (Open Location Code) to coordinates.
+"""Plus Codes (Open Location Code) to coordinates, and coordinates to a place.
 
 Accepts what Google Maps shows and shares:
     8FVC9G8F+6X                       a full code: decoded offline
@@ -7,10 +7,13 @@ Accepts what Google Maps shows and shares:
                                       nearest to it is recovered and decoded
 
 The locality goes to OpenStreetMap's Nominatim (with a generic client name, nothing
-about the user); answers are kept in memory.
+about the user); answers are kept in memory. reverse() sends it coordinates the same way.
 """
 
+import asyncio
+import math
 import re
+import time
 from typing import Any
 
 import httpx
@@ -21,6 +24,11 @@ SEPARATOR_AT = 8
 PAIR_LENGTH = 10
 GRID_ROWS, GRID_COLS = 5, 4
 NOMINATIM = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_REVERSE = "https://nominatim.openstreetmap.org/reverse"
+REQUEST_GAP_S = 1.1     # Nominatim's usage policy: at most one request a second
+NEAR_M = 60             # a named place further than this from the point isn't where it is
+# what Nominatim can name that isn't a venue
+NOT_A_VENUE = {"highway", "boundary", "place", "railway", "waterway", "natural", "landuse"}
 USER_AGENT = "AdventureEngine/1.0 (self-hosted)"
 
 CODE_RE = re.compile(r"^\s*([23456789CFGHJMPQRVWX0]{2,8}\+[23456789CFGHJMPQRVWX]*)\s*,?\s*(.*?)\s*$", re.IGNORECASE)
@@ -185,3 +193,49 @@ async def resolve(text: str) -> dict[str, Any]:
     full = recover_nearest(code, ref_lat, ref_lon)
     lat, lon = decode(full)
     return {"lat": round(lat, 6), "lon": round(lon, 6), "code": full, "place": name}
+
+
+_reversed: dict[tuple[float, float], dict[str, str | None]] = {}
+_reverse_lock = asyncio.Lock()
+_reverse_at = 0.0
+
+
+def _metres(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    rad = math.pi / 180
+    x = (lon2 - lon1) * rad * math.cos((lat1 + lat2) / 2 * rad)
+    return 6_371_000 * math.hypot(x, (lat2 - lat1) * rad)
+
+
+def read_place(body: dict[str, Any], lat: float, lon: float) -> dict[str, str | None]:
+    """Nominatim's reverse answer -> {venue, address, city}, null where it doesn't say."""
+    a = body.get("address") or {}
+    city = next((a[k] for k in ("city", "town", "village", "hamlet", "municipality", "city_district", "suburb", "county") if a.get(k)), None)
+    road = a.get("road") or a.get("pedestrian") or a.get("footway")
+    address = " ".join(x for x in (a.get("house_number"), road) if x) if road else None
+    venue, name = None, (body.get("name") or "").strip()
+    if name and body.get("category") not in NOT_A_VENUE and name not in (road, city):
+        try:
+            near = _metres(lat, lon, float(body["lat"]), float(body["lon"])) <= NEAR_M
+        except (KeyError, ValueError):
+            near = False
+        box = [float(v) for v in body.get("boundingbox") or []]   # a park or campus: inside counts
+        inside = len(box) == 4 and box[0] <= lat <= box[1] and box[2] <= lon <= box[3]
+        venue = name if near or inside else None
+    return {"venue": venue, "address": address, "city": city}
+
+
+async def reverse(lat: float, lon: float) -> dict[str, str | None]:
+    """What's at a point: {venue, address, city}, each null if unknown."""
+    global _reverse_at
+    key = (round(lat, 5), round(lon, 5))
+    async with _reverse_lock:
+        if key in _reversed:
+            return _reversed[key]
+        await asyncio.sleep(max(0.0, _reverse_at + REQUEST_GAP_S - time.monotonic()))
+        _reverse_at = time.monotonic()
+        async with httpx.AsyncClient(timeout=10, headers={"User-Agent": USER_AGENT}) as client:
+            res = await client.get(NOMINATIM_REVERSE, params={"lat": lat, "lon": lon, "format": "jsonv2", "zoom": 18, "addressdetails": 1, "accept-language": "en"})
+        if res.status_code != 200:
+            raise PlusCodeError(f"the geocoder answered {res.status_code}")
+        _reversed[key] = read_place(res.json(), lat, lon)
+        return _reversed[key]

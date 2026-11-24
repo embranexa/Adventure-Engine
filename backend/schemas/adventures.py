@@ -76,7 +76,9 @@ class ForgePayload(BaseModel):
 
 
 class ItemPayload(BaseModel):
-    """An item's sheet; checked further in services/items.py."""
+    """An adventure's sheet (purpose and effects: items only); checked further in services/items.py."""
+
+    face: Literal["cover", "model"] | None = None
 
     purpose: str | None = None
     effects: list[Effect] | None = None

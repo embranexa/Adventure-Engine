@@ -1,4 +1,4 @@
-import { memo, useState, useRef } from 'react';
+import { memo, useEffect, useState, useRef } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { pendingChanges } from '../filters.js';
@@ -89,6 +89,22 @@ function PanelGroupImpl({ node, popout = false }) {
         setHoverZone(computeDropZone(e));
     };
 
+    // dragleave also fires between the group's own children: only leaving the group counts.
+    // (relatedTarget, what the pointer entered, can be missing: then go by where it is.)
+    /** @param {DragEvent} e */
+    const handleDragLeave = (e) => {
+        const group = groupRef.current;
+        const to = /** @type {Node | null} */ (e.relatedTarget);
+        if (!group) return;
+        if (to) { if (group.contains(to)) return; } else {
+            const r = group.getBoundingClientRect();
+            if (e.clientX > r.left && e.clientX < r.right && e.clientY > r.top && e.clientY < r.bottom) return;
+        }
+        setHoverZone(null);
+    };
+    // the drag ended (dropped, or cancelled over this group)
+    useEffect(() => { if (!draggingPanelId) setHoverZone(null); }, [draggingPanelId]);
+
     /** @param {DragEvent} e */
     const handleDrop = (e) => {
         e.preventDefault();
@@ -109,7 +125,7 @@ function PanelGroupImpl({ node, popout = false }) {
             onPointerDownCapture=${() => focusGroup(node.id)}
             onFocusCapture=${() => focusGroup(node.id)}
             onDragOver=${popout ? undefined : handleDragOver}
-            onDragLeave=${popout ? undefined : () => setHoverZone(null)}
+            onDragLeave=${popout ? undefined : handleDragLeave}
             onDrop=${popout ? undefined : handleDrop}
         >
             <${Corners} />
@@ -171,7 +187,7 @@ function PanelGroupImpl({ node, popout = false }) {
                 ${activeTab && html`<${PanelContent} panelId=${activeTab} />`}
             </div>
 
-            ${hoverZone && html`
+            ${hoverZone && draggingPanelId && html`
                 <div className="drop-overlay">
                     <div className=${`drop-zone-preview ${hoverZone}`}></div>
                 </div>

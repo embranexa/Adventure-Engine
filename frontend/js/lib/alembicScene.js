@@ -19,6 +19,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { splitTitle } from './quests.js';
 import { deferredResize, isResizing, viewOf } from './resizing.js';
 
 const LAYER_X = 66;       // spacing between steps (left to right)
@@ -236,8 +237,10 @@ export class AlembicScene {
             if (!node) node = this._addNode(info, x, z);
             node.target.set(x, 0, z);
             node.title = info.title;
-            node.labelId.textContent = info.id;
-            node.labelTitle.textContent = info.title;
+            const { verb, subject } = splitTitle(info.title);
+            node.labelId.textContent = verb ? `${info.id} · ${verb}` : info.id;
+            node.labelTitle.textContent = subject || verb;
+            node.label.classList.toggle('noverb', !verb);
             node.label.title = `${info.id} · ${info.title}`;
             this._setState(node, info.state);
         }

@@ -177,7 +177,7 @@ def adventure_to_dict(
         "phase_changed_at": _iso(a.phase_changed_at),
         "epitaph": {"cause": epitaph.cause, "note": epitaph.note} if epitaph else None,
         "bounty": bounty_to_dict(a.bounty, paid or {}) if a.bounty else None,
-        "item": {"purpose": sheet.purpose or "", "effects": sheet.effects or [], "model": sheet.model, "forge": sheet.forge} if sheet and a.type == "item" else None,
+        "item": {"purpose": sheet.purpose or "", "effects": sheet.effects or [], "model": sheet.model, "forge": sheet.forge, "face": sheet.face} if sheet else None,
         "enshrining": enshrining_to_dict(enshrining, moves) if enshrining else None,
         "stats": a.stats,
         "flags": a.flags or [],

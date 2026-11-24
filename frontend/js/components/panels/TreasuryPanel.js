@@ -43,7 +43,7 @@ export function TreasuryPanel() {
             const sealed = !!a.enshrining?.sealed_at, spec = modelSpec(a, { fallback: VIOLET });
             return {
                 id: a.id, label: a.title ?? 'Untitled', sub: sealed ? verdictName(a.enshrining?.verdict) : a.enshrining ? 'Draft' : 'Unsealed',
-                model: { ...spec, type: spec.parts ? 'recipe' : 'vessel', on: sealed },
+                model: { ...spec, type: spec.parts && a.type === 'item' ? 'recipe' : 'vessel', on: sealed },
             };
         }),
     }], [artifacts, entities]);

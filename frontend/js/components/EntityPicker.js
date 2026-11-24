@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { ENTITY_TYPES } from '../lifecycle.js';
-
-const MAX_SUGGESTIONS = 8;
+import { keepInView, matchesByType } from '../lib/entityOptions.js';
 
 /**
  * Entities of some types, picked by a type-ahead: chips of those picked (click opens one in
@@ -26,9 +25,7 @@ export function EntityPicker({ ids, types, placeholder, chips = true, onAdd, onR
     const options = useMemo(() => {
         const pool = entities.filter((e) => types.includes(e.type));
         /** @type {({ obj: Entity, type?: undefined } | { obj?: undefined, type: EntityType })[]} */
-        const list = pool.filter((e) => !ids.includes(e.id) && (!q || e.name.toLowerCase().includes(q)))
-            .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name))
-            .slice(0, MAX_SUGGESTIONS).map((obj) => ({ obj }));
+        const list = matchesByType(pool.filter((e) => !ids.includes(e.id)), q).map((obj) => ({ obj }));
         if (q) for (const type of types) if (!pool.some((e) => e.type === type && e.name.toLowerCase() === q)) list.push({ type });
         return list;
     }, [entities, ids.join(), types.join(), q]);
@@ -73,15 +70,17 @@ export function EntityPicker({ ids, types, placeholder, chips = true, onAdd, onR
                 onKeyDown=${onKeyDown} />
             ${open && options.length > 0 && html`
                 <div className="ol-menu" role="listbox">
-                    ${options.map((o, i) => html`
-                        <button key=${o.obj ? o.obj.id : `new-${o.type}`} role="option" aria-selected=${i === active}
+                    ${options.map((o, i) => {
+                        const group = o.obj ? ENTITY_TYPES[o.obj.type].plural : 'New';
+                        const before = options[i - 1], last = before && (before.obj ? ENTITY_TYPES[before.obj.type].plural : 'New');
+                        return html`${types.length > 1 && group !== last && html`<div key=${`g-${group}`} className="ol-group">${group}</div>`}<button key=${o.obj ? o.obj.id : `new-${o.type}`} role="option" ref=${i === active ? keepInView : undefined} aria-selected=${i === active}
                             className=${`ol-option ${i === active ? 'active' : ''} ${o.obj ? 'link' : 'create'}`}
                             onMouseDown=${(/** @type {Event} */ e) => e.preventDefault()} onClick=${() => choose(o)} onMouseEnter=${() => setActive(i)}>
                             ${o.obj
-                                ? html`<i>${ENTITY_TYPES[o.obj.type].glyph}</i><span>${o.obj.name}</span><em>${ENTITY_TYPES[o.obj.type].label}</em>`
+                                ? html`<i>${ENTITY_TYPES[o.obj.type].glyph}</i><span>${o.obj.name}</span>`
                                 : html`<i>✦</i><span>New ${ENTITY_TYPES[o.type].label.toLowerCase()} “${query.trim()}”</span>`}
-                        </button>
-                    `)}
+                        </button>`;
+                    })}
                 </div>
             `}
         </div>

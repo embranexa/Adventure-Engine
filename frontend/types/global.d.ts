@@ -119,7 +119,7 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     /** What it's worth in ambrosia; null without a bounty. */
     bounty: { effort: number; resistance: number; ratio: number; locked_at: string | null;
         total: number; action_share: number; paid_actions: number; paid_seal: number } | null;
-    /** Its sheet (the Inventory): items only. */
+    /** Its sheet: a model (any type); an item's purpose and effects. */
     item: ItemSheet | null;
     /** Its analysis (the Treasury): a draft until sealed. */
     enshrining: (Omit<Analysis, 'link' | 'moves'> & { link: string | null; moves: (Omit<AnalysisMove, 'better'> & { better: string | null })[];
@@ -168,12 +168,13 @@ interface Preparation { id: string; item: string | null; text: string; checked: 
 interface Adversary { entity_id: string | null; name: string }
 /** An effect judged after the fact; keys of ones added by hand start with "own:". */
 interface FeedbackRow { key: string; label: string; skill: string | null; rating: number; result: 'helped' | 'none' | 'hurt' | null }
-/** An action laid on the anvil. */
+/** A targeted quest. */
 interface Pin { adventure: string; action: string }
 /** What you wrote about an archetype; null description: the built-in one. */
 interface IdolNotes { description: string | null; skills: string[] }
-interface ItemSheet { purpose: string; effects: ItemEffect[]; model: ModelPart[] | null; forge: ForgeState | null }
-/** Claude's work on an item's model (backend/services/forge.py). */
+/** An adventure's model and, for items, purpose and effects. */
+interface ItemSheet { purpose: string; effects: ItemEffect[]; model: ModelPart[] | null; forge: ForgeState | null; /** which shows when it has both */ face: 'cover' | 'model' | null }
+/** Claude's work on a model (backend/services/forge.py). */
 interface ForgeState { status: 'forging' | 'ready' | 'failed'; text: string; at: string; proposal: ModelPart[] | null; error?: string | null }
 
 /** How a move is graded (js/lib/analysis.js GRADES). */
@@ -500,9 +501,14 @@ interface WorkspaceState {
     setSteward(adventureId: string, entityId: string, role: 'archon' | 'herald' | 'commissioner', on: boolean): Promise<string | null>;
     setAffinity(playerId: string, entityId: string, on: boolean): Promise<string | null>;
     setWarden(siteId: string, entityId: string, on: boolean): Promise<string | null>;
-    /** Actions laid on the anvil (the Crucible), in order. */
+    /** Targeted quests (the Crucible), in order. */
     pins: Pin[];
     setPins(pins: Pin[]): void;
+    /** Target a quest, or stop. */
+    togglePin(adventureId: string, actionId: string): void;
+    /** Quest verbs you defined. */
+    verbs: string[];
+    setVerbs(verbs: string[]): void;
     /** What you wrote about each archetype (the Cohort). */
     idols: Partial<Record<Archetype, IdolNotes>>;
     setIdol(id: Archetype, changes: Partial<IdolNotes>): void;
@@ -514,11 +520,11 @@ interface WorkspaceState {
     partyHistory(adventureId: string): Promise<PartyLogEntry[]>;
     /** Set what an adventure is worth; null clears it. Resolves to an error message, or null. */
     saveBounty(adventureId: string, bounty: { effort: number; resistance: number; ratio: number } | null): Promise<string | null>;
-    /** Ask Claude for an item's model, or changes to it. These resolve to an error message, or null. */
+    /** Ask Claude for an adventure's model, or changes to it. These resolve to an error message, or null. */
     forgeModel(adventureId: string, text: string): Promise<string | null>;
     acceptModel(adventureId: string): Promise<string | null>;
     dismissModel(adventureId: string): Promise<string | null>;
-    /** Set an item's purpose, effects or model. Resolves to an error message, or null. */
+    /** Set an adventure's model or face, or an item's purpose or effects. Resolves to an error message, or null. */
     saveItem(adventureId: string, changes: Partial<ItemSheet>): Promise<string | null>;
     /** Save the draft analysis, or seal (or amend) it. Resolves to the names new to the Codex, or an error message. */
     saveEnshrining(adventureId: string, analysis: Analysis, seal: boolean): Promise<{ discovered: string[] } | string>;

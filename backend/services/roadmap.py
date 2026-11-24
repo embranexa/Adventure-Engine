@@ -1,6 +1,6 @@
 """Action roadmaps (the Alembic): one dependency graph of actions per adventure.
 
-A roadmap is stored on its adventure as JSON:
+The interface calls actions quests. A roadmap is stored on its adventure as JSON:
 
     {"actions": [{"id": "A1", "title": "Buy tickets", "notes": "..."}, ...],   # notes optional
      "edges":   [["A1", "A2"], ...],     # A1 must be done before A2
@@ -14,7 +14,7 @@ unfinished prerequisite.
 
 The roadmap also moves its adventure (the user's rule, resources/UPGRADES_PLAN.md U3), for
 adventures in the Alembic or later (never queued, classifying or killed): no action done
--> distillate (decomposing); some done -> alloy (constructing); all done -> stays where it
+-> distillate (decomposing), or alloy if one is a target; some done -> alloy (constructing); all done -> stays where it
 is (promotion to animus is the Promote button), except a distillate becomes alloy. So
 un-completing an action on an animus, artifact or relic sends it back to alloy. Moving an
 adventure by hand to animus or later marks every action done (triage.set_phase).
@@ -28,6 +28,7 @@ from backend.db.base import SessionLocal
 from backend.db.queries import list_adventures
 from backend.services import ledger
 from backend.services.hub import hub
+from backend.services.targets import is_targeted
 from backend.services.triage import NotFound, _get_adventure, _leave_treasury, _set_phase
 
 MAX_ACTIONS = 200
@@ -77,16 +78,16 @@ def normalize(raw: dict[str, Any]) -> dict[str, Any]:
     """
     actions = raw.get("actions") or []
     if len(actions) > MAX_ACTIONS:
-        raise InvalidRoadmap(f"at most {MAX_ACTIONS} actions")
+        raise InvalidRoadmap(f"at most {MAX_ACTIONS} quests")
     clean_actions: list[dict[str, str]] = []
     seen: set[str] = set()
     for action in actions:
         action_id = str(action.get("id", ""))
         title = str(action.get("title", "")).strip()
         if not ID_PATTERN.match(action_id):
-            raise InvalidRoadmap(f"bad action id {action_id!r} (letters, digits, - and _ only)")
+            raise InvalidRoadmap(f"bad quest id {action_id!r} (letters, digits, - and _ only)")
         if action_id in seen:
-            raise InvalidRoadmap(f"action {action_id} appears twice")
+            raise InvalidRoadmap(f"quest {action_id} appears twice")
         seen.add(action_id)
         clean = {"id": action_id, "title": (title or action_id)[:MAX_TITLE]}
         notes = str(action.get("notes") or "").strip()
@@ -101,9 +102,9 @@ def normalize(raw: dict[str, Any]) -> dict[str, Any]:
             raise InvalidRoadmap("each link needs a source and a target")
         a, b = str(edge[0]), str(edge[1])
         if a not in seen or b not in seen:
-            raise InvalidRoadmap(f"link {a} --> {b} names an unknown action")
+            raise InvalidRoadmap(f"link {a} --> {b} names an unknown quest")
         if a == b:
-            raise InvalidRoadmap(f"action {a} can't depend on itself")
+            raise InvalidRoadmap(f"quest {a} can't depend on itself")
         if (a, b) not in edges:
             edges.append((a, b))
     if cycle := find_cycle(ids, edges):
@@ -128,13 +129,14 @@ def normalize(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def phase_for(phase: str, roadmap: dict[str, Any] | None) -> str:
-    """The phase an adventure belongs in given its roadmap (see the module docstring)."""
+def phase_for(phase: str, roadmap: dict[str, Any] | None, targeted: bool = False) -> str:
+    """The phase an adventure belongs in given its roadmap (see the module docstring).
+    `targeted`: one of its quests is a target, so building has begun (services/targets.py)."""
     if phase not in ROADMAP_PHASES or not roadmap or not roadmap.get("actions"):
         return phase
     total, done = len(roadmap["actions"]), len(roadmap.get("done") or [])
     if done == 0:
-        return "decomposing"
+        return "constructing" if targeted else "decomposing"
     if done < total:
         return "constructing"
     return "constructing" if phase == "decomposing" else phase
@@ -149,7 +151,7 @@ async def save_roadmap(adventure_id: uuid.UUID, raw: dict[str, Any] | None) -> d
     async with SessionLocal() as session:
         adventure = await _get_adventure(session, adventure_id)
         adventure.roadmap = roadmap
-        target = phase_for(adventure.phase, roadmap)
+        target = phase_for(adventure.phase, roadmap, await is_targeted(session, adventure))
         if target != adventure.phase:
             await _leave_treasury(session, adventure, target)
             _set_phase(adventure, target)  # logged as a transition like any phase change

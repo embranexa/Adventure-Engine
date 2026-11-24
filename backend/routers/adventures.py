@@ -117,8 +117,8 @@ async def save_enshrining(adventure_id: uuid.UUID, payload: EnshriningPayload):
 
 @router.put("/{adventure_id}/item")
 async def save_item(adventure_id: uuid.UUID, payload: ItemPayload):
-    """Set an item's purpose, effects or model (only the fields sent). 409 unless it's an
-    item; 422 for an invalid effect or recipe."""
+    """Set its model or face, or an item's purpose or effects (only the fields sent). 409 for a
+    purpose or effects on anything else; 422 for an invalid effect or recipe."""
     with triage_errors():
         try:
             await items.save_item(adventure_id, payload.model_dump(exclude_unset=True))
@@ -129,8 +129,8 @@ async def save_item(adventure_id: uuid.UUID, payload: ItemPayload):
 
 @router.post("/{adventure_id}/forge")
 async def request_model(adventure_id: uuid.UUID, payload: ForgePayload):
-    """Ask Claude for the item's model, or for changes to it. The result arrives as a
-    proposal on the item (an `adventures` message). 409 if it can't start; 422 without text."""
+    """Ask Claude for the adventure's model, or for changes to it. The result arrives as a
+    proposal on its sheet (an `adventures` message). 409 if it can't start; 422 without text."""
     with triage_errors():
         try:
             await forge.request(adventure_id, payload.text)
@@ -141,7 +141,7 @@ async def request_model(adventure_id: uuid.UUID, payload: ForgePayload):
 
 @router.post("/{adventure_id}/forge/accept")
 async def accept_model(adventure_id: uuid.UUID):
-    """The proposal becomes the item's model."""
+    """The proposal becomes the model."""
     with triage_errors():
         await forge.accept(adventure_id)
     return {"status": "accepted"}

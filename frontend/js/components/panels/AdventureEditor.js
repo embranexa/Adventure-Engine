@@ -4,7 +4,7 @@ import { useWorkspaceStore } from '../../store.js';
 import { ADVENTURE_TYPES } from '../../lifecycle.js';
 import { confirmHere } from '../../lib/windows.js';
 import { weekday } from '../../lib/occurrences.js';
-import { PLACE_PLACEHOLDER, coordsText, readPlace } from '../../lib/places.js';
+import { PLACE_PLACEHOLDER, coordsText, fillPlace, placeAt, readPlace } from '../../lib/places.js';
 
 const pad2 = (/** @type {number} */ n) => String(n).padStart(2, '0');
 /** Date -> "2026-11-20" (local). @param {Date} d */
@@ -239,6 +239,8 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
     };
 
     const [placeNote, setPlaceNote] = useState(/** @type {string | null} */ (null));
+    const shownId = useRef(adventure.id);
+    shownId.current = adventure.id;
     useEffect(() => setPlaceNote(null), [adventure.id]);
 
     /** Coordinates as "lat, lon", or a Plus Code (full, or short with a town). @param {string} text */
@@ -247,7 +249,19 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
         const place = await readPlace(text);
         if ('error' in place) { setSaving(false); setError(place.error); return place.error; }
         setPlaceNote(place.note);
-        return save({ lat: place.lat, lon: place.lon });
+        const was = adventure, err = await save({ lat: place.lat, lon: place.lon });
+        if (err || place.lat == null || place.lon == null) return err;
+        // then what's there: venue, address and city, where they're empty
+        const { lat, lon } = place;
+        const say = (/** @type {string} */ s) => { if (shownId.current === was.id) setPlaceNote([place.note, s].filter(Boolean).join(' · ')); };
+        say('Looking up the place…');
+        const now = await placeAt(lat, lon);
+        const before = now && was.own.lat != null && was.own.lon != null ? await placeAt(was.own.lat, was.own.lon) : null;
+        const changes = now ? fillPlace(now, before, { venue: was.venue, address: was.address, city: was.city }) : {};
+        const failed = Object.keys(changes).length ? await updateAdventure(was.id, changes) : null;
+        const filled = Object.entries(changes).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`);
+        say(failed ?? (!now ? 'Place not found' : filled.length ? `Filled in ${filled.join(' · ')}` : ''));
+        return null;
     };
 
     /** Shared props for a plain text field. @param {'title' | 'description' | 'venue' | 'address' | 'city' | 'url' | 'cover_url' | 'costs' | 'rewards'} key */

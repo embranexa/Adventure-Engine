@@ -20,15 +20,24 @@ export const sigilPoints = (a) => Math.max(4, Math.min(9, 4 + (a.roadmap?.action
 export const owned = (a) => a.phase === 'completed' || a.phase === 'decommissioned';
 
 /**
- * Whether a part of an item's model is made: solid, else a blueprint. A part tied to an
- * action is made when that's done; the rest once construction starts.
+ * Whether a part of a model is made: solid, else a blueprint. A part tied to a quest is made
+ * when that's done; the rest once an item's construction starts, and always for other types.
  * @param {AdventureRecord} a @param {ModelPart} part
  */
 export function partMade(a, part) {
     if (owned(a)) return true;
     if (part.act != null) return a.roadmap?.done?.includes(part.act) ?? false;
-    return a.phase === 'constructing' || a.phase === 'consuming';
+    return a.type !== 'item' || a.phase === 'constructing' || a.phase === 'consuming';
 }
+
+/** @param {AdventureRecord} a @returns {ItemSheet} */
+export const sheetOf = (a) => a.item ?? { purpose: '', effects: [], model: null, forge: null, face: null };
+
+/** The Forge's proposal waiting on it, if any. @param {AdventureRecord} a */
+export const proposalOf = (a) => (a.item?.forge && a.item.forge.status !== 'forging' ? a.item.forge.proposal : null);
+
+/** Whether its model shows in place of its cover. @param {AdventureRecord} a */
+export const showsModel = (a) => Boolean(a.item?.model) && (a.type === 'item' || a.item?.face !== 'cover');
 
 /**
  * What a 3D view needs to show an adventure: its model with each part made or not, or the
@@ -36,7 +45,7 @@ export function partMade(a, part) {
  * @param {AdventureRecord} a @param {{ finished?: boolean, fallback?: string }} [options]
  */
 export function modelSpec(a, { finished = false, fallback } = {}) {
-    const parts = a.type === 'item' && a.item?.model ? a.item.model.filter((p) => p.on).map((p) => ({ ...p, made: finished || partMade(a, p) })) : null;
+    const parts = a.item?.model && showsModel(a) ? a.item.model.filter((p) => p.on).map((p) => ({ ...p, made: finished || partMade(a, p) })) : null;
     return {
         id: a.id, kind: a.type, color: adventureColor(a, fallback), points: sigilPoints(a), on: owned(a),
         rings: a.enshrining?.sealed_at ? verdictRings(a.enshrining.verdict) : 0, cover: coverSrc(a.cover_url), parts,

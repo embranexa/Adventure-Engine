@@ -1,4 +1,4 @@
-"""Item sheets (the Inventory): what an item is for, its effects, and its 3D model.
+"""Sheets: an adventure's 3D model, and (items only, the Inventory) what it's for and its effects.
 
 A model is a recipe: data, never code. It lists named parts made of known shapes
 (SHAPES), each with a place, a material role (MATERIALS) and optionally the roadmap action
@@ -138,11 +138,11 @@ def clean_effects(rows: list[dict[str, Any]], skills: set[str]) -> list[dict[str
 
 
 async def save_item(adventure_id: uuid.UUID, changes: dict[str, Any]) -> None:
-    """Set an item's purpose, effects and / or model (only the fields sent)."""
+    """Set an adventure's model and which face shows; an item's purpose and effects (only the fields sent)."""
     async with SessionLocal() as session:
         adventure = await _get_adventure(session, adventure_id)
-        if adventure.type != "item":
-            raise InvalidTransition("only items have a sheet")
+        if adventure.type != "item" and {"purpose", "effects"} & set(changes):
+            raise InvalidTransition("only items have a purpose and effects")
         sheet = await session.get(ItemSheet, adventure_id)
         if sheet is None:
             sheet = ItemSheet(adventure_id=adventure_id, purpose="", effects=[])
@@ -157,6 +157,8 @@ async def save_item(adventure_id: uuid.UUID, changes: dict[str, Any]) -> None:
             if len(rows) > MAX_EFFECTS:
                 raise InvalidItem(f"too many effects (max {MAX_EFFECTS})")
             sheet.effects = clean_effects(rows, await skill_ids(session))
+        if "face" in changes:
+            sheet.face = changes["face"]
         if "model" in changes:
             sheet.model = clean_model(changes["model"])
         sheet.updated_at = utcnow()

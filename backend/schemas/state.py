@@ -76,9 +76,15 @@ class Pin(BaseModel):
 
 
 class Anvil(BaseModel):
-    """Actions laid on the anvil (the Crucible), in order."""
+    """Targeted quests (the Crucible), in order."""
 
     pins: list[Pin] = Field(default_factory=list, max_length=200)
+
+
+class Verbs(BaseModel):
+    """Quest verbs you defined (the Alembic), beside the built-in ones."""
+
+    verbs: list[str] = Field(default_factory=list, max_length=100)
 
 
 class Idol(BaseModel):

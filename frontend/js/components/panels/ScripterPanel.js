@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
+import { allVerbs, splitTitle } from '../../lib/quests.js';
 import { analyze, orEmpty, parseScript, toScript } from '../../lib/roadmap.js';
 
-const SCRIPT_HELP = 'A1[Buy tickets] --> A2[Book hotel]   ·   A1 --> A3   ·   # comment';
+const SCRIPT_HELP = 'A1[Acquire tickets] --> A2[Resolve lodging]   ·   A1 --> A3   ·   # comment';
 
 /**
  * The Scripter: the selected adventure's roadmap as script text (the Alembic draws it).
@@ -13,6 +14,7 @@ const SCRIPT_HELP = 'A1[Buy tickets] --> A2[Book hotel]   ·   A1 --> A3   ·   
 export function ScripterPanel() {
     const item = useWorkspaceStore((s) => (s.selectedItemId ? s.itemsById[s.selectedItemId] : null));
     const saveRoadmap = useWorkspaceStore((s) => s.saveRoadmap);
+    const verbs = useWorkspaceStore((s) => s.verbs);
     const showPanel = useWorkspaceStore((s) => s.showPanel);
 
     const adventure = item?.kind === 'adventure' ? item : null;
@@ -32,7 +34,7 @@ export function ScripterPanel() {
             <div className="panel-body scripter">
                 <div className="nc-empty">
                     ${item ? 'Raw events have no roadmap' : 'Nothing selected'}
-                    <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to script its actions'}</small>
+                    <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to script its quests'}</small>
                 </div>
             </div>
         `;
@@ -41,6 +43,10 @@ export function ScripterPanel() {
     const compile = () => {
         const result = parseScript(text, roadmap);
         if (result.error !== null) { setError(result.error); return; }
+        // every quest starts with a verb; ones written before that may stay as they were
+        const before = new Map(roadmap.actions.map((a) => [a.id, a.title]));
+        const bare = result.roadmap.actions.find((a) => !splitTitle(a.title).verb && before.get(a.id) !== a.title);
+        if (bare) { setError(`${bare.id} needs a verb first: ${allVerbs(verbs).join(', ')}`); return; }
         setError(null);
         setDirty(false);
         saveRoadmap(adventure.id, result.roadmap);
@@ -58,7 +64,7 @@ export function ScripterPanel() {
                 className="scr-text"
                 spellCheck=${false}
                 value=${text}
-                placeholder=${'# One statement per line\nA1[First step] --> A2[Second step]\nA1 --> A3[In parallel]'}
+                placeholder=${'# One statement per line\nA1[Research parts] --> A2[Acquire parts]\nA1 --> A3[Design case]'}
                 onInput=${(/** @type {any} */ e) => { setText(e.target.value); setDirty(true); setError(null); }}
                 onKeyDown=${(/** @type {KeyboardEvent} */ e) => {
                     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); compile(); }
@@ -73,10 +79,10 @@ export function ScripterPanel() {
                 ${dirty && html`<button className="btn ghost" onClick=${revert} title="Esc">Revert</button>`}
                 <span className="scr-spacer"></span>
                 <button className="btn ghost" onClick=${resetProgress} disabled=${!analysis.doneCount}
-                    title="Mark every action as not done">↺ Reset progress</button>
+                    title="Mark every quest as not done">↺ Reset progress</button>
             </div>
             <div className="scr-status">
-                <span className=${dirty ? 'scr-dirty' : ''}>${dirty ? '● Edited, not compiled' : `${analysis.total} ${analysis.total === 1 ? 'action' : 'actions'}`}</span>
+                <span className=${dirty ? 'scr-dirty' : ''}>${dirty ? '● Edited, not compiled' : `${analysis.total} ${analysis.total === 1 ? 'quest' : 'quests'}`}</span>
                 <span><b>${analysis.doneCount}</b> / ${analysis.total} complete</span>
             </div>
         </div>

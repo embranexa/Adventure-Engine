@@ -1,3 +1,4 @@
+import { setOwnVerbs } from './lib/quests.js';
 import { create } from 'zustand';
 import * as feed from './feed.js';
 import { indexItems, sameList } from './events.js';
@@ -491,6 +492,7 @@ const workspaceStore = (set, get) => ({
         }
         get().loadLayoutPresets();
         getJson('/api/state/anvil').then((s) => s && set({ pins: s.pins }));
+        getJson('/api/state/verbs').then((s) => { if (s) { setOwnVerbs(s.verbs); set({ verbs: s.verbs }); } });
         getJson('/api/state/idols').then((s) => s && set({ idols: s.idols }));
         // items become past (and fall behind the Hermetic Seal) as time passes
         setInterval(() => set((state) => withVisible(state, {})), 60_000);
@@ -856,6 +858,12 @@ const workspaceStore = (set, get) => ({
 
     pins: [],
     setPins: (pins) => { set({ pins }); scheduleSave('anvil', () => ({ pins: get().pins })); },
+    togglePin: (adventure, action) => {
+        const { pins, setPins } = get(), on = pins.some((p) => p.adventure === adventure && p.action === action);
+        setPins(on ? pins.filter((p) => p.adventure !== adventure || p.action !== action) : [...pins, { adventure, action }]);
+    },
+    verbs: [],
+    setVerbs: (verbs) => { setOwnVerbs(verbs); set({ verbs }); scheduleSave('verbs', () => ({ verbs: get().verbs })); },
     idols: {},
     setIdol: (id, changes) => {
         set((s) => ({ idols: { ...s.idols, [id]: { description: null, skills: [], ...s.idols[id], ...changes } } }));

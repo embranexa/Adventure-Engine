@@ -37,3 +37,30 @@ export async function readPlace(text) {
         return { error: 'Server unreachable' };
     }
 }
+
+/** @typedef {{ venue: string | null, address: string | null, city: string | null }} PlaceWords */
+
+/** What's at a point (asks the server), or null if it can't say. @param {number} lat @param {number} lon @returns {Promise<PlaceWords | null>} */
+export async function placeAt(lat, lon) {
+    try {
+        const res = await fetch(`/api/geo/reverse?lat=${lat}&lon=${lon}`);
+        return res.ok ? await res.json() : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The fields a new point fills in: the empty ones, and those that only say what was at the
+ * old point (filled in by it). Anything else you wrote stays.
+ * @param {PlaceWords} now @param {PlaceWords | null} before @param {PlaceWords} current
+ */
+export function fillPlace(now, before, current) {
+    /** @type {Partial<PlaceWords>} */
+    const changes = {};
+    for (const key of /** @type {(keyof PlaceWords)[]} */ (['venue', 'address', 'city'])) {
+        const mine = current[key]?.trim() || null, stale = mine != null && mine === before?.[key];
+        if ((mine == null || stale) && now[key] !== mine && (now[key] || stale)) changes[key] = now[key];
+    }
+    return changes;
+}

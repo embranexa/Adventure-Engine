@@ -113,6 +113,25 @@ with TestClient(app) as c:
     # pins and idols
     call("PUT", "/state/anvil", {"pins": [{"adventure": b, "action": "A1"}]})
     assert call("GET", "/state/anvil")["pins"][0]["action"] == "A1"
+    call("PUT", "/state/anvil", {"pins": []})
+    # targets: the first makes its adventure alloy, the last one dropped takes that back
+    t = adventure("item", "T build")
+    call("PUT", f"/adventures/{t}/roadmap", {"actions": [{"id": "A1", "title": "Acquire x"}, {"id": "A2", "title": "Design y"}], "edges": [], "done": []})
+    assert get(t)["phase"] == "queued"
+    call("PUT", "/state/anvil", {"pins": [{"adventure": t, "action": "gone"}]})
+    assert get(t)["phase"] == "queued"
+    call("PUT", "/state/anvil", {"pins": []})
+    call("PUT", "/state/anvil", {"pins": [{"adventure": t, "action": "A1"}]})
+    assert get(t)["phase"] == "constructing"
+    road = {**get(t)["roadmap"]}
+    call("PUT", f"/adventures/{t}/roadmap", road)  # an edit doesn't take it back
+    assert get(t)["phase"] == "constructing"
+    call("PUT", "/state/anvil", {"pins": []})
+    assert get(t)["phase"] == "decomposing"
+    call("PUT", "/state/anvil", {"pins": [{"adventure": t, "action": "A1"}]})
+    call("PUT", f"/adventures/{t}/roadmap", {**road, "done": ["A1"]})
+    call("PUT", "/state/anvil", {"pins": []})  # done, so it leaves the targets
+    assert get(t)["phase"] == "constructing"
     call("PUT", "/state/idols", {"idols": {"vanguard": {"description": "x", "skills": [skill]}}})
     assert call("GET", "/state/idols")["idols"]["vanguard"]["skills"] == [skill]
 

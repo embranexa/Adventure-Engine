@@ -1765,3 +1765,37 @@ input.obj-text:hover { border-color: var(--steel-2); } input.obj-text:focus { ou
 .pr-crown { flex-shrink: 0; width: 12px; margin-left: -2px; color: #fff1c9; font-size: 12px; text-align: center; text-shadow: 0 0 7px rgba(255, 241, 201, 0.7); }
 .cpx-section { padding-bottom: 4px; border-bottom: 1px solid var(--steel-2); color: var(--text-bright); font: 600 13px var(--font-display); letter-spacing: 0.2em; text-transform: uppercase; }
 .cpx-section b { color: var(--text-muted); } .cpx-section:not(:first-child) { margin-top: 8px; }
+.ol-group { padding: 7px 8px 3px; color: var(--text-dim); font: 600 10px var(--font-display); letter-spacing: 0.16em; text-transform: uppercase; }
+.ol-group:not(:first-child) { border-top: 1px solid var(--steel-1); margin-top: 3px; }
+.btn.alm-pin.on { border-color: var(--m-alloy); color: var(--m-alloy); box-shadow: 0 0 10px color-mix(in srgb, var(--m-alloy) 30%, transparent); }
+
+/* quest verbs */
+.alm-verb { width: 108px; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--steel-2); background: rgba(0, 0, 0, 0.4); color: var(--text-dim); font: 600 12px var(--font-display); letter-spacing: 0.06em; color-scheme: dark; }
+.alm-verb.on { color: color-mix(in srgb, var(--todo) 60%, #fff); border-color: color-mix(in srgb, var(--todo) 45%, transparent); }
+.alm-verb option, .alm-verb optgroup { background: #0c0d10; color: var(--text); font: 400 12px var(--font-body); }
+.ql-verb { margin-right: 2px; color: color-mix(in srgb, var(--alloy) 60%, #fff); font: 600 11px var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; }
+.alm-verb.missing { border-color: var(--pending); color: var(--pending); }
+.alm-label.noverb b::after { content: ' · verb?'; color: var(--pending); }
+.ql-noverb { color: var(--pending); font: 500 10px var(--font-mono); }
+
+/* the Refinery card's cover / model switch, and the Forge under it */
+.tcard-face { position: relative; }
+.tcard-face .tcard-art { position: relative; }
+.tcard-face .model-view { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+.tcard-switch { position: absolute; right: 7px; bottom: 7px; display: flex; border-radius: 4px; overflow: hidden; background: rgba(5, 6, 8, 0.8); box-shadow: inset 0 0 0 1px var(--steel-3); }
+.tcard-switch button { padding: 2px 8px; border: 0; background: none; cursor: pointer; color: var(--text-dim); font: 600 10px var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; }
+.tcard-switch button.on { color: var(--text-bright); background: rgba(255, 255, 255, 0.1); }
+.node-card > .nec-pane { flex-shrink: 0; }
+.lm-card.model .lm-img { display: none; }
+.node-card .nec-pane textarea, .node-card .nec-pane select {
+    width: 100%; min-width: 0; padding: 5px 7px; border: 1px solid var(--steel-3); border-radius: 5px;
+    background: rgba(0, 0, 0, 0.4); color: var(--text-bright); font: 400 12.5px/1.4 var(--font-body); user-select: text; color-scheme: dark;
+}
+.node-card .nec-pane textarea:focus, .node-card .nec-pane select:focus { border-color: var(--steel-5); outline: none; }
+.node-card .nec-pane select option { background: #0c0d10; }
+.node-card .nec-pane input[type=range] { width: 100%; min-width: 0; accent-color: var(--steel-5); grid-column: 2; }
+.node-card .inv-part { grid-template-columns: 18px minmax(0, 1fr) 76px; } .node-card .inv-part select:last-child { grid-column: 3; }
+.node-card .btn.inv-forge { border-color: color-mix(in srgb, var(--accent) 65%, var(--steel-3)); color: #d4fbfc; }
+.node-card > .nec-pane { margin-top: 12px; }
+.tcard-accept { position: absolute; left: 7px; top: 7px; padding: 3px 10px; border: 1px solid var(--accent); border-radius: 4px; background: rgba(5, 6, 8, 0.85); color: var(--accent-light); cursor: pointer; font: 600 11px var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; }
+.tcard-accept:hover { background: color-mix(in srgb, var(--accent) 25%, #050608); }
