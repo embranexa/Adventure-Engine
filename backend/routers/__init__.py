@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter
 
-from backend.routers import adventures, events, geo, live, media, entities, sources, state, transitions, workspace
+from backend.routers import adventures, events, geo, live, media, entities, party, sources, state, transitions, workspace
 
 api_router = APIRouter()
-for module in (workspace, events, adventures, entities, sources, state, transitions, media, geo, live):
+for module in (workspace, events, adventures, entities, party, sources, state, transitions, media, geo, live):
     api_router.include_router(module.router)

@@ -36,7 +36,7 @@ are stored once, in the Agora's ledger, tagged with their adventure. **[proposed
 ## Sanctum
 
 A new signal chain zone for machines that handle what is not primary matter. **[decided]**
-Members: Codex, Inventory, Agora (formerly Entropy Market), plus Pantheon and Mastery, shown
+Members: Codex, Cohort (2026-11-23), Inventory, Agora (formerly Entropy Market), plus Pantheon and Mastery, shown
 locked for now. **[decided]** Built on the signal chain 2026-11-22 with no pipes or
 moves, by the user's choice; only the Codex works. Pipe topology: **[open]** (`sanctum-board.html`). Inventory holds
 items' effects and displays the items, so no adventure is counted twice. **[proposed]**
@@ -201,7 +201,7 @@ Renamed 2026-11-22 in code, API, database and interface:
 | pillar | **deity** |
 | song | **performance** |
 
-Entity types: deity, site, contact, organization, skill. Adventure types: event, item,
+Entity types: deity, site, player (contact until 2026-11-23), organization, skill. Adventure types: event, item,
 performance. A performance can have a date and place (a gig) or none (a song) **[decided, not
 built: code still refuses a when/where on performances]**. The transitions log's `entity` column became `subject`, so *entity* only ever
 means a Codex entity.

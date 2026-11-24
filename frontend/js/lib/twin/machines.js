@@ -35,7 +35,7 @@ const RIM_COLORS = { include: '#e6ebf2', exclude: '#ff4a3d' };
 const PACE_S = 0.5;          // a mechanism winds up or down in this long
 
 /** Plinth radius per body: the base is sized to the machine. */
-export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, agora: 9, inventory: 9, pantheon: 10, mastery: 8, nexus: 8, atlas: 7, calendar: 8, ledger: 8, enricher: 8, sieve: 8 };
+export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, cohort: 9, agora: 9, inventory: 9, pantheon: 10, mastery: 8, nexus: 8, atlas: 7, calendar: 8, ledger: 8, enricher: 8, sieve: 8 };
 
 /** Which body a node gets. */
 export function bodyOf(node) {
@@ -730,6 +730,25 @@ const BODIES = {
         for (const s of [-1, 1]) g.add(tube([V(s * 1.4, Y + 11, 0), V(s * 3.6, Y + 11.4, 0), V(s * 4.2, Y + 8.6, 0), V(s * 3.4, Y + 6.8, 0)], 0.28, M.gilt, 24));
         if (node.locked) chain(c, g, 7.6);
         return { group: g, height: Y + 15 };
+    },
+    // twelve standing figures (the archetypes) around a brazier
+    cohort(c) {
+        const { G, M, color, cyl, torus, lathe, gem, light, additive, RUNES, mine, busy, a } = c;
+        const g = G(), turn = G();
+        g.add(cyl(8.4, 8.8, 0.8, M.stone, Y, 48), torus(8.4, 0.25, M.gilt, Y + 0.9), turn);
+        for (let i = 0; i < 12; i++) {
+            const t = (i / 12) * TAU, x = Math.cos(t) * 6.9, z = Math.sin(t) * 6.9, h = i % 3 === 0 ? 1.6 : 0;
+            const robe = lathe([[1.25, 0], [1.05, 1], [0.6, 5 + h], [0.75, 6.2 + h], [0.3, 7 + h]], i % 2 ? M.silver : M.brass, 16);
+            robe.position.set(x, Y + 0.8, z);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.72, 14, 10), i % 2 ? M.silver : M.brass);
+            head.position.set(x, Y + 8.5 + h, z);
+            turn.add(robe, head);
+        }
+        const face = new THREE.Mesh(new THREE.RingGeometry(3.2, 5.4, 64), mine(additive(RUNES, light, 0.6))); face.rotation.x = -Math.PI / 2; face.position.y = Y + 0.95; g.add(face);
+        g.add(lathe([[2, Y + 0.8], [0.9, Y + 1.6], [0.7, Y + 6], [2.2, Y + 8], [2.4, Y + 8.6]], M.gilt, 32));
+        const flame = gem(color, 1.8); flame.position.y = Y + 11.6; flame.scale.y = 1.6; g.add(flame);
+        a.push((dt) => { const k = busy(); turn.rotation.y += dt * 0.15 * k; face.rotation.z -= dt * 0.3 * k; flame.rotation.y += dt * 0.6 * k; });
+        return { group: g, height: Y + 16 };
     },
     // a glass case of shelves, a gear over it
     inventory(c) {

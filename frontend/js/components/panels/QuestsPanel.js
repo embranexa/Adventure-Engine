@@ -7,13 +7,14 @@ import { safeHttpUrl } from '../../events.js';
 import { nextActionPay, remaining } from '../../lib/bounty.js';
 import { modelSpec } from '../../lib/items.js';
 import { ModelView } from '../ModelView.js';
+import { PartyRoster } from '../PartyRoster.js';
 import { PromoteButton } from '../PromoteButton.js';
 
 const DAY_MS = 86_400_000;
 const COMPLETE_DELAY_MS = 420; // let the check land before the quest leaves
 
 /** "today", "in 3 days", "2 days ago"; null when undated. @param {string | null} iso */
-function dueLabel(iso) {
+export function dueLabel(iso) {
     if (!iso) return null;
     const start = new Date(iso);
     if (Number.isNaN(start.getTime())) return null;
@@ -33,7 +34,7 @@ function dueLabel(iso) {
  * when it has neither, or the image won't load).
  * @param {{ adventure: AdventureRecord }} props
  */
-function QuestCover({ adventure }) {
+export function QuestCover({ adventure }) {
     const src = safeHttpUrl(adventure.cover_url);
     const [failed, setFailed] = useState(false);
     const spec = useMemo(() => (adventure.type === 'item' ? modelSpec(adventure) : null), [adventure]);
@@ -156,6 +157,7 @@ export function QuestsPanel() {
                                     </div>
                                 `;
                             })}
+                            <${PartyRoster} adventure=${adventure} />
                             </div>
                         </section>
                     `;

@@ -20,7 +20,7 @@ from sqlalchemy import delete
 from backend.db.base import SessionLocal
 from backend.db.models import (
     ADVENTURE_FLAGS, ADVENTURE_TYPES, OUTSIDE_NODE, PHASE_NODES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure,
-    AdventureEntity, Enshrining, Epitaph, ItemSheet, Move,
+    AdventureEntity, Enshrining, Epitaph, ItemSheet, Move, PartyLog, Steward,
 )
 from backend.db.queries import list_adventures
 from backend.services.entities import _delete_links
@@ -172,7 +172,8 @@ async def abandon_adventure(adventure_id: uuid.UUID) -> None:
         if adventure.phase != "killed":
             raise InvalidTransition("only vestiges (killed adventures) can be abandoned")
         await _delete_links(session, AdventureEntity.adventure_id == adventure_id)
-        for table in (Epitaph, Enshrining, Move, ItemSheet):
+        await session.flush()  # the links removed above log their players leaving
+        for table in (Epitaph, Enshrining, Move, ItemSheet, Steward, PartyLog):
             await session.execute(delete(table).where(table.adventure_id == adventure_id))
         record(session, "adventure", adventure_id, PHASE_NODES["killed"], OUTSIDE_NODE)
         if adventure.event_id:

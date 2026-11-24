@@ -5,7 +5,7 @@
 // and Hermetic Seal) combine with AND. The result is the subset every view shows.
 //
 // Most facets have one value per item (its city, its source). Entity facets (deity,
-// site, contact) and tags have several: an item passes an include if ANY of its values is
+// site, player) and tags have several: an item passes an include if ANY of its values is
 // included, and fails if any is excluded. An item with none counts as UNKNOWN.
 
 import { ADVENTURE_FLAGS, ADVENTURE_TYPES, ENTITY_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
@@ -86,9 +86,14 @@ export const FACETS = [
         value: (i) => (i.kind === 'omen' ? i.review : null),
         display: (v) => REVIEW_STAGES[/** @type {ReviewState} */ (v)]?.matter ?? v,
     },
+    {
+        key: 'collaboration', label: 'Collaboration', modes: ['adventures'],
+        value: (i) => (i.kind === 'adventure' ? (i.collaboration ? 'collaboration' : 'solo') : null),
+        display: (v) => (v === 'collaboration' ? '☉ Collaboration' : 'Solo'),
+    },
     entityFacet('deity'),
     entityFacet('site'),
-    entityFacet('contact'),
+    entityFacet('player'),
     entityFacet('organization'),
     entityFacet('skill'),
 ];

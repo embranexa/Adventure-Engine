@@ -16,9 +16,9 @@ const NOT_LENSES = new Set(['phase', 'review']);
  *  is appended ungrouped, so a new facet still becomes a lens. */
 const LENS_GROUPS = /** @type {[string, LensKey[]][]} */ ([
     ['Basic', ['stage', 'source', 'type']],
-    ['Descriptor', ['tag', 'flag']],
+    ['Descriptor', ['tag', 'flag', 'collaboration']],
     ['Place', ['city', 'region', 'metro']],
-    ['Entity', ['deity', 'site', 'contact', 'organization', 'skill']],
+    ['Entity', ['deity', 'site', 'player', 'organization', 'skill']],
 ]);
 
 /** @param {LensKey} key */
@@ -45,7 +45,7 @@ export function sourceColor(name) {
     return SOURCE_COLORS[/** @type {keyof typeof SOURCE_COLORS} */ (name)] ?? PALETTE[hash(name) % PALETTE.length];
 }
 /** Entity facets: their values are entity ids, coloured by the entity. */
-const ENTITY_LENSES = new Set(['deity', 'site', 'contact', 'organization', 'skill']);
+const ENTITY_LENSES = new Set(['deity', 'site', 'player', 'organization', 'skill']);
 const UNKNOWN_COLOR = '#5b616b';
 /** Value for rows the lens's facet doesn't apply to (raw events under an adventure-only facet). */
 export const NOT_APPLICABLE = 'n/a';

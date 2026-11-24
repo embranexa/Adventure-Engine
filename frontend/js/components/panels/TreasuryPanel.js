@@ -3,6 +3,8 @@ import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { accuracy, verdictName, verdictRings } from '../../lib/analysis.js';
 import { adventureColor, modelSpec, sigilPoints } from '../../lib/items.js';
+import { partyOf } from '../../lib/complexGraph.js';
+import { PARTY_STATUSES } from '../../lifecycle.js';
 import { Cabinet } from '../Cabinet.js';
 import { Ceremony } from '../Ceremony.js';
 import { AnalysisView } from './AnalysisView.js';
@@ -59,6 +61,7 @@ export function TreasuryPanel() {
         const lines = [['Verdict', verdictName(rec.verdict)]];
         if (acc != null) lines.push(['Accuracy', acc.toFixed(1)]);
         if (pay) lines.push(['Ambrosia', `+${pay}`]);
+        for (const m of partyOf(a)) if (m.status && PARTY_STATUSES[m.status].stage === 'aftermath') lines.push([PARTY_STATUSES[m.status].label, m.name]);
         for (const name of discovered) lines.push(['New in the Codex', name]);
         setCeremony({ title: 'Enshrined', subtitle: a.title ?? 'Untitled', color: colorOf(a), seed: a.id, points: sigilPoints(a), rings: verdictRings(rec.verdict), lines });
     };

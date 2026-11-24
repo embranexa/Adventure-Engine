@@ -125,7 +125,7 @@ const DRAW = {
         for (const t of ticks) poly(g, t);
         g.beginPath(); g.arc(C, C, 5, 0, Math.PI * 2); g.fill();
     },
-    contact(g) {
+    player(g) {
         g.beginPath(); g.arc(C, 50, 13, 0, Math.PI * 2); g.stroke();
         g.beginPath(); g.arc(C, 96, 28, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
     },

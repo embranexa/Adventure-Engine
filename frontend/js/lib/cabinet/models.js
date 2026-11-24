@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { amphora, flask } from './flasks.js';
 import { recipeModel } from './recipe.js';
 import { hash } from './sigil.js';
+import { playerSigil } from './players.js';
 import { vessel } from './vessels.js';
 
 /** A dead adventure: one of three monuments between two candles, lit once it has an epitaph. */
@@ -33,4 +34,4 @@ function urn(K, group, m) {
     return flames.length ? { frame: (t) => flames.forEach((x, i) => { x.scale.y = 1 + Math.sin(t / 90 + i * 2) * 0.1; }) } : null;
 }
 
-export const MODELS = { urn, vessel, recipe: recipeModel, amphora, flask };
+export const MODELS = { urn, vessel, recipe: recipeModel, amphora, flask, sigil: playerSigil };

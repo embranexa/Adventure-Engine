@@ -1,5 +1,7 @@
 """Request bodies for the entity endpoints (services/entities.py checks the rest)."""
 
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -14,14 +16,14 @@ class EntityFields(BaseModel):
     city: str | None = None
     lat: float | None = None
     lon: float | None = None
-    # contacts only: email, phone, handle (null clears one)
-    details: dict[str, str | None] | None = None
+    # players only: email, phone, handle, archetype, warmth, tags (null clears one)
+    details: dict[str, Any] | None = None
     # "#rrggbb"; null or "" goes back to the default colour
     color: str | None = None
 
 
 class EntityCreate(EntityFields):
-    type: str  # deity | site | contact
+    type: str  # backend.db.models.ENTITY_TYPES
 
 
 class EntityUpdate(EntityFields):

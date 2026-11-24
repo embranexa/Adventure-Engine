@@ -25,10 +25,10 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis' | 'treasury' | 'inventory' | 'agora';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis' | 'treasury' | 'inventory' | 'agora' | 'complex' | 'arena' | 'cohort';
 
 /** Icon names drawn by components/PanelTitle.js. */
-type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb' | 'crown' | 'satchel' | 'amphora';
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb' | 'crown' | 'satchel' | 'amphora' | 'molecule' | 'swords' | 'cohort';
 
 /** A panel's definition (backend/services/workspace.py). Its title reads:
  *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
@@ -131,7 +131,11 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     /** Action roadmap (Alembic), or null before one is drafted. */
     roadmap: Roadmap | null;
     /** Linked entities (the Codex). */
-    entities: { id: string; type: EntityType; name: string }[];
+    entities: LinkedEntity[];
+    /** Heralds and commissioners; wardens are its site's. */
+    stewards: { id: string; type: EntityType; name: string; role: 'herald' | 'commissioner' }[];
+    /** Someone is bonded, emergent or in the aftermath. */
+    collaboration: boolean;
     /** Its linked site, if any; a hand-made event takes its where from it. */
     site_id: string | null;
     /** Free text for now (the Agora later). */
@@ -248,7 +252,7 @@ type ExcludedFate = 'siphon' | 'purge' | 'keep';
 
 type AdventureFlag = 'important' | 'urgent' | 'favorite' | 'maybe' | 'waiting';
 
-type FacetKey = 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'type' | 'phase' | 'review';
+type FacetKey = 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'collaboration' | 'type' | 'phase' | 'review';
 
 /** Local calendar days, inclusive. */
 interface DateRange { start: string; end: string; mode: FilterMode }
@@ -273,7 +277,7 @@ interface FilterState {
 }
 
 /** "stage" (Matter) or a facet that can color rows. */
-type LensKey = 'none' | 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'type' | 'deity' | 'site' | 'contact' | 'organization' | 'skill';
+type LensKey = 'none' | 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'collaboration' | 'type' | 'deity' | 'site' | 'player' | 'organization' | 'skill';
 
 /** One move between signal chain nodes (backend/services/transitions.py). */
 interface TransitionRecord {
@@ -294,8 +298,17 @@ interface FlowRecord {
     count: number;
 }
 
-/** deity | site | contact | organization | skill (js/lifecycle.js ENTITY_TYPES); only sites have a location. */
-type EntityType = 'deity' | 'site' | 'contact' | 'organization' | 'skill';
+/** deity | site | player | organization | skill (js/lifecycle.js ENTITY_TYPES); only sites have a location. */
+type EntityType = 'deity' | 'site' | 'player' | 'organization' | 'skill';
+
+/** ids in js/lifecycle.js ARCHETYPES */
+type Archetype = 'vanguard' | 'performer' | 'enchanter' | 'juggernaut' | 'rogue' | 'summoner' | 'resonator' | 'merchant' | 'artificer' | 'wizard' | 'cleric' | 'patron';
+interface PlayerDetails { email?: string; phone?: string; handle?: string; archetype?: Archetype; warmth?: number; tags?: string[] }
+type PartyStatus = 'resonant' | 'charging' | 'attuning' | 'resisted' | 'bonded' | 'emergent' | 'annealed' | 'neutralized' | 'repelled';
+type StewardRole = 'herald' | 'commissioner' | 'warden';
+/** An entity linked to an adventure; a player's link is its place in the party. */
+interface LinkedEntity { id: string; type: EntityType; name: string; status?: PartyStatus; status_at?: string | null; note?: string | null; impact?: string | null; follow_up?: string | null }
+interface PartyLogEntry { id: number; at: string; player_id: string; from: PartyStatus | null; to: PartyStatus | null }
 
 /** An entity (the Codex): something adventures link to (backend/services/entities.py). */
 interface Entity {
@@ -309,8 +322,12 @@ interface Entity {
     city: string | null;
     lat: number | null;
     lon: number | null;
-    /** contacts: email, phone, handle */
-    details: Record<string, string>;
+    /** players only */
+    details: PlayerDetails;
+    /** players: ids of what it resonates with */
+    affinities: string[];
+    /** sites: ids of the players and organizations that keep it */
+    wardens: string[];
     /** "#rrggbb" chosen in the Codex; null = default (entityColor in lib/lens.js) */
     color: string | null;
     created_at: string;
@@ -319,7 +336,7 @@ interface Entity {
 /** A change sent to PATCH /api/entities/{id}: only the keys present change; null clears. */
 type EntityChanges = Partial<{
     name: string | null; description: string | null; url: string | null; address: string | null;
-    city: string | null; lat: number | null; lon: number | null; details: Record<string, string | null>;
+    city: string | null; lat: number | null; lon: number | null; details: { [K in keyof PlayerDetails]: PlayerDetails[K] | null };
     color: string | null;
 }>;
 
@@ -460,6 +477,17 @@ interface WorkspaceState {
     /** The Agora's ledger (backend/services/ledger.py), newest first. */
     ambrosia: AmbrosiaLedger;
     setAmbrosia(ambrosia: AmbrosiaLedger): void;
+    /** Add a player to a party or change its place there. These resolve to an error message, or null. */
+    setPartyMember(adventureId: string, playerId: string, changes: { status?: PartyStatus; note?: string | null; impact?: string | null; follow_up?: string | null }): Promise<string | null>;
+    setSteward(adventureId: string, entityId: string, role: 'herald' | 'commissioner', on: boolean): Promise<string | null>;
+    setAffinity(playerId: string, entityId: string, on: boolean): Promise<string | null>;
+    setWarden(siteId: string, entityId: string, on: boolean): Promise<string | null>;
+    /** The player the Complex should open (set by openInComplex). */
+    complexFocus: { adventureId: string; playerId: string; at: number } | null;
+    /** Select an adventure and show one of its players in the Complex. */
+    openInComplex(adventureId: string, playerId: string | null): void;
+    /** Status changes in a party, newest first. */
+    partyHistory(adventureId: string): Promise<PartyLogEntry[]>;
     /** Set what an adventure is worth; null clears it. Resolves to an error message, or null. */
     saveBounty(adventureId: string, bounty: { effort: number; resistance: number; ratio: number } | null): Promise<string | null>;
     /** Ask Claude for an item's model, or changes to it. These resolve to an error message, or null. */

@@ -25,6 +25,7 @@ from backend.db.models import (
 )
 from backend.db.queries import list_entities
 from backend.services import ledger
+from backend.services.entities import add_link
 from backend.services.hub import hub
 from backend.services.triage import InvalidTransition, _get_adventure, broadcast_pools
 
@@ -160,6 +161,6 @@ async def _discover(session: AsyncSession, adventure: Adventure, discoveries: li
         if entity.type == "site" and adventure.type in WHEN_WHERE_TYPES:
             continue
         if await session.get(AdventureEntity, (adventure.id, entity.id)) is None:
-            session.add(AdventureEntity(adventure_id=adventure.id, entity_id=entity.id))
+            add_link(session, adventure.id, entity, "emergent")  # a player met there joins the party
             await session.flush()
     return new

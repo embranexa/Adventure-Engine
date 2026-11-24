@@ -8,7 +8,7 @@
  *   NET     foundry floor: harvesters -> centrifuge -> sump; the forge
  *   CORE    raised bench:  hopper -> refinery -> alembic -> crucible -> arena -> treasury
  *           -> archive; necropolis behind (kill manifold)
- *   SANCTUM front: codex, inventory, agora, pantheon, mastery (no pipes yet)
+ *   SANCTUM front: codex, cohort, inventory, agora, pantheon, mastery (no pipes yet)
  *   GALLERY back, raised:  nexus, atlas, calendar, ledger (the viewers)
  *
  * Liquid height = rows held (each zone on its own scale). Pipes lie on the floor, dark

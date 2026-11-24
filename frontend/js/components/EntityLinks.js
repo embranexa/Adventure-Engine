@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { ENTITY_TYPES } from '../lifecycle.js';
+import { PartyRoster } from './PartyRoster.js';
 
 const MAX_SUGGESTIONS = 8;
 
@@ -67,12 +68,14 @@ export function EntityLinks({ adventure }) {
         else if (e.key === 'Escape') { setQuery(''); setOpen(false); inputRef.current?.blur(); }
     };
 
-    const byType = /** @type {[EntityType, { id: string, type: EntityType, name: string }[]][]} */ (
-        Object.keys(ENTITY_TYPES).map((t) => [t, adventure.entities.filter((o) => o.type === t)]).filter(([, list]) => list.length));
+    const byType = /** @type {[EntityType, LinkedEntity[]][]} */ (
+        Object.keys(ENTITY_TYPES).map((t) => [t, adventure.entities.filter((o) => o.type === t)]).filter(([t, list]) => t !== 'player' && list.length)); // players are in the roster
 
     return html`
         <div className="ol">
-            <div className="ol-head">Links</div>
+            <div className="ol-head">Links
+                <button className="cls-layer ol-complex" onClick=${() => showPanel('complex')} title="Its players and stewards">${adventure.collaboration ? '☉ Collaboration' : 'Complex'} ⟶</button>
+            </div>
             ${byType.length > 0 && html`
                 <div className="ol-chips">
                     ${byType.map(([type, list]) => list.map((o) => html`
@@ -92,7 +95,7 @@ export function EntityLinks({ adventure }) {
                     ref=${inputRef}
                     className="ol-input"
                     value=${query}
-                    placeholder=${'+ Link a deity, site, contact, organization or skill…'}
+                    placeholder=${'+ Link a deity, site, player, organization or skill…'}
                     aria-label="Link an entity"
                     onInput=${(/** @type {any} */ e) => { setQuery(e.target.value); setOpen(true); setActive(0); }}
                     onFocus=${() => setOpen(true)}
@@ -119,6 +122,7 @@ export function EntityLinks({ adventure }) {
                     </div>
                 `}
             </div>
+            <${PartyRoster} adventure=${adventure} stewards=${true} removable=${true} />
             ${adventure.type === 'event' && html`<div className="ol-hint">An event has one site: linking another replaces it${adventure.event_id ? '' : ' · its site is its where'}</div>`}
             ${error && html`<div className="nc-error">${error}</div>`}
         </div>

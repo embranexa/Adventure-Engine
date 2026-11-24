@@ -8,6 +8,7 @@ import {
 import { remaining } from '../../lib/bounty.js';
 import { confirmHere } from '../../lib/windows.js';
 import { safeHttpUrl } from '../../events.js';
+import { AftermathPane } from '../AftermathPane.js';
 import { GradeIcon } from '../GradeIcon.js';
 
 const SAVE_MS = 700;
@@ -222,6 +223,7 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
                             ? html`<label className="ana-field"><span>Link to the performance (required)</span><input type="url" value=${rec.link} placeholder="https://" onInput=${(/** @type {any} */ e) => change({ link: e.target.value })} /></label>`
                             : link && html`<a className="cls-layer" href=${link} target="_blank" rel="noreferrer noopener">Watch the performance ↗</a>`)}
                     </section>
+                    <${AftermathPane} adventure=${adventure} editing=${editing} />
                     <section className="nec-pane">
                         <h4>Discovered entities</h4>
                         ${rec.discoveries.map((d, i) => {
@@ -241,7 +243,7 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
                         ${!editing && !rec.discoveries.length && html`<p className="nec-dim">None</p>`}
                         ${editing && html`
                             ${[...new Set(rec.discoveries.map((d) => d.type))].map((t) => html`<datalist key=${t} id=${`found-${t}`}>${entities.filter((e) => e.type === t).map((e) => html`<option key=${e.id} value=${e.name}></option>`)}</datalist>`)}
-                            <div><button className="cls-layer" onClick=${() => change({ discoveries: [...rec.discoveries, { type: 'contact', name: '', entity_id: null }] })}>+ Entity</button></div>
+                            <div><button className="cls-layer" onClick=${() => change({ discoveries: [...rec.discoveries, { type: 'player', name: '', entity_id: null }] })}>+ Entity</button></div>
                         `}
                     </section>
                     <section className="nec-pane">

@@ -4,8 +4,11 @@
     events         raw harvested events, unique per (source, api_id), each with a review state
     adventures     the events you kept and hand-made ones, each with a lifecycle phase
                    and an optional action roadmap
-    entities        entities (deities, sites, contacts, organizations, skills) that adventures link to (the Codex)
-    adventure_entities  links between adventures and entities
+    entities        entities (deities, sites, players, organizations, skills) that adventures link to (the Codex)
+    adventure_entities  links between adventures and entities; a player's link is its place in the party
+    entity_links   links between entities: a player's affinities, a site's wardens
+    stewards       heralds and commissioners of an adventure
+    party_log      every change of a player's status in a party
     enshrinings    the analysis of a completed adventure (the Treasury), sealed or draft
     moves          the moves of an enshrining, graded like a chess game's
     ambrosia       the Agora's ledger: every amount earned or taken back
@@ -166,12 +169,30 @@ class Adventure(Base):
 
 
 # Entities (the Codex): things adventures link to. Only sites have a location.
-ENTITY_TYPES = ("deity", "site", "contact", "organization", "skill")
+ENTITY_TYPES = ("deity", "site", "player", "organization", "skill")
 GEO_ENTITY_TYPES = ("site",)
+
+# What a player can be (one or none); names, idols and groups are in frontend/js/lifecycle.js.
+ARCHETYPES = ("vanguard", "performer", "enchanter", "juggernaut", "rogue", "summoner",  # ops
+              "resonator", "merchant", "artificer", "wizard",                           # tech
+              "cleric", "patron")                                                       # staff
+
+# A player's status in an adventure's party (colours in frontend/js/lifecycle.js).
+RECRUITMENT_STATUSES = ("resonant", "charging", "attuning", "resisted")
+ACTIVE_STATUSES = ("bonded", "emergent")
+AFTERMATH_STATUSES = ("annealed", "neutralized", "repelled")  # only once it's completed
+PARTY_STATUSES = RECRUITMENT_STATUSES + ACTIVE_STATUSES + AFTERMATH_STATUSES
+COLLABORATING = ACTIVE_STATUSES + AFTERMATH_STATUSES  # anyone here makes it a collaboration
+
+# Stewards of an adventure. Wardens belong to its site instead (EntityLink).
+STEWARD_ROLES = ("herald", "commissioner")
+STEWARD_TYPES = ("player", "organization")
+# What players can be linked to; shared links are their resonance with an adventure.
+AFFINITY_TYPES = ("deity", "site", "organization", "skill")
 
 
 class Entity(Base):
-    """A deity, site, contact, organization or skill that adventures link to (see services/entities.py)."""
+    """A deity, site, player, organization or skill that adventures link to (see services/entities.py)."""
 
     __tablename__ = "entities"
 
@@ -185,7 +206,7 @@ class Entity(Base):
     city: Mapped[str | None] = mapped_column(String(200))
     lat: Mapped[float | None] = mapped_column(Float)
     lon: Mapped[float | None] = mapped_column(Float)
-    # type-specific extras: contact {email, phone, handle}
+    # type-specific extras: player {email, phone, handle, archetype, warmth 0-5, tags}
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     # "#rrggbb", chosen in the Codex; null = a stable default picked from the id (frontend)
     color: Mapped[str | None] = mapped_column(String(7))
@@ -206,6 +227,50 @@ class AdventureEntity(Base):
     entity_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # players only (see services/party.py)
+    status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # PARTY_STATUSES
+    status_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)  # the proposal
+    follow_up: Mapped[str | None] = mapped_column(String(10), nullable=True)  # "2026-12-01"
+    impact: Mapped[str | None] = mapped_column(Text, nullable=True)  # what they changed (the Treasury)
+    # what its aftermath added to the player's warmth, so a change of mind takes it back
+    nudge: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class EntityLink(Base):
+    """A link between two entities. affinity: a player to what it resonates with
+    (AFFINITY_TYPES). warden: a player or organization to the site it keeps."""
+
+    __tablename__ = "entity_links"
+
+    from_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
+    to_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(10), primary_key=True)  # affinity | warden
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Steward(Base):
+    """A player or organization that brought (herald) or issued (commissioner) an adventure."""
+
+    __tablename__ = "stewards"
+
+    adventure_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("adventures.id", ondelete="CASCADE"), primary_key=True)
+    entity_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(16), primary_key=True)  # STEWARD_ROLES
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class PartyLog(Base):
+    """One change of a player's status in a party. from_status null: joined; to_status null: left."""
+
+    __tablename__ = "party_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    adventure_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
+    player_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
+    from_status: Mapped[str | None] = mapped_column(String(16))
+    to_status: Mapped[str | None] = mapped_column(String(16))
 
 
 class Ambrosia(Base):
