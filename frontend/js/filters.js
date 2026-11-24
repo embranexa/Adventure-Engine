@@ -5,7 +5,7 @@
 // and Hermetic Seal) combine with AND. The result is the subset every view shows.
 //
 // Most facets have one value per item (its city, its source). Entity facets (deity,
-// site, contact) and tags have several: an item passes an include if ANY of its values is
+// site, player) and tags have several: an item passes an include if ANY of its values is
 // included, and fails if any is excluded. An item with none counts as UNKNOWN.
 
 import { ADVENTURE_FLAGS, ADVENTURE_TYPES, ENTITY_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
@@ -86,9 +86,19 @@ export const FACETS = [
         value: (i) => (i.kind === 'omen' ? i.review : null),
         display: (v) => REVIEW_STAGES[/** @type {ReviewState} */ (v)]?.matter ?? v,
     },
+    {
+        key: 'collaboration', label: 'Collaboration', modes: ['adventures'],
+        value: (i) => (i.kind === 'adventure' ? (i.collaboration ? 'collaboration' : 'solo') : null),
+        display: (v) => (v === 'collaboration' ? '☉ Collaboration' : 'Solo'),
+    },
+    {
+        key: 'leader', label: 'Leader', modes: ['adventures'],
+        value: (i) => (i.kind === 'adventure' ? (i.stewards.some((s) => s.role === 'archon') ? 'others' : 'me') : null),
+        display: (v) => (v === 'me' ? '♛ Led by me' : '♛ Led by others'),
+    },
     entityFacet('deity'),
     entityFacet('site'),
-    entityFacet('contact'),
+    entityFacet('player'),
     entityFacet('organization'),
     entityFacet('skill'),
 ];
@@ -186,7 +196,7 @@ export function passes(item, filters, mode, now) {
         if (includes && !values.some((v) => settings[v] === 'include')) return false;
     }
 
-    // items and performances have no when/where: date and proximity filters don't apply to them
+    // without a when/where (items, songs), date and proximity filters don't apply
     if (!hasWhenWhere(item)) return true;
     if (filters.date_range) {
         const inside = inDateRange(item, filters.date_range);

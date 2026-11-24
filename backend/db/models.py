@@ -4,12 +4,15 @@
     events         raw harvested events, unique per (source, api_id), each with a review state
     adventures     the events you kept and hand-made ones, each with a lifecycle phase
                    and an optional action roadmap
-    entities        entities (deities, sites, contacts, organizations, skills) that adventures link to (the Codex)
-    adventure_entities  links between adventures and entities
+    entities        entities (deities, sites, players, organizations, skills, spells) that adventures link to (the Codex)
+    adventure_entities  links between adventures and entities; a player's link is its place in the party
+    entity_links   links between entities: a player's affinities, a site's wardens
+    stewards       heralds and commissioners of an adventure
+    party_log      every change of a player's status in a party
     enshrinings    the analysis of a completed adventure (the Treasury), sealed or draft
     moves          the moves of an enshrining, graded like a chess game's
     ambrosia       the Agora's ledger: every amount earned or taken back
-    item_sheets    an item's purpose, effects and 3D model (the Inventory)
+    item_sheets    an adventure's 3D model; an item's purpose and effects (the Inventory)
     epitaphs       why a killed adventure died (the Necropolis)
     app_state      small JSON settings that must survive restarts (filters)
     geocache       place lookups (address / venue / city -> coordinates), so each is asked once
@@ -67,10 +70,10 @@ CODEX_NODE = "codex"            # entities; links travel codex <-> refinery
 def harvester_node(source_name: str) -> str:
     return f"harvester:{source_name}"
 
-# Adventure types. Only events have a when/where; items and performances are exempt from everything
-# that uses one (calendar, map, date/proximity filters, the missed-adventure sweeper).
-ADVENTURE_TYPES = ("event", "item", "performance")
-WHEN_WHERE_TYPES = ("event",)
+# Adventure types. Items have no when/where. Events do; a performance or battle may (a gig, not
+# a song): without one it's exempt from the calendar, map, date/proximity filters and sweeper.
+ADVENTURE_TYPES = ("event", "item", "performance", "battle")
+WHEN_WHERE_TYPES = ("event", "performance", "battle")
 # Flags an adventure can carry (any number), set by hand; display in frontend/js/lifecycle.js
 ADVENTURE_FLAGS = ("important", "urgent", "favorite", "maybe", "waiting")
 
@@ -135,7 +138,7 @@ class Adventure(Base):
     type: Mapped[str] = mapped_column(String(20), default="event")  # event | performance | item | ...
     title: Mapped[str | None] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text)
-    # when/where: events only (WHEN_WHERE_TYPES)
+    # when/where: WHEN_WHERE_TYPES only
     start_time: Mapped[datetime | None] = mapped_column(UTCDateTime)
     end_time: Mapped[datetime | None] = mapped_column(UTCDateTime)
     timezone: Mapped[str | None] = mapped_column(String(64))
@@ -159,6 +162,12 @@ class Adventure(Base):
     # what it's worth: {effort, resistance, ratio, locked_at}; see services/bounty.py, ledger.py
     bounty: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     flags: Mapped[list[str] | None] = mapped_column(JSON, default=list)  # ADVENTURE_FLAGS, set by hand
+    # what counts as winning: [{id, text, kind: primary | bonus, state: open | achieved | failed}]
+    objectives: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=list, nullable=True)
+    # what you ready for it: [{id, item (an item adventure's id) | null, text, checked, effects}]
+    preparations: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=list, nullable=True)
+    # battles only: [{entity_id (a player or organization) | null, name}]
+    adversaries: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=list, nullable=True)
     # action roadmap (Alembic): {actions, edges, done}; see backend/services/roadmap.py
     roadmap: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
@@ -166,12 +175,35 @@ class Adventure(Base):
 
 
 # Entities (the Codex): things adventures link to. Only sites have a location.
-ENTITY_TYPES = ("deity", "site", "contact", "organization", "skill")
+ENTITY_TYPES = ("deity", "site", "player", "organization", "skill", "spell")
 GEO_ENTITY_TYPES = ("site",)
+
+# What a player can be (one or none); names, idols and groups are in frontend/js/lifecycle.js.
+ARCHETYPES = ("vanguard", "performer", "enchanter", "juggernaut", "rogue", "summoner",  # ops
+              "resonator", "merchant", "artificer", "wizard",                           # tech
+              "cleric", "patron")                                                       # staff
+
+# A player's status in an adventure's party (colours in frontend/js/lifecycle.js).
+RECRUITMENT_STATUSES = ("resonant", "charging", "attuning", "resisted")
+ACTIVE_STATUSES = ("bonded", "emergent")
+AFTERMATH_STATUSES = ("annealed", "neutralized", "repelled")  # only once it's completed
+PARTY_STATUSES = RECRUITMENT_STATUSES + ACTIVE_STATUSES + AFTERMATH_STATUSES
+COLLABORATING = ACTIVE_STATUSES + AFTERMATH_STATUSES  # anyone here makes it a collaboration
+
+# Stewards of an adventure. Wardens belong to its site instead (EntityLink).
+# The archon leads it: one at most, a player, always in the party (bonded or beyond). None: you lead.
+STEWARD_ROLES = ("archon", "herald", "commissioner")
+STEWARD_TYPES = ("player", "organization")
+# What players can be linked to; shared links are their resonance with an adventure.
+AFFINITY_TYPES = ("deity", "site", "organization", "skill")
+# Spells are never linked to anything: their skills are those of the sealed plays that name
+# them (queries.spell_skills).
+UNLINKABLE_TYPES = ("spell",)
+ADVERSARY_TYPES = ("player", "organization")
 
 
 class Entity(Base):
-    """A deity, site, contact, organization or skill that adventures link to (see services/entities.py)."""
+    """A deity, site, player, organization, skill or spell that adventures link to (see services/entities.py)."""
 
     __tablename__ = "entities"
 
@@ -185,7 +217,7 @@ class Entity(Base):
     city: Mapped[str | None] = mapped_column(String(200))
     lat: Mapped[float | None] = mapped_column(Float)
     lon: Mapped[float | None] = mapped_column(Float)
-    # type-specific extras: contact {email, phone, handle}
+    # type-specific extras: player {email, phone, handle, archetype, warmth 0-5, tags}
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     # "#rrggbb", chosen in the Codex; null = a stable default picked from the id (frontend)
     color: Mapped[str | None] = mapped_column(String(7))
@@ -206,6 +238,52 @@ class AdventureEntity(Base):
     entity_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # players only (see services/party.py)
+    status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # PARTY_STATUSES
+    status_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    role: Mapped[str | None] = mapped_column(String(60), nullable=True)  # what they do here ("sound")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)  # the proposal
+    follow_up: Mapped[str | None] = mapped_column(String(10), nullable=True)  # "2026-12-01"
+    impact: Mapped[str | None] = mapped_column(Text, nullable=True)  # what they changed (the Treasury)
+    # what its aftermath added to the player's warmth, so a change of mind takes it back
+    nudge: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class EntityLink(Base):
+    """A link between two entities. affinity: a player to what it resonates with
+    (AFFINITY_TYPES). warden: a player or organization to the site it keeps."""
+
+    __tablename__ = "entity_links"
+
+    from_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
+    to_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(10), primary_key=True)  # affinity | warden
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Steward(Base):
+    """A player or organization that brought (herald) or issued (commissioner) an adventure, or
+    the player leading it (archon)."""
+
+    __tablename__ = "stewards"
+
+    adventure_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("adventures.id", ondelete="CASCADE"), primary_key=True)
+    entity_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(16), primary_key=True)  # STEWARD_ROLES
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class PartyLog(Base):
+    """One change of a player's status in a party. from_status null: joined; to_status null: left."""
+
+    __tablename__ = "party_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    adventure_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
+    player_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
+    from_status: Mapped[str | None] = mapped_column(String(16))
+    to_status: Mapped[str | None] = mapped_column(String(16))
 
 
 class Ambrosia(Base):
@@ -224,15 +302,17 @@ class Ambrosia(Base):
 
 
 class ItemSheet(Base):
-    """What an item is for, what it does, and its model (see services/items.py)."""
+    """An adventure's model, of any type; and what an item is for and does (see services/items.py)."""
 
     __tablename__ = "item_sheets"
 
     adventure_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("adventures.id", ondelete="CASCADE"), primary_key=True)
     purpose: Mapped[str] = mapped_column(Text, default="")
-    effects: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{text, target, amount}]
+    effects: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{skill, rating, text}]
     model: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)  # a recipe: parts
+    # cover | model: which one shows when it has both (null: the model; items always show it)
+    face: Mapped[str | None] = mapped_column(String(8), nullable=True)
     # the Forge's work on it: {status: forging | ready | failed, text, at, proposal, error}
     forge: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
@@ -276,6 +356,8 @@ class Enshrining(Base):
     gains: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)   # spoils: [{name, qty, unit}]
     losses: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # tithes
     discoveries: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{type, name, entity_id}]
+    # what helped or hurt: [{key, label, skill, rating, result: helped | none | hurt}]
+    feedback: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=list, nullable=True)
     sealed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     amended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
@@ -293,6 +375,7 @@ class Move(Base):
     text: Mapped[str] = mapped_column(Text)
     grade: Mapped[str] = mapped_column(String(12))  # MOVE_GRADES
     better: Mapped[str | None] = mapped_column(Text)  # the better line, if there was one
+    spell: Mapped[str | None] = mapped_column(String(40), nullable=True)  # id of a spell entity
     skills: Mapped[list[str]] = mapped_column(JSON, default=list)  # ids of skill entities
 
 

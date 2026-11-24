@@ -1,13 +1,15 @@
 """Database startup: create tables, add new columns, register sources, migrate old data,
 backfill the transitions log (once)."""
 
+import json
 import logging
+import uuid
 
 from sqlalchemy import Connection, inspect, select, text, update
 from sqlalchemy.schema import CreateColumn
 
 from backend.db.base import DB_PATH, Base, SessionLocal, engine
-from backend.db.models import AppState, EventSource
+from backend.db.models import AppState, Entity, EventSource
 
 log = logging.getLogger(__name__)
 
@@ -66,8 +68,32 @@ def _migrate_names(conn: Connection) -> None:
             conn.execute(text(f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}"))
     if "entities" in tables:
         conn.execute(text("UPDATE entities SET type = 'deity' WHERE type = 'pillar'"))
+        conn.execute(text("UPDATE entities SET type = 'player' WHERE type = 'contact'"))  # 2026-11-23
+    if "enshrinings" in tables:
+        conn.execute(text("""UPDATE enshrinings SET discoveries = REPLACE(discoveries, '"type": "contact"', '"type": "player"')
+                             WHERE discoveries LIKE '%"type": "contact"%'"""))
     if "adventures" in tables:
         conn.execute(text("UPDATE adventures SET type = 'performance' WHERE type = 'song'"))
+
+
+def _unlink_spells(conn: Connection) -> None:
+    """Spells could be linked for a while (2026-11-23); now they can't."""
+    spells = "(SELECT id FROM entities WHERE type = 'spell')"
+    conn.execute(text(f"DELETE FROM adventure_entities WHERE entity_id IN {spells}"))
+    conn.execute(text(f"DELETE FROM entity_links WHERE from_id IN {spells} OR to_id IN {spells}"))
+
+
+def _give_statuses(conn: Connection) -> None:
+    """Players linked before parties existed get a status: emergent if a sealed analysis
+    discovered them there, else resonant."""
+    rows = conn.execute(text("""SELECT l.adventure_id, l.entity_id, l.created_at, n.discoveries
+        FROM adventure_entities l JOIN entities e ON e.id = l.entity_id
+        LEFT JOIN enshrinings n ON n.adventure_id = l.adventure_id AND n.sealed_at IS NOT NULL
+        WHERE e.type = 'player' AND l.status IS NULL""")).all()
+    for adventure_id, entity_id, at, discoveries in rows:
+        found = {str(d.get("entity_id") or "").replace("-", "") for d in json.loads(discoveries or "[]")}
+        conn.execute(text("UPDATE adventure_entities SET status = :s, status_at = :at WHERE adventure_id = :a AND entity_id = :e"),
+                     {"s": "emergent" if entity_id in found else "resonant", "at": at, "a": adventure_id, "e": entity_id})
 
 
 async def init_db(sources: dict[str, str]) -> None:
@@ -81,6 +107,8 @@ async def init_db(sources: dict[str, str]) -> None:
         await conn.run_sync(_migrate_names)
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_add_missing_columns)
+        await conn.run_sync(_give_statuses)
+        await conn.run_sync(_unlink_spells)
 
     async with SessionLocal() as session:
         existing = set((await session.scalars(select(EventSource.name))).all())
@@ -91,6 +119,7 @@ async def init_db(sources: dict[str, str]) -> None:
         await session.commit()
 
     await _migrate_saved_places()
+    await _seed_spells()
 
     async with engine.begin() as conn:
         # the Refiner was renamed the Refinery: logged moves keep working under the new id
@@ -99,6 +128,20 @@ async def init_db(sources: dict[str, str]) -> None:
 
     from backend.services.transitions import backfill  # avoids an import cycle
     await backfill()
+
+
+SPELLS = ("Hook", "Propose", "Combine", "Transition", "Enter", "Exit", "Reflect", "Charge", "Discharge", "Deflect", "Evade")
+
+
+async def _seed_spells() -> None:
+    """Once: the first spells. Deleted ones stay deleted."""
+    async with SessionLocal() as session:
+        if await session.get(AppState, "spells_seeded"):
+            return
+        have = {n.lower() for n in (await session.scalars(select(Entity.name).where(Entity.type == "spell"))).all()}
+        session.add_all(Entity(id=uuid.uuid4(), type="spell", name=n, details={}) for n in SPELLS if n.lower() not in have)
+        session.add(AppState(key="spells_seeded", value=True))
+        await session.commit()
 
 
 async def _migrate_saved_places() -> None:

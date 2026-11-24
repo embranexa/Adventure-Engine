@@ -1,3 +1,4 @@
+import { setOwnVerbs } from './lib/quests.js';
 import { create } from 'zustand';
 import * as feed from './feed.js';
 import { indexItems, sameList } from './events.js';
@@ -490,6 +491,9 @@ const workspaceStore = (set, get) => ({
             console.error('[state] could not load saved filters', err);
         }
         get().loadLayoutPresets();
+        getJson('/api/state/anvil').then((s) => s && set({ pins: s.pins }));
+        getJson('/api/state/verbs').then((s) => { if (s) { setOwnVerbs(s.verbs); set({ verbs: s.verbs }); } });
+        getJson('/api/state/idols').then((s) => s && set({ idols: s.idols }));
         // items become past (and fall behind the Hermetic Seal) as time passes
         setInterval(() => set((state) => withVisible(state, {})), 60_000);
         startFeed(get);
@@ -831,6 +835,52 @@ const workspaceStore = (set, get) => ({
 
     ambrosia: { balance: 0, entries: [], by_kind: {} },
     setAmbrosia: (ambrosia) => set({ ambrosia }),
+
+    setPartyMember: async (adventureId, playerId, changes) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/party/${playerId}`, 'PUT', changes);
+        return typeof res === 'string' ? res : null;
+    },
+
+    setSteward: async (adventureId, entityId, role, on) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/stewards/${entityId}/${role}`, on ? 'PUT' : 'DELETE');
+        return typeof res === 'string' ? res : null;
+    },
+
+    setAffinity: async (playerId, entityId, on) => {
+        const res = await sendJson(`/api/entities/${playerId}/affinities/${entityId}`, on ? 'PUT' : 'DELETE');
+        return typeof res === 'string' ? res : null;
+    },
+
+    setWarden: async (siteId, entityId, on) => {
+        const res = await sendJson(`/api/entities/${siteId}/wardens/${entityId}`, on ? 'PUT' : 'DELETE');
+        return typeof res === 'string' ? res : null;
+    },
+
+    pins: [],
+    setPins: (pins) => { set({ pins }); scheduleSave('anvil', () => ({ pins: get().pins })); },
+    togglePin: (adventure, action) => {
+        const { pins, setPins } = get(), on = pins.some((p) => p.adventure === adventure && p.action === action);
+        setPins(on ? pins.filter((p) => p.adventure !== adventure || p.action !== action) : [...pins, { adventure, action }]);
+    },
+    verbs: [],
+    setVerbs: (verbs) => { setOwnVerbs(verbs); set({ verbs }); scheduleSave('verbs', () => ({ verbs: get().verbs })); },
+    idols: {},
+    setIdol: (id, changes) => {
+        set((s) => ({ idols: { ...s.idols, [id]: { description: null, skills: [], ...s.idols[id], ...changes } } }));
+        scheduleSave('idols', () => ({ idols: get().idols }));
+    },
+
+    complexFocus: null,
+    openInComplex: (adventureId, playerId) => {
+        get().selectItem(adventureId, 'complex');
+        set({ complexFocus: playerId ? { adventureId, playerId, at: Date.now() } : null });
+        get().showPanel('complex');
+    },
+
+    partyHistory: async (adventureId) => {
+        const res = await getJson(`/api/adventures/${adventureId}/party/history`);
+        return Array.isArray(res) ? res : [];
+    },
 
     saveBounty: async (adventureId, bounty) => {
         const res = await sendJson(`/api/adventures/${adventureId}/bounty`, 'PUT', bounty ? { effort: bounty.effort, resistance: bounty.resistance, ratio: bounty.ratio } : undefined);

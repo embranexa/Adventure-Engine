@@ -37,9 +37,21 @@ PANELS_METADATA = {
         "id": "codex", "kind": "codex", "icon": "codex",
         "name": "Codex", "question": "with", "flow": ["entities", "links"],
     },
+    "complex": {
+        "id": "complex", "kind": "complex", "icon": "molecule",
+        "name": "Combinator", "question": "who", "flow": ["adventure", "collaboration"],
+    },
     "quests": {
         "id": "quests", "kind": "quests", "icon": "scroll",
         "name": "Crucible", "question": "now", "flow": ["alloy", "animus"],
+    },
+    "arena": {
+        "id": "arena", "kind": "arena", "icon": "swords",
+        "name": "Arena", "question": "with whom", "flow": ["animus", "artifact"],
+    },
+    "cohort": {
+        "id": "cohort", "kind": "cohort", "icon": "cohort",
+        "name": "Cohort", "question": "who", "flow": ["players", "archetypes"],
     },
     "ledger": {
         "id": "ledger", "kind": "ledger", "icon": "ledger",
@@ -78,7 +90,7 @@ DEFAULT_LAYOUT_TREE: dict[str, Any] = {
         "type": "split",
         "direction": "horizontal",
         "ratio": 50,
-        "first": {"id": "leaf-classifier", "type": "leaf", "tabs": ["classifier", "alembic", "signal_chain"], "activeTab": "alembic"},
+        "first": {"id": "leaf-classifier", "type": "leaf", "tabs": ["classifier", "alembic", "complex", "signal_chain"], "activeTab": "alembic"},
         "second": {
             "id": "split-map-calendar",
             "type": "split",

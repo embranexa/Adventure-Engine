@@ -40,12 +40,15 @@ export const SUMP = 'sump';
 export const FORGE = 'forge';
 export const CODEX = 'codex';
 export const MANIFOLD = 'manifold';
+export const COHORT = 'cohort';
+/** The Combinator (the Complex panel's id stays): in the Core, before the Refinery; no pipes yet. */
+export const COMPLEX = 'complex';
 export const INVENTORY = 'inventory';
 export const AGORA = 'agora';
 export const PANTHEON = 'pantheon';
 export const MASTERY = 'mastery';
 /** The Sanctum: machines for what isn't primary matter, left to right. They have no pipes yet. */
-export const SANCTUM = [CODEX, INVENTORY, AGORA, PANTHEON, MASTERY];
+export const SANCTUM = [CODEX, COHORT, INVENTORY, AGORA, PANTHEON, MASTERY];
 /** Fills in what harvested events lack (cover, exact place, end time): not built yet. */
 export const ENRICHER = 'enricher';
 /** The autonomous filter: a tunable chain of rules between the harvesters and the Centrifuge: not built yet. */
@@ -97,11 +100,13 @@ export function twinNodes(sourceNames) {
         core('classifying', 'processor', 'Refinery', { panel: 'node', mode: 'adventures' }),
         core('decomposing', 'processor', 'Alembic', { panel: 'alembic', mode: 'adventures' }),
         core('constructing', 'processor', 'Crucible', { panel: 'quests', mode: 'adventures' }),
-        core('consuming', 'processor', 'Arena'),
+        core('consuming', 'processor', 'Arena', { panel: 'arena', mode: 'adventures' }),
+        node({ id: COMPLEX, label: 'Combinator', zone: 'core', kind: 'cabinet', action: { panel: 'complex', mode: 'adventures' } }),
         core('completed', 'vessel', 'Treasury', { panel: 'treasury' }),
         core('decommissioned', 'vessel', 'Archive'),
         core('killed', 'vessel', 'Necropolis', { panel: 'necropolis' }),
         node({ id: CODEX, label: 'Codex', zone: 'sanctum', kind: 'cabinet', holds: 'entities', action: { panel: 'codex' } }),
+        node({ id: COHORT, label: 'Cohort', zone: 'sanctum', kind: 'cabinet', action: { panel: 'cohort' } }),
         node({ id: INVENTORY, label: 'Inventory', zone: 'sanctum', kind: 'cabinet', action: { panel: 'inventory' } }),
         node({ id: AGORA, label: 'Agora', zone: 'sanctum', kind: 'cabinet', action: { panel: 'agora' } }),
         node({ id: PANTHEON, label: 'Pantheon', zone: 'sanctum', kind: 'cabinet', locked: true }),

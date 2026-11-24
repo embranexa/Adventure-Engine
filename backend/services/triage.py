@@ -35,7 +35,7 @@ from backend.db.models import (
     CENTRIFUGE_NODE, MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure, Enshrining, Epitaph,
     Event, EventSource, harvester_node,
 )
-from backend.db.queries import list_adventures, list_events
+from backend.db.queries import list_adventures, list_events, list_entities
 from backend.services import ledger
 from backend.services.hub import hub
 from backend.services.transitions import record_many
@@ -58,6 +58,8 @@ async def broadcast_pools() -> None:
     async with SessionLocal() as session:
         await hub.broadcast("events", events=await list_events(session))
         await hub.broadcast("adventures", adventures=await list_adventures(session))
+        # a broken seal takes a spell's skills back (queries.spell_skills)
+        await hub.broadcast("entities", entities=await list_entities(session))
 
 
 async def _get_event(session: AsyncSession, event_id: uuid.UUID) -> Event:
@@ -318,7 +320,7 @@ async def set_phase(adventure_id: uuid.UUID, phase: str) -> None:
 async def sweep_missed() -> int:
     """Kill adventures that were still pre-Arena when their event ended.
 
-    Events only (items and performances have no when/where), crawled or hand-made. "Ended" = end
+    Those with a date (never items), crawled or hand-made. "Ended" = end
     time, else start time, the adventure's own (set by hand) over its raw event's. Only adventures whose phase was last set
     *before* the event ended count as missed: reviving one afterwards, or passing an
     event that is already over, is a deliberate choice and isn't undone.

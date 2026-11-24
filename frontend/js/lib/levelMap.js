@@ -5,7 +5,8 @@
  * LevelMap — AR-style event map on MapLibre + three.js (ported from legacy/static/lib/map.js)
  *
  * Each event becomes a neon tower with an orb floating above it. A card
- * (title + cover image) hangs above every orb and always faces the viewer.
+ * (title + cover image) hangs above every orb and always faces the viewer. An event that
+ * shows a 3D model has that instead of a tower, standing on the map (mapModels.js).
  * Cards are HTML overlays projected from the orb's 3D position, so any image
  * URL works (no CORS needed, unlike WebGL textures) and text stays crisp.
  * Styles live in frontend/styles.css under "Map".
@@ -23,6 +24,7 @@
 
 import { loadScript, loadStylesheet } from './loadScript.js';
 import { stageOf } from '../lifecycle.js';
+import { modelSpec, showsModel } from './items.js';
 import { deferredResize, isResizing, viewOf } from './resizing.js';
 
 const VENDOR = '/frontend/vendor';
@@ -80,6 +82,8 @@ export class LevelMap {
             orbHover: 70,         // meters between tower top and orb centre
             minTowerHeight: 60,   // tower height for an event with no guests
             approxScatterM: 1800, // radius over which events at an approximate place are scattered
+            modelHeight: 150,     // meters a model stands, and at least modelPx pixels
+            modelPx: 74,
             clusterPx: 64,        // events closer than about this many pixels merge into one medallion
             flyToOnSelect: true,
             fitOnFirstData: true, // frame all events the first time any arrive
@@ -149,6 +153,7 @@ export class LevelMap {
         return {
             id: String(raw.id ?? index),
             title: raw.title ?? `Event ${index + 1}`,
+            spec: raw.kind === 'adventure' && showsModel(raw) ? modelSpec(raw, { fallback: '#' + color.getHexString() }) : null,
             image: raw.cover_url ?? null,
             lng,
             lat,
@@ -375,6 +380,7 @@ export class LevelMap {
             this._styleReady = true;
             this._addBuildings();
             this.map.addLayer(this.layer);
+            this._syncModels();
             this._renderRing();
             this._maybeFit();
         });
@@ -530,7 +536,12 @@ export class LevelMap {
                 sel: 0, hov: 0,
                 selected: false, hoverPick: false, hoverCard: false,
                 parts: { orb, core, wire, spinner, halo, scan, pulse, beam, edges },
+                at: mc, orbHit, towerHit, floor: [floor, floorRing, pulse],
             };
+            if (node.spec) { // its model stands here instead (mapModels.js); the ground markings stay
+                for (const o of [towerBody, edges, cap, scan, beam]) o.visible = false;
+                for (const o of orb.children) if (o !== orbHit) o.visible = false;
+            }
 
             orbHit.userData.entry = entry;
             towerHit.userData.entry = entry;
@@ -542,7 +553,28 @@ export class LevelMap {
 
 
         this._entriesVersion++;
+        this._syncModels();
         this.nodeCount.textContent = String(this.nodes.length);
+    }
+
+    /** Hand the events that show a model to the model layer (loaded the first time there is one). */
+    _syncModels() {
+        const list = this.entries.filter((e) => e.node.spec).map((e) => ({ id: e.node.id, spec: e.node.spec, at: e.at, m: e.m }));
+        if (this.models) { this.models.update(list); return; }
+        if (!list.length || this._loadingModels || !this._styleReady) return;
+        this._loadingModels = true;
+        import('./mapModels.js').then(({ MapModels }) => {
+            if (!this.map) return; // disposed meanwhile
+            this.models = new MapModels();
+            this.map.addLayer(this.models.layer);
+            this._syncModels();
+        }).catch((err) => console.error('[Map] models failed to load', err));
+    }
+
+    /** Metres a model stands at this zoom: its own height, or enough to be seen. */
+    _modelSize(e) {
+        const perPx = 40075016.7 * Math.cos(e.node.lat * Math.PI / 180) / (512 * 2 ** this.map.getZoom());
+        return Math.max(this.config.modelHeight, this.config.modelPx * perPx);
     }
 
     _clearNodes() {
@@ -591,7 +623,8 @@ export class LevelMap {
         );
 
         const imgBox = el('div', 'lm-img');
-        const src = this._safeImageUrl(node.image);
+        if (node.spec) card.classList.add('model'); // the model is its picture
+        const src = node.spec ? null : this._safeImageUrl(node.image);
         if (src) {
             const img = document.createElement('img');
             img.alt = '';
@@ -672,7 +705,7 @@ export class LevelMap {
 
         for (const e of this.entries) {
             if (e.clustered) { e.card.style.visibility = 'hidden'; continue; }
-            const z = (e.parts.orb.position.z + lift) * e.m;
+            const z = (e.node.spec ? (e.tall ?? 0) * 1.06 : e.parts.orb.position.z + lift) * e.m;
             this._v4.set(e.group.position.x, e.group.position.y, z, 1)
                 .applyMatrix4(this.camera.projectionMatrix);
 
@@ -723,6 +756,19 @@ export class LevelMap {
     /*  Animation                                                          */
     /* ------------------------------------------------------------------ */
 
+    /** Size a model, its picking proxies and ground markings for this zoom; returns its height. */
+    _standModel(e) {
+        const size = this._modelSize(e), lift = e.sel * 0.18 + e.hov * 0.06;
+        this.models?.place(e.node.id, { size, visible: !e.clustered, lift });
+        const tall = (this.models?.heightOf(e.node.id) || size) * (1 + lift);
+        e.towerHit.scale.set(size * 0.5 / this.config.towerRadius, size * 0.5 / this.config.towerRadius, tall);
+        e.orbHit.scale.setScalar(size * 0.4);
+        e.floor[0].scale.setScalar(size * 0.75);
+        e.floor[1].scale.setScalar(size * 0.75);
+        e.tall = tall;
+        return tall;
+    }
+
     _animate(t, dt) {
         const R = this.config.towerRadius;
         const TAU = Math.PI * 2;
@@ -741,11 +787,12 @@ export class LevelMap {
         for (const e of this.entries) {
             const p = e.parts;
             const ph = e.phase * TAU;
+            const tall = e.node.spec ? this._standModel(e) : 0;
 
             e.sel += ((e.selected ? 1 : 0) - e.sel) * k;
             e.hov += ((e.hoverPick || e.hoverCard || e.hoverExt ? 1 : 0) - e.hov) * k;
 
-            p.orb.position.z = e.orbZ + Math.sin(t * 1.4 + ph) * 4 + e.sel * 14 + e.hov * 6;
+            p.orb.position.z = e.node.spec ? tall * 0.5 : e.orbZ + Math.sin(t * 1.4 + ph) * 4 + e.sel * 14 + e.hov * 6;
             p.orb.scale.setScalar(1 + e.sel * 0.3 + e.hov * 0.12);
 
             p.core.material.color.copy(e.node.color)
@@ -766,7 +813,7 @@ export class LevelMap {
 
             // Ground pulse.
             const pf = (t * 0.45 + e.phase) % 1;
-            p.pulse.scale.setScalar(R * (1.2 + pf * 3.4));
+            p.pulse.scale.setScalar((tall ? tall * 0.3 : R) * (1.2 + pf * 3.4));
             p.pulse.material.opacity = (1 - pf) * 0.6;
 
             p.beam.material.opacity = 0.45 + 0.2 * Math.sin(t * 9 + ph * 3);

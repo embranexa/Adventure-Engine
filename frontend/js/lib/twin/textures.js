@@ -4,6 +4,7 @@
 // (resources/signal chain digital twin/atelier.html); see PHASE7_PLAN.md.
 
 import * as THREE from 'three';
+import { SANCTUM } from '../twinTopology.js';
 
 const TAU = Math.PI * 2;
 
@@ -145,18 +146,18 @@ export function zoneFloor(zone, r, viewers = {}, plaque = null) {
             const f = Math.sqrt(Math.abs(IY * IY - IX * IX)) * 0.82, alongY = IY > IX;
             [[-1, '⊖'], [1, '☿']].forEach(([sg, sym]) => { const x = cx + (alongY ? 0 : sg * f), y = cy + (alongY ? sg * f : 0), rr = C * 0.42; blackDisc(x, y, rr); ring(x, y, rr, 3); ring(x, y, rr * 0.85, 1.2); glyphs(x, y, 0, [sym], rr); });
         } else if (zone === 'sanctum') {
-            // five medallions, one under each machine (evenly spread, 46 units in from the sides),
+            // a medallion under each machine (evenly spread, 46 units in from the sides),
             // threaded by two weaving lines; each holds a polygram with one more point than the last
-            const x0 = 46 * k, step = (W - 2 * x0) / 4, rr = Math.min(IY * 0.92, step * 0.42);
+            const x0 = 46 * k, n0 = SANCTUM.length, step = (W - 2 * x0) / (n0 - 1), rr = Math.min(IY * 0.92, step * 0.42);
             for (const s of [1, -1]) {
                 g.lineWidth = 1.6; g.beginPath();
-                for (let i = 0; i <= 160; i++) { const u = i / 160, x = x0 + u * (W - 2 * x0), y = cy + s * Math.sin(u * 4 * Math.PI) * rr * 0.62; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+                for (let i = 0; i <= 160; i++) { const u = i / 160, x = x0 + u * (W - 2 * x0), y = cy + s * Math.sin(u * (n0 - 1) * Math.PI) * rr * 0.62; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
                 g.stroke();
             }
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < n0; i++) {
                 const x = x0 + i * step, n = 5 + i;
                 blackDisc(x, cy, rr); medallion(x, cy, rr);
-                poly(x, cy, rr * 0.76, n, 2, -Math.PI / 2, 2); ring(x, cy, rr * 0.3, 1.5);
+                poly(x, cy, rr * 0.76, n, 2, -Math.PI / 2, 2); if (n % 2 === 0) poly(x, cy, rr * 0.76, n, 2, -Math.PI / 2 + TAU / n, 2); ring(x, cy, rr * 0.3, 1.5);
             }
         } else {
             // the great work: seven interlocking circles for the seven metals along the oval, the heptagram at the centre

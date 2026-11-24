@@ -24,6 +24,9 @@ const PANEL_MACHINES = {
     necropolis: [PHASE_NODES.killed],
     treasury: [PHASE_NODES.completed],
     inventory: ['inventory'],
+    cohort: ['cohort'],
+    complex: ['complex'],
+    arena: [PHASE_NODES.consuming],
     agora: ['agora'],
 };
 const RECENT = 15;
@@ -35,7 +38,7 @@ const NODE_COLORS = {
     [SUMP]: REVIEW_STAGES.ignored.color,
     [FORGE]: '#ff7a3c',
     [CODEX]: '#c8a46a',
-    inventory: '#cfd3da', agora: '#e9b949', pantheon: '#c86bf0', mastery: '#ff8f6b',
+    cohort: '#7fb2ff', complex: '#f5c542', inventory: '#cfd3da', agora: '#e9b949', pantheon: '#c86bf0', mastery: '#ff8f6b',
     enricher: '#c8a46a',
     sieve: '#c8a46a',
     nexus: '#9fb4c8', atlas: '#9fb4c8', calendar: '#9fb4c8', ledger: '#9fb4c8',

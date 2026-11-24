@@ -1,19 +1,29 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { PHASE_STAGES } from '../../lifecycle.js';
 import { analyze, promotionTarget, toggleDone } from '../../lib/roadmap.js';
 import { safeHttpUrl } from '../../events.js';
 import { nextActionPay, remaining } from '../../lib/bounty.js';
-import { modelSpec } from '../../lib/items.js';
+import { splitTitle } from '../../lib/quests.js';
+import { modelSpec, showsModel } from '../../lib/items.js';
 import { ModelView } from '../ModelView.js';
+import { PartyRoster } from '../PartyRoster.js';
 import { PromoteButton } from '../PromoteButton.js';
 
+/** Where a target shows: alloy, and what's about to become alloy. */
+const BUILDING = new Set(['queued', 'classifying', 'decomposing', 'constructing']);
 const DAY_MS = 86_400_000;
 const COMPLETE_DELAY_MS = 420; // let the check land before the quest leaves
 
+/** A quest's title, its verb set apart. @param {{ title: string }} props */
+function QuestTitle({ title }) {
+    const { verb, subject } = splitTitle(title);
+    return verb ? html`<b className="ql-verb">${verb}</b> ${subject}` : html`<i className="ql-noverb" title="Every quest needs a verb: pick one in the Alembic">verb?</i> ${subject}`;
+}
+
 /** "today", "in 3 days", "2 days ago"; null when undated. @param {string | null} iso */
-function dueLabel(iso) {
+export function dueLabel(iso) {
     if (!iso) return null;
     const start = new Date(iso);
     if (Number.isNaN(start.getTime())) return null;
@@ -29,14 +39,14 @@ function dueLabel(iso) {
 }
 
 /**
- * An item's model, or an adventure's cover image, down the left side of its card (nothing
+ * An adventure's model, or its cover image, down the left side of its card (nothing
  * when it has neither, or the image won't load).
  * @param {{ adventure: AdventureRecord }} props
  */
-function QuestCover({ adventure }) {
+export function QuestCover({ adventure }) {
     const src = safeHttpUrl(adventure.cover_url);
     const [failed, setFailed] = useState(false);
-    const spec = useMemo(() => (adventure.type === 'item' ? modelSpec(adventure) : null), [adventure]);
+    const spec = useMemo(() => (adventure.type === 'item' || showsModel(adventure) ? modelSpec(adventure) : null), [adventure]);
     if (spec) return html`<div className="ql-cover"><${ModelView} spec=${spec} distance=${140} label=${adventure.title ?? ''} /></div>`;
     if (!src || failed) return null;
     return html`
@@ -60,6 +70,10 @@ export function QuestsPanel() {
     const selectItem = useWorkspaceStore((s) => s.selectItem);
     const hoverItem = useWorkspaceStore((s) => s.hoverItem);
     const saveRoadmap = useWorkspaceStore((s) => s.saveRoadmap);
+    useWorkspaceStore((s) => s.verbs); // quest titles show them
+    const pins = useWorkspaceStore((s) => s.pins);
+    const setPins = useWorkspaceStore((s) => s.setPins);
+    const togglePin = useWorkspaceStore((s) => s.togglePin);
     const [completing, setCompleting] = useState(() => new Set(/** @type {string[]} */ ([])));
 
     const groups = useMemo(
@@ -68,8 +82,32 @@ export function QuestsPanel() {
             .map((a) => ({ adventure: a, analysis: analyze(a.roadmap) })),
         [adventures],
     );
-    const questCount = groups.reduce((n, g) => n + g.analysis.bottlenecks.length, 0);
     const crucible = PHASE_STAGES.constructing;
+
+    // the targets (pins), in order. Done ones (and deleted ones) leave; locked ones
+    // wait out of sight until they're ready again. One in an adventure not yet alloy makes it alloy
+    // (backend/services/targets.py).
+    useEffect(() => {
+        if (!adventures.length) return;
+        const kept = pins.filter((p) => {
+            const road = adventures.find((a) => a.id === p.adventure)?.roadmap;
+            return road?.actions.some((x) => x.id === p.action) && !road.done.includes(p.action);
+        });
+        if (kept.length !== pins.length) setPins(kept);
+    }, [adventures, pins]);
+    const anvil = pins.flatMap((pin) => {
+        const adventure = adventures.find((a) => a.id === pin.adventure && BUILDING.has(a.phase));
+        const quest = adventure && analyze(adventure.roadmap).bottlenecks.find((q) => q.id === pin.action);
+        return quest ? [{ pin, adventure, quest }] : [];
+    });
+    const questCount = groups.reduce((n, g) => n + g.analysis.bottlenecks.length, 0);
+    const pinned = (/** @type {string} */ a, /** @type {string} */ q) => pins.some((p) => p.adventure === a && p.action === q);
+    /** Swap with the one shown above or below. @param {number} i @param {1 | -1} way */
+    const move = (i, way) => {
+        const next = [...pins], x = next.indexOf(anvil[i].pin), y = next.indexOf(anvil[i + way].pin);
+        [next[x], next[y]] = [next[y], next[x]];
+        setPins(next);
+    };
 
     /** @param {AdventureRecord} adventure @param {string} actionId */
     const complete = (adventure, actionId) => {
@@ -88,11 +126,11 @@ export function QuestsPanel() {
     /** @param {string} id */
     const inPool = (id) => Boolean(itemsById[id]);
 
-    if (!groups.length) {
+    if (!groups.length && !anvil.length) {
         return html`
             <div className="panel-body quests">
                 <div className="nc-empty">No alloy yet
-                    <small>Adventures that become alloy list their next actions here</small>
+                    <small>Adventures that become alloy list their next quests here</small>
                 </div>
             </div>
         `;
@@ -105,6 +143,29 @@ export function QuestsPanel() {
                 <span>· ${groups.length} ${crucible.matter}</span>
             </div>
             <div className="ql-list">
+                ${anvil.length > 0 && html`
+                    <section className="anvil">
+                        <div className="anvil-head">◎ Targets <b>${anvil.length}</b></div>
+                        ${anvil.map(({ pin, adventure, quest }, i) => {
+                            const pay = nextActionPay(adventure);
+                            return html`
+                                <div key=${`${adventure.id}:${quest.id}`} className=${`ql-quest ${completing.has(`${adventure.id}:${quest.id}`) ? 'completing' : ''}`}>
+                                    <button className="ql-check" onClick=${() => complete(adventure, quest.id)} aria-label=${`Complete ${quest.title}`} title="Complete">
+                                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"></path></svg></button>
+                                    <span className="ql-quest-text">
+                                        <span className="ql-quest-title"><${QuestTitle} title=${quest.title} /></span>
+                                        ${quest.notes && html`<span className="ql-quest-notes">${quest.notes}</span>`}
+                                        <button className="anvil-of" disabled=${!inPool(adventure.id)} onClick=${() => selectItem(adventure.id, 'quests')}>${adventure.title}</button>
+                                    </span>
+                                    ${pay > 0 && html`<span className="ql-pay" title="Ambrosia for the next quest">+${pay}</span>`}
+                                    <span className="anvil-move">
+                                        <button disabled=${i === 0} aria-label=${`Move ${quest.title} up`} onClick=${() => move(i, -1)}>▲</button>
+                                        <button disabled=${i === anvil.length - 1} aria-label=${`Move ${quest.title} down`} onClick=${() => move(i, 1)}>▼</button>
+                                    </span>
+                                    <button className="anvil-btn on" aria-label=${`Stop targeting ${quest.title}`} title="No longer a target" onClick=${() => togglePin(pin.adventure, pin.action)}>◎</button>
+                                </div>`;
+                        })}
+                    </section>`}
                 ${groups.map(({ adventure, analysis }) => {
                     const due = dueLabel(adventure.start);
                     const target = promotionTarget(adventure.phase);
@@ -130,7 +191,7 @@ export function QuestsPanel() {
                                 ${due && html`<span className="ql-due">${due}</span>`}
                             </div>
                             ${analysis.total > 0 && html`
-                                <div className="ql-progress" title=${`${analysis.doneCount} of ${analysis.total} actions done`}>
+                                <div className="ql-progress" title=${`${analysis.doneCount} of ${analysis.total} quests done`}>
                                     <span className="alm-meter"><i style=${{ width: `${pct}%` }}></i></span>
                                     <span>${analysis.doneCount}/${analysis.total}</span>
                                 </div>
@@ -139,7 +200,7 @@ export function QuestsPanel() {
                                 <div className="ql-none">No roadmap yet — draft one in the Alembic</div>
                             `}
                             ${analysis.complete && target && html`<${PromoteButton} adventureId=${adventure.id} target=${target} compact=${true} />`}
-                            ${analysis.bottlenecks.map((quest) => {
+                            ${analysis.bottlenecks.filter((q) => !pinned(adventure.id, q.id)).map((quest) => {
                                 const key = `${adventure.id}:${quest.id}`;
                                 return html`
                                     <div key=${quest.id} className=${`ql-quest ${completing.has(key) ? 'completing' : ''}`}>
@@ -148,14 +209,17 @@ export function QuestsPanel() {
                                             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"></path></svg>
                                         </button>
                                         <span className="ql-quest-text">
-                                            <span className="ql-quest-title">${quest.title}</span>
+                                            <span className="ql-quest-title"><${QuestTitle} title=${quest.title} /></span>
                                             ${quest.notes && html`<span className="ql-quest-notes">${quest.notes}</span>`}
                                         </span>
-                                        ${pay > 0 && html`<span className="ql-pay" title="Ambrosia for the next action">+${pay}</span>`}
+                                        ${pay > 0 && html`<span className="ql-pay" title="Ambrosia for the next quest">+${pay}</span>`}
+                                        <button className="anvil-btn" aria-label=${`Target ${quest.title}`} title="Target: to the top"
+                                            onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); togglePin(adventure.id, quest.id); }}>◎</button>
                                         <span className="ql-quest-id">${quest.id}</span>
                                     </div>
                                 `;
                             })}
+                            <${PartyRoster} adventure=${adventure} />
                             </div>
                         </section>
                     `;

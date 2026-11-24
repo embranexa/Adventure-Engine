@@ -1,0 +1,43 @@
+// The twelve archetypes' idols (pure): what the Cohort's idol gallery says about each.
+// Names, groups and mediums are in lifecycle.js ARCHETYPES. Descriptions can be rewritten in
+// the app; `skills` are suggestions, made into Codex skills only when clicked.
+
+/** @type {Record<Archetype, { color: string, numeral: string, emblem: string, characters: string, description: string, skills: string[] }>} */
+export const IDOLS = {
+    vanguard: { color: '#f2c14e', numeral: 'I', emblem: 'The thunderbolt', characters: 'Vanguard, paladin',
+        description: 'Stands at the front and makes others willing to follow. The Vanguard decides when no one else will, holds the line when it wavers, and lends their own spirit to the party’s.',
+        skills: ['Leadership', 'Politics', 'Authority', 'Intimidation', 'Constitution'] },
+    performer: { color: '#ffb347', numeral: 'II', emblem: 'The lyre', characters: 'Magician, sorcerer, bard',
+        description: 'Gathers attention and spends it well. The Performer turns a room into an audience, a story into a spell, and an ordinary night into one people retell.',
+        skills: ['Storytelling', 'Comedy', 'Illusion', 'Music', 'Deception'] },
+    enchanter: { color: '#ff7aa8', numeral: 'III', emblem: 'The scallop', characters: 'Enchanter, hypnotist, mesmer',
+        description: 'Works in desire. The Enchanter sees what people want before they say it, and draws them closer: to an idea, to a place, to each other.',
+        skills: ['Charm', 'Charisma', 'Seduction', 'Persuasion', 'Vitality'] },
+    juggernaut: { color: '#ef4e4e', numeral: 'IV', emblem: 'The spear and shield', characters: 'Juggernaut, brute',
+        description: 'Takes the hit and keeps moving. The Juggernaut brings force and endurance: the one who lifts, carries, pushes through, and is still standing at the end.',
+        skills: ['Strength', 'Toughness', 'Vitality', 'Endurance', 'Constitution', 'Defense', 'Courage', 'Power'] },
+    rogue: { color: '#b7c4e8', numeral: 'V', emblem: 'The bow and crescent', characters: 'Rogue, pirate, ranger, archer',
+        description: 'Finds what is hidden and goes where others can’t. The Rogue tracks scarce things, slips past obstacles, and strikes once, precisely.',
+        skills: ['Stealth', 'Agility', 'Precision', 'Deception', 'Street smarts', 'Acrobatics', 'Speed'] },
+    summoner: { color: '#8fce5a', numeral: 'VI', emblem: 'The pipes', characters: 'Summoner, menagerist',
+        description: 'Acts through others’ hands. The Summoner calls up helpers, creatures and machines, gives them their orders, and lets them run wild in the right direction.',
+        skills: ['Remote control'] },
+    resonator: { color: '#4fc3d9', numeral: 'VII', emblem: 'The peacock', characters: 'Resonator, guildmaster',
+        description: 'Tunes people to one another. The Resonator builds rapport and culture, keeps morale, and makes a crowd into a community that outlives the evening.',
+        skills: ['Diplomacy'] },
+    merchant: { color: '#5fd0b0', numeral: 'VIII', emblem: 'The caduceus', characters: 'Merchant, quartermaster',
+        description: 'Keeps things moving. The Merchant knows who has it, who needs it and what it’s worth, and gets it there in time.',
+        skills: ['Negotiation', 'Agility', 'Logistics', 'Arbitrage'] },
+    artificer: { color: '#ff8a4c', numeral: 'IX', emblem: 'The hammer and anvil', characters: 'Artificer, technomancer, smith, metallurgist',
+        description: 'Makes the thing that makes it possible. The Artificer understands matter and machines, and turns a sketch into something that holds weight.',
+        skills: ['Craftsmanship', 'Dexterity'] },
+    wizard: { color: '#8f8cff', numeral: 'X', emblem: 'The owl', characters: 'Wizard, arcanist',
+        description: 'Knows the terrain before it’s walked. The Wizard reads, remembers and plans: the one who sees three moves ahead and names the way through.',
+        skills: ['Strategy', 'Intelligence', 'Wisdom', 'Perception', 'Navigation'] },
+    cleric: { color: '#ffd9a0', numeral: 'XI', emblem: 'The hearth', characters: 'Warden, priest, cleric',
+        description: 'Keeps the fire. The Cleric makes a place safe to be in, tends those who are worn down, and sees that everyone comes home.',
+        skills: ['Healing', 'Hospitality', 'Domestication'] },
+    patron: { color: '#a98bd6', numeral: 'XII', emblem: 'The bident and key', characters: 'Patron',
+        description: 'Holds the keys below ground. The Patron brings capital and leverage, weighs what is owed, and makes a hard thing possible by standing behind it.',
+        skills: ['Finance', 'Discipline', 'Law', 'Justice'] },
+};

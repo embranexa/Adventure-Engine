@@ -6,7 +6,7 @@ import { BEFORE_CRUCIBLE, BOUNTY_RANGES, DEFAULT_BOUNTY, actionShare, bountyTota
 const FIELDS = /** @type {const} */ ([
     ['effort', 'Effort', 'How much work it is'],
     ['resistance', 'Resistance', 'How much you don’t want to'],
-    ['ratio', 'Payout lever', 'The share its actions pay'],
+    ['ratio', 'Payout lever', 'The share its quests pay'],
 ]);
 const SAVE_MS = 350;
 
@@ -60,7 +60,7 @@ export function BountyControl({ adventure }) {
                     `)}
                     ${total
                         ? html`<div className="bounty-split"><span style=${{ width: `${draft.ratio}%` }}>${share || ''}</span><span>${total - share}</span></div>
-                            <p>${share} from its actions, ${total - share} when it’s enshrined.</p>`
+                            <p>${share} from its quests, ${total - share} when it’s enshrined.</p>`
                         : html`<p>No resistance, no pay.</p>`}
                     ${locked && html`<p>Locked. Paid so far: ${stored.paid_actions + stored.paid_seal}.</p>`}
                     ${error && html`<div className="nc-error" role="alert">${error}</div>`}

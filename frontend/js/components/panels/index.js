@@ -4,9 +4,12 @@
 
 import { AgoraPanel } from './AgoraPanel.js';
 import { AlembicPanel } from './AlembicPanel.js';
+import { ArenaPanel } from './ArenaPanel.js';
 import { CalendarPanel } from './CalendarPanel.js';
 import { ClassifierPanel } from './ClassifierPanel.js';
 import { CodexPanel } from './CodexPanel.js';
+import { CohortPanel } from './CohortPanel.js';
+import { ComplexPanel } from './ComplexPanel.js';
 import { InventoryPanel } from './InventoryPanel.js';
 import { LedgerPanel } from './LedgerPanel.js';
 import { MapPanel } from './MapPanel.js';
@@ -26,6 +29,9 @@ export const PANEL_COMPONENTS = {
     alembic: AlembicPanel,
     scripter: ScripterPanel,
     codex: CodexPanel,
+    complex: ComplexPanel,
+    arena: ArenaPanel,
+    cohort: CohortPanel,
     quests: QuestsPanel,
     twin: SignalChainPanel,
     ledger: LedgerPanel,

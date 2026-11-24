@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
-import { ENTITY_TYPES } from '../lifecycle.js';
-
-const MAX_SUGGESTIONS = 8;
+import { ENTITY_TYPES, UNLINKABLE } from '../lifecycle.js';
+import { keepInView, matchesByType } from '../lib/entityOptions.js';
+import { PartyRoster } from './PartyRoster.js';
 
 /**
  * The adventure's links to entities (the Codex), in the Refinery: chips grouped by
@@ -31,14 +31,12 @@ export function EntityLinks({ adventure }) {
     /** Options: matching unlinked entities, then "create" for each type. */
     const options = useMemo(() => {
         /** @type {({ kind: 'link', obj: Entity } | { kind: 'create', type: EntityType })[]} */
-        const list = entities
-            .filter((o) => !linkedIds.has(o.id) && (!q || o.name.toLowerCase().includes(q)))
-            .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name))
-            .slice(0, MAX_SUGGESTIONS)
+        const list = matchesByType(entities
+            .filter((o) => !UNLINKABLE.includes(o.type) && !linkedIds.has(o.id)), q)
             .map((obj) => ({ kind: /** @type {const} */ ('link'), obj }));
-        const exact = entities.some((o) => o.name.toLowerCase() === q);
+        const exact = entities.some((o) => !UNLINKABLE.includes(o.type) && o.name.toLowerCase() === q);
         if (q && !exact) {
-            for (const type of /** @type {EntityType[]} */ (Object.keys(ENTITY_TYPES))) list.push({ kind: 'create', type });
+            for (const type of /** @type {EntityType[]} */ (Object.keys(ENTITY_TYPES))) if (!UNLINKABLE.includes(type)) list.push({ kind: 'create', type });
         }
         return list;
     }, [entities, q, adventure.entities]);
@@ -67,12 +65,14 @@ export function EntityLinks({ adventure }) {
         else if (e.key === 'Escape') { setQuery(''); setOpen(false); inputRef.current?.blur(); }
     };
 
-    const byType = /** @type {[EntityType, { id: string, type: EntityType, name: string }[]][]} */ (
-        Object.keys(ENTITY_TYPES).map((t) => [t, adventure.entities.filter((o) => o.type === t)]).filter(([, list]) => list.length));
+    const byType = /** @type {[EntityType, LinkedEntity[]][]} */ (
+        Object.keys(ENTITY_TYPES).map((t) => [t, adventure.entities.filter((o) => o.type === t)]).filter(([t, list]) => t !== 'player' && list.length)); // players are in the roster
 
     return html`
         <div className="ol">
-            <div className="ol-head">Links</div>
+            <div className="ol-head">Links
+                <button className="cls-layer ol-complex" onClick=${() => showPanel('complex')} title="Its players and stewards">${adventure.collaboration ? '☉ Collaboration' : 'Combinator'} ⟶</button>
+            </div>
             ${byType.length > 0 && html`
                 <div className="ol-chips">
                     ${byType.map(([type, list]) => list.map((o) => html`
@@ -92,7 +92,7 @@ export function EntityLinks({ adventure }) {
                     ref=${inputRef}
                     className="ol-input"
                     value=${query}
-                    placeholder=${'+ Link a deity, site, contact, organization or skill…'}
+                    placeholder=${'+ Link a deity, site, player, organization or skill…'}
                     aria-label="Link an entity"
                     onInput=${(/** @type {any} */ e) => { setQuery(e.target.value); setOpen(true); setActive(0); }}
                     onFocus=${() => setOpen(true)}
@@ -101,10 +101,13 @@ export function EntityLinks({ adventure }) {
                 />
                 ${open && options.length > 0 && html`
                     <div className="ol-menu" role="listbox">
-                        ${options.map((option, i) => html`
-                            <button
+                        ${options.map((option, i) => {
+                            const group = option.kind === 'link' ? ENTITY_TYPES[option.obj.type].plural : 'New';
+                            const before = options[i - 1], last = before && (before.kind === 'link' ? ENTITY_TYPES[before.obj.type].plural : 'New');
+                            return html`${group !== last && html`<div key=${`g-${group}`} className="ol-group">${group}</div>`}<button
                                 key=${option.kind === 'link' ? option.obj.id : `new-${option.type}`}
                                 role="option"
+                                ref=${i === active ? keepInView : undefined}
                                 aria-selected=${i === active}
                                 className=${`ol-option ${i === active ? 'active' : ''} ${option.kind}`}
                                 onMouseDown=${(/** @type {Event} */ e) => e.preventDefault()}
@@ -112,14 +115,15 @@ export function EntityLinks({ adventure }) {
                                 onMouseEnter=${() => setActive(i)}
                             >
                                 ${option.kind === 'link'
-                                    ? html`<i>${ENTITY_TYPES[option.obj.type].glyph}</i><span>${option.obj.name}</span><em>${ENTITY_TYPES[option.obj.type].label}</em>`
+                                    ? html`<i>${ENTITY_TYPES[option.obj.type].glyph}</i><span>${option.obj.name}</span>`
                                     : html`<i>✦</i><span>New ${ENTITY_TYPES[option.type].label.toLowerCase()} “${query.trim()}”</span>`}
-                            </button>
-                        `)}
+                            </button>`;
+                        })}
                     </div>
                 `}
             </div>
-            ${adventure.type === 'event' && html`<div className="ol-hint">An event has one site: linking another replaces it${adventure.event_id ? '' : ' · its site is its where'}</div>`}
+            <${PartyRoster} adventure=${adventure} stewards=${true} removable=${true} />
+            ${adventure.type !== 'item' && html`<div className="ol-hint">One site only: linking another replaces it${adventure.event_id ? '' : ' · its site is its where'}</div>`}
             ${error && html`<div className="nc-error">${error}</div>`}
         </div>
     `;

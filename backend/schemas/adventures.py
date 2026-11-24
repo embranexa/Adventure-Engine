@@ -31,7 +31,18 @@ class MovePayload(BaseModel):
     text: str = ""
     grade: str = "good"
     better: str | None = None
+    spell: str | None = None  # a spell entity's id
     skills: list[str] = Field(default_factory=list)
+
+
+class Feedback(BaseModel):
+    """Something that helped or hurt: an effect that was active, or one added after."""
+
+    key: str = Field(max_length=100)
+    label: str = ""
+    skill: str | None = None
+    rating: int = 0
+    result: Literal["helped", "none", "hurt"] | None = None
 
 
 class EnshriningPayload(BaseModel):
@@ -44,13 +55,14 @@ class EnshriningPayload(BaseModel):
     losses: list[Line] = Field(default_factory=list)
     discoveries: list[Discovery] = Field(default_factory=list)
     moves: list[MovePayload] = Field(default_factory=list)
+    feedback: list[Feedback] = Field(default_factory=list)
     seal: bool = False
 
 
 class Effect(BaseModel):
+    skill: str       # a skill entity's id
+    rating: int = 1  # -3 (strong debuff) to 3 (strong buff), not 0
     text: str = ""
-    target: str = "other"  # "favor", "other" or a skill entity's id
-    amount: float = 0      # percent; below 0 is a debuff
 
 
 class BountyPayload(BaseModel):
@@ -64,7 +76,9 @@ class ForgePayload(BaseModel):
 
 
 class ItemPayload(BaseModel):
-    """An item's sheet; checked further in services/items.py."""
+    """An adventure's sheet (purpose and effects: items only); checked further in services/items.py."""
+
+    face: Literal["cover", "model"] | None = None
 
     purpose: str | None = None
     effects: list[Effect] | None = None
@@ -79,6 +93,26 @@ class Recurrence(BaseModel):
     until: date | None = None
 
 
+class Objective(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    text: str = Field("", max_length=300)
+    kind: Literal["primary", "bonus"] = "primary"
+    state: Literal["open", "achieved", "failed"] = "open"
+
+
+class Preparation(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    item: str | None = None  # an owned item of the adventure's gear set
+    text: str = Field("", max_length=300)
+    checked: bool = False
+    effects: list["Effect"] = Field(default_factory=list, max_length=20)  # free-text ones only
+
+
+class Adversary(BaseModel):
+    entity_id: str | None = None
+    name: str = Field("", max_length=200)
+
+
 class AdventureFields(BaseModel):
     """An adventure's own fields (services/adventures.py checks the rest). Only the fields
     sent are changed: send null or "" to clear one."""
@@ -87,7 +121,7 @@ class AdventureFields(BaseModel):
     description: str | None = None
     url: str | None = None
     cover_url: str | None = None
-    # when/where (events only); times need an offset, e.g. 2026-12-06T14:00:00-08:00
+    # when/where (not items); times need an offset, e.g. 2026-12-06T14:00:00-08:00
     start_time: AwareDatetime | None = None
     end_time: AwareDatetime | None = None
     timezone: str | None = None
@@ -98,10 +132,17 @@ class AdventureFields(BaseModel):
     city: str | None = None
     lat: float | None = None
     lon: float | None = None
+    objectives: list[Objective] | None = Field(None, max_length=50)
+    preparations: list[Preparation] | None = Field(None, max_length=50)
+    adversaries: list[Adversary] | None = Field(None, max_length=20)
     costs: str | None = None
     rewards: str | None = None
     # flags (backend.db.models.ADVENTURE_FLAGS): the full set it should carry; [] clears them
     flags: list[Literal["important", "urgent", "favorite", "maybe", "waiting"]] | None = None
+
+    def sent(self) -> dict[str, Any]:
+        """The fields sent, in full (exclude_unset would also drop nested defaults)."""
+        return {k: v for k, v in self.model_dump().items() if k in self.model_fields_set}
 
 
 class AdventureUpdate(AdventureFields):

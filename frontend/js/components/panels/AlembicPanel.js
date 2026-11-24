@@ -4,43 +4,101 @@ import { useWorkspaceStore } from '../../store.js';
 import {
     addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, roadmapColors, setNotes, toggleDone, toggleLink,
 } from '../../lib/roadmap.js';
+import { FIRST_VERB, allVerbs, cleanVerb, joinTitle, knownVerb, splitTitle } from '../../lib/quests.js';
 import { BountyControl } from '../BountyControl.js';
 import { PromoteButton } from '../PromoteButton.js';
 import { focusedWindow } from '../../lib/windows.js';
 
+/** Entries of the verb menu that aren't verbs. */
+const NEW = '+new', FORGET = '-forget:';   // a verb can't start with these
+
 /**
- * Controls for the selected action: rename, complete/undo, link, add the next action,
+ * Controls for the selected quest: its verb and subject, complete/undo, link, add the next quest,
  * delete, and its notes (free text, saved when you leave the box; shown in the Crucible).
- * @param {{ info: import('../../lib/roadmap.js').ActionInfo, linking: boolean, waiting: string[],
+ * @param {{ info: import('../../lib/roadmap.js').ActionInfo, linking: boolean, pinned: boolean, onPin: () => void, waiting: string[],
  *           onRename: (t: string) => void, onNotes: (t: string) => void, onToggle: () => void, onLink: () => void,
  *           onAddNext: () => void, onDelete: () => void, autoFocus: boolean }} props
  */
-function ActionBar({ info, linking, waiting, onRename, onNotes, onToggle, onLink, onAddNext, onDelete, autoFocus }) {
-    const [draft, setDraft] = useState(info.title);
+function ActionBar({ info, linking, pinned, onPin, waiting, onRename, onNotes, onToggle, onLink, onAddNext, onDelete, autoFocus }) {
+    const own = useWorkspaceStore((s) => s.verbs);
+    const setVerbs = useWorkspaceStore((s) => s.setVerbs);
+    // a verb of yours can be forgotten once no quest uses it
+    const adventures = useWorkspaceStore((s) => s.adventures);
+    const unused = useMemo(() => {
+        const used = new Set(adventures.flatMap((a) => a.roadmap?.actions.map((x) => splitTitle(x.title).verb) ?? []));
+        return own.filter((v) => !used.has(v));
+    }, [adventures, own]);
+    const [naming, setNaming] = useState(/** @type {string | null} */ (null));
+    useEffect(() => setNaming(null), [info.id]);
+    const { verb, subject } = splitTitle(info.title);
+    const [draft, setDraft] = useState(subject);
     const [notes, setNotesDraft] = useState(info.notes);
     useEffect(() => setNotesDraft(info.notes), [info.id, info.notes]);
     const inputRef = useRef(/** @type {HTMLInputElement | null} */ (null));
-    useEffect(() => setDraft(info.title), [info.id, info.title]);
+    useEffect(() => setDraft(subject), [info.id, subject]);
     useEffect(() => {
         if (autoFocus) { inputRef.current?.focus(); inputRef.current?.select(); }
     }, [info.id, autoFocus]);
 
-    const commit = () => { if (draft.trim() && draft !== info.title) onRename(draft); else setDraft(info.title); };
+    const commit = () => {
+        const next = joinTitle(verb, draft);
+        // no verb yet: hold what's typed until one is picked (or typed first)
+        if (next && next !== info.title && !splitTitle(next).verb) return;
+        if (next && next !== info.title) onRename(next);
+        else setDraft(subject);
+    };
+    /** @param {string} next */
+    const apply = (next) => {
+        const title = joinTitle(next, draft);
+        if (title && title !== info.title) onRename(title);
+        inputRef.current?.focus();
+        inputRef.current?.select();
+    };
+    /** @param {string} value */
+    const pickVerb = (value) => {
+        if (value === NEW) { setNaming(''); return; }
+        if (value.startsWith(FORGET)) { setVerbs(own.filter((v) => v !== value.slice(FORGET.length))); return; }
+        apply(value);
+    };
+    const nameVerb = () => {
+        if (naming == null) return;
+        const word = cleanVerb(naming), same = word && knownVerb(word);
+        setNaming(null);
+        if (!word) return;
+        if (!same) setVerbs([...own, word]);
+        apply(same || word);
+    };
 
     return html`
         <div className="alm-bar" onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
             <span className=${`alm-bar-id state-${info.state}`}>${info.id}</span>
+            ${naming == null
+                ? html`
+                    <select className=${`alm-verb ${verb ? 'on' : 'missing'}`} value=${verb ?? ''} aria-label="Quest verb" title=${verb ? 'What to do' : 'Every quest needs a verb'} onChange=${(/** @type {any} */ e) => pickVerb(e.target.value)}>
+                        ${!verb && html`<option value="" disabled hidden>Verb…</option>`}
+                        ${allVerbs(own).map((v) => html`<option key=${v} value=${v}>${v}</option>`)}
+                        <option value=${NEW}>+ New verb…</option>
+                        ${unused.map((v) => html`<option key=${`f-${v}`} value=${FORGET + v}>− Forget “${v}”</option>`)}
+                    </select>`
+                : html`
+                    <input className="alm-verb" value=${naming} maxLength=${30} placeholder="New verb" aria-label="New verb" autoFocus=${true}
+                        onInput=${(/** @type {any} */ e) => setNaming(e.target.value)} onBlur=${nameVerb}
+                        onKeyDown=${(/** @type {KeyboardEvent} */ e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); nameVerb(); }
+                            if (e.key === 'Escape') setNaming(null);
+                        }} />`}
             <input
                 ref=${inputRef}
                 className="alm-bar-title"
                 value=${draft}
                 maxLength=${200}
-                aria-label="Action title"
+                aria-label="Quest subject"
+                placeholder="Subject"
                 onInput=${(/** @type {any} */ e) => setDraft(e.target.value)}
                 onBlur=${commit}
                 onKeyDown=${(/** @type {KeyboardEvent} */ e) => {
                     if (e.key === 'Enter') /** @type {HTMLInputElement} */ (e.target).blur();
-                    if (e.key === 'Escape') { setDraft(info.title); /** @type {HTMLInputElement} */ (e.target).blur(); }
+                    if (e.key === 'Escape') { setDraft(subject); /** @type {HTMLInputElement} */ (e.target).blur(); }
                 }}
             />
             ${info.state === 'locked'
@@ -48,11 +106,13 @@ function ActionBar({ info, linking, waiting, onRename, onNotes, onToggle, onLink
                 : html`<button className=${`btn alm-complete ${info.state}`} onClick=${onToggle}>
                     ${info.state === 'done' ? '↺ Undo' : '✓ Complete'}
                   </button>`}
+            ${info.state === 'ready' && html`<button className=${`btn alm-pin ${pinned ? 'on' : ''}`} aria-pressed=${pinned} onClick=${onPin}
+                title=${pinned ? 'No longer a target' : 'Target it: to the top of the Crucible. Its adventure becomes alloy'}>◎ ${pinned ? 'Targeted' : 'Target'}</button>`}
             <button className=${`btn ${linking ? 'on' : ''}`} onClick=${onLink}
-                title="Then click another action to make it come after this one (click a linked one to unlink)">⟶ Link</button>
-            <button className="btn" onClick=${onAddNext} title="Add an action that comes after this one">+ Next</button>
-            <button className="btn ghost alm-delete" onClick=${onDelete} title="Delete this action">✕</button>
-            <textarea className="alm-bar-notes" rows=${notes ? 3 : 1} maxLength=${2000} placeholder="Notes (optional)…" aria-label="Action notes"
+                title="Then click another quest to make it come after this one (click a linked one to unlink)">⟶ Link</button>
+            <button className="btn" onClick=${onAddNext} title="Add a quest that comes after this one">+ Next</button>
+            <button className="btn ghost alm-delete" onClick=${onDelete} title="Delete this quest">✕</button>
+            <textarea className="alm-bar-notes" rows=${notes ? 3 : 1} maxLength=${2000} placeholder="Notes (optional)…" aria-label="Quest notes"
                 value=${notes} spellCheck=${true}
                 onInput=${(/** @type {any} */ e) => setNotesDraft(e.target.value)}
                 onBlur=${() => { if (notes.trim() !== info.notes) onNotes(notes); }}
@@ -73,6 +133,9 @@ export function AlembicPanel() {
     const saveRoadmap = useWorkspaceStore((s) => s.saveRoadmap);
     const roadmapError = useWorkspaceStore((s) => s.roadmapError);
     const showPanel = useWorkspaceStore((s) => s.showPanel);
+    const verbs = useWorkspaceStore((s) => s.verbs); // quest labels show them
+    const pins = useWorkspaceStore((s) => s.pins);
+    const togglePin = useWorkspaceStore((s) => s.togglePin);
 
     const adventure = item?.kind === 'adventure' ? item : null;
     const roadmap = orEmpty(adventure?.roadmap);
@@ -141,7 +204,7 @@ export function AlembicPanel() {
         // ?v= forces one fresh download past a copy cached before the server sent
         // Cache-Control: no-cache (a hard reload doesn't bypass the cache for lazy imports).
         // @ts-ignore -- the query string hides the module's path from the type checker
-        import('../../lib/alembicScene.js?v=3')
+        import('../../lib/alembicScene.js?v=4')
             .then(({ AlembicScene }) => {
                 if (disposed || !hostRef.current) return;
                 sceneRef.current = new AlembicScene(hostRef.current, {
@@ -168,7 +231,7 @@ export function AlembicPanel() {
         sceneRef.current.setColors(colors.todo, colors.done);
         sceneRef.current.update(analysis, { selectedId: selected, linkFromId: linkFrom, refit });
         shownId.current = adventure?.id ?? null;
-    }, [analysis, selected, linkFrom, status, adventure?.id, colors.todo, colors.done]);
+    }, [analysis, selected, linkFrom, status, adventure?.id, colors.todo, colors.done, verbs]);
 
     // finishing the last action makes every still flare
     const wasComplete = useRef({ id: /** @type {string | null} */ (null), complete: false });
@@ -191,7 +254,7 @@ export function AlembicPanel() {
 
     /** @param {string | null} parentId */
     const add = (parentId) => {
-        const { roadmap: next, id } = addAction(roadmap, 'New action', parentId);
+        const { roadmap: next, id } = addAction(roadmap, joinTitle(FIRST_VERB, 'New quest'), parentId);
         save(next);
         setSelected(id);
         setLinkFrom(null);
@@ -215,7 +278,7 @@ export function AlembicPanel() {
             ${status === 'ready' && !adventure && html`
                 <div className="nc-empty alm-overlay-empty">
                     ${item ? 'Raw events have no roadmap' : 'Nothing selected'}
-                    <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to break it into actions'}</small>
+                    <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to break it into quests'}</small>
                 </div>
             `}
 
@@ -227,7 +290,7 @@ export function AlembicPanel() {
                             <span className="alm-meter"><i style=${{ width: `${pct}%` }}></i></span>
                         </span>
                     `}
-                    <button className="cls-layer" onClick=${() => add(null)} title="Add an action that doesn't depend on anything">+ Action</button>
+                    <button className="cls-layer" onClick=${() => add(null)} title="Add a quest that doesn't depend on anything">+ Quest</button>
                     <button className="cls-layer" onClick=${() => showPanel('scripter')} title="Edit the roadmap as text in the Scripter">Script ⟶</button>
                     <${BountyControl} key=${adventure.id} adventure=${adventure} />
                 </div>
@@ -235,15 +298,15 @@ export function AlembicPanel() {
                 ${analysis.total === 0 && html`
                     <div className="alm-empty" onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
                         <span>No roadmap yet</span>
-                        <small>Break this adventure into actions: what has to happen, and in what order?</small>
+                        <small>Break this adventure into quests: what has to happen, and in what order?</small>
                         <div>
-                            <button className="btn" onClick=${() => add(null)}>+ First action</button>
+                            <button className="btn" onClick=${() => add(null)}>+ First quest</button>
                             <button className="btn ghost" onClick=${() => showPanel('scripter')}>Write a script</button>
                         </div>
                     </div>
                 `}
 
-                ${linkFrom && html`<div className="alm-notice link">Click the action that comes after ${linkFrom} · click a linked one to unlink · Esc to cancel</div>`}
+                ${linkFrom && html`<div className="alm-notice link">Click the quest that comes after ${linkFrom} · click a linked one to unlink · Esc to cancel</div>`}
                 ${!linkFrom && notice && html`<div className="alm-notice">${notice}</div>`}
 
                 <div className="alm-bottom">
@@ -252,6 +315,8 @@ export function AlembicPanel() {
                         <${ActionBar}
                             info=${selectedInfo}
                             waiting=${selectedInfo.parents.filter((p) => analysis.byId.get(p)?.state !== 'done').map((p) => `${p} ${titles.get(p) ?? ''}`.trim())}
+                            pinned=${pins.some((p) => p.adventure === adventure.id && p.action === selectedInfo.id)}
+                            onPin=${() => togglePin(adventure.id, selectedInfo.id)}
                             linking=${linkFrom === selectedInfo.id}
                             autoFocus=${focusTitle}
                             onRename=${(/** @type {string} */ t) => save(renameAction(roadmap, selectedInfo.id, t))}

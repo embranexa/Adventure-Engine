@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
-import { modelSpec } from '../../lib/items.js';
+import { modelSpec, proposalOf, sheetOf, showsModel } from '../../lib/items.js';
 import { ModelView } from '../ModelView.js';
 import { centrifugeOrder, useWorkspaceStore } from '../../store.js';
 import { formatEventWhen, formatPrice, safeHttpUrl } from '../../events.js';
 import { ADVENTURE_FLAGS, ADVENTURE_TYPES, MAIN_ROUTE, PHASE_STAGES, hasWhenWhere, stageOf } from '../../lifecycle.js';
 import { AdventureEditor } from './AdventureEditor.js';
+import { Forge } from '../Forge.js';
+import { Adversaries } from '../Adversaries.js';
+import { Objectives } from '../Objectives.js';
 import { EntityLinks } from '../EntityLinks.js';
 
 // details keys shown in their own rows; any others are listed generically below
@@ -60,10 +63,19 @@ function CardArt({ src }) {
  * The selected item as a trading card. Four designators: matter (foil frame + strip),
  * deity (banner), difficulty (pips), element (corner badge). Deity, difficulty,
  * element and HP/ATK/DEF are set by hand later; until then they show as empty.
- * @param {{ item: PoolItem }} props
+ * Adventures switch between their cover and their 3D model.
+ * @param {{ item: PoolItem, face: 'cover' | 'model', onFace: (f: 'cover' | 'model') => void }} props
  */
-function TradingCard({ item }) {
-    const spec = useMemo(() => (item.kind === 'adventure' && item.type === 'item' ? modelSpec(item) : null), [item]); // items show their model
+function TradingCard({ item, face, onFace }) {
+    const acceptModel = useWorkspaceStore((s) => s.acceptModel);
+    const [error, setError] = useState(/** @type {string | null} */ (null));
+    // a proposal from the Forge shows on the card until it's accepted or dismissed
+    const spec = useMemo(() => {
+        if (item.kind !== 'adventure' || face !== 'model') return null;
+        const proposal = proposalOf(item), model = proposal ?? item.item?.model ?? null;
+        if (!model && item.type !== 'item') return null;
+        return modelSpec({ ...item, item: { ...sheetOf(item), model, face: 'model' } }, { finished: !!proposal });
+    }, [item, face]);
     const stage = stageOf(item);
     const stats = item.kind === 'adventure' ? item.stats : undefined;
     const element = /** @type {keyof typeof ELEMENT_PATHS | null} */ (stat(stats, 'element'));
@@ -89,9 +101,20 @@ function TradingCard({ item }) {
                     <span className="tcard-title">${item.title}</span>
                     ${deity && html`<span className="tcard-deity">${deity}</span>`}
                 </div>
-                ${spec
-                    ? html`<div className="tcard-art"><${ModelView} key=${item.id} spec=${spec} distance=${132} label=${item.title ?? ''} /></div>`
-                    : html`<${CardArt} key=${item.id} src=${safeHttpUrl(item.cover_url)} />`}
+                <div className="tcard-face">
+                    ${spec
+                        ? html`<div className="tcard-art"><${ModelView} key=${item.id} spec=${spec} distance=${132} orbit=${true} label=${`Model of ${item.title ?? ''}. Drag to turn it.`} /></div>`
+                        : face === 'model'
+                            ? html`<div className="tcard-art"><span>NO MODEL YET</span></div>`
+                            : html`<${CardArt} key=${item.id} src=${safeHttpUrl(item.cover_url)} />`}
+                    ${item.kind === 'adventure' && face === 'model' && proposalOf(item) && html`
+                        <button className="tcard-accept" title="Until you accept it, it shows only here" onClick=${async () => setError(await acceptModel(item.id))}>Proposal · Accept</button>`}
+                    ${error && html`<div className="nc-error" role="alert">${error}</div>`}
+                    ${item.kind === 'adventure' && html`
+                        <div className="tcard-switch" role="group" aria-label="Cover or model">
+                            ${/** @type {('cover' | 'model')[]} */ (['cover', 'model']).map((f) => html`<button key=${f} aria-pressed=${face === f} className=${face === f ? 'on' : ''} onClick=${() => onFace(f)}>${f}</button>`)}
+                        </div>`}
+                </div>
                 <div className="tcard-strip">
                     <span>★ ${stage ? stage.matter : 'unknown'}</span>
                     <span className="pips" title=${difficulty ? `Difficulty ${difficulty} of 5` : 'Difficulty not set'}>
@@ -289,6 +312,18 @@ export function NodeCard() {
     const actionError = useWorkspaceStore((s) => s.actionError);
     const stage = event ? stageOf(event) : null;
 
+    // cover or model: what it shows elsewhere, until switched here
+    const saveItem = useWorkspaceStore((s) => s.saveItem);
+    const shows = event?.kind === 'adventure' && (showsModel(event) || Boolean(proposalOf(event))) ? 'model' : 'cover';
+    const [face, setFace] = useState(/** @type {'cover' | 'model'} */ (shows));
+    useEffect(() => setFace(shows), [event?.id, shows]);
+    /** @param {'cover' | 'model'} f */
+    const pickFace = (f) => {
+        setFace(f);
+        // with a model to show, the choice is saved; items always show theirs
+        if (event?.kind === 'adventure' && event.type !== 'item' && event.item?.model) saveItem(event.id, { face: f });
+    };
+
     const [editing, setEditing] = useState(false);
     const fresh = event != null && editingId === event.id; // just created here
     useEffect(() => { setEditing(fresh); }, [event?.id, fresh]);
@@ -306,7 +341,9 @@ export function NodeCard() {
         >
             ${event
                 ? html`
-                    <${TradingCard} item=${event} />
+                    <${TradingCard} item=${event} face=${face} onFace=${pickFace} />
+                    ${event.kind === 'adventure' && face === 'model' && html`<${Forge} key=${`f${event.id}`} adventure=${event} model=${sheetOf(event).model} stage=${false}
+                        onChange=${(/** @type {ModelPart[] | null} */ model) => saveItem(event.id, { model })} />`}
                     ${stage && html`
                         <div className="nc-stage">
                             <span>${stage.matter} · ${stage.hint}</span>
@@ -320,6 +357,8 @@ export function NodeCard() {
                         : html`<${ItemActions} item=${event} />`}
                     ${event.kind === 'adventure' && !editing && html`<${FlagToggles} adventure=${event} />`}
                     ${event.kind === 'adventure' && html`<${EntityLinks} adventure=${event} />`}
+                    ${event.kind === 'adventure' && event.type === 'battle' && html`<${Adversaries} key=${`v${event.id}`} adventure=${event} />`}
+                    ${event.kind === 'adventure' && html`<${Objectives} key=${`o${event.id}`} adventure=${event} edit=${true} />`}
                     ${!(event.kind === 'adventure' && editing) && html`<${EventRows} event=${event} />`}
                 `
                 : html`

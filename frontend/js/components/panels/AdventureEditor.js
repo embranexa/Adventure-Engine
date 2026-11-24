@@ -4,7 +4,7 @@ import { useWorkspaceStore } from '../../store.js';
 import { ADVENTURE_TYPES } from '../../lifecycle.js';
 import { confirmHere } from '../../lib/windows.js';
 import { weekday } from '../../lib/occurrences.js';
-import { PLACE_PLACEHOLDER, coordsText, readPlace } from '../../lib/places.js';
+import { PLACE_PLACEHOLDER, coordsText, fillPlace, placeAt, readPlace } from '../../lib/places.js';
 
 const pad2 = (/** @type {number} */ n) => String(n).padStart(2, '0');
 /** Date -> "2026-11-20" (local). @param {Date} d */
@@ -203,7 +203,7 @@ export function Field({ label, value, kind = 'text', placeholder = '', overridde
 
 /**
  * Edit an adventure in place: its type (hand-made only), title, description, when/where
- * (events only), link and cover. Each field saves on its own; the card above updates live.
+ * (not items), link and cover. Each field saves on its own; the card above updates live.
  * @param {{ adventure: PoolItem & { kind: 'adventure' }, focusTitle: boolean, onDone: () => void }} props
  */
 export function AdventureEditor({ adventure, focusTitle, onDone }) {
@@ -217,7 +217,7 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
 
     const own = adventure.own;
     const crawled = adventure.event_id != null;
-    const isEvent = adventure.type === 'event';
+    const placed = adventure.type !== 'item'; // items have no when/where
     // a hand-made event with a linked site takes its where from the site
     const site = !crawled && adventure.site_id ? entities.find((o) => o.id === adventure.site_id) ?? null : null;
 
@@ -233,12 +233,14 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
     /** @param {AdventureType} type */
     const setType = (type) => {
         if (type === adventure.type) return;
-        const losesWhenWhere = isEvent && (own.start || own.venue || own.address || own.city || own.lat != null);
-        if (losesWhenWhere && !confirmHere(`A ${type} has no when or where: its time and place will be cleared. Continue?`)) return;
+        const losesWhenWhere = type === 'item' && (own.start || own.venue || own.address || own.city || own.lat != null);
+        if (losesWhenWhere && !confirmHere(`An item has no when or where: its time and place will be cleared. Continue?`)) return;
         save({ type });
     };
 
     const [placeNote, setPlaceNote] = useState(/** @type {string | null} */ (null));
+    const shownId = useRef(adventure.id);
+    shownId.current = adventure.id;
     useEffect(() => setPlaceNote(null), [adventure.id]);
 
     /** Coordinates as "lat, lon", or a Plus Code (full, or short with a town). @param {string} text */
@@ -247,7 +249,19 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
         const place = await readPlace(text);
         if ('error' in place) { setSaving(false); setError(place.error); return place.error; }
         setPlaceNote(place.note);
-        return save({ lat: place.lat, lon: place.lon });
+        const was = adventure, err = await save({ lat: place.lat, lon: place.lon });
+        if (err || place.lat == null || place.lon == null) return err;
+        // then what's there: venue, address and city, where they're empty
+        const { lat, lon } = place;
+        const say = (/** @type {string} */ s) => { if (shownId.current === was.id) setPlaceNote([place.note, s].filter(Boolean).join(' · ')); };
+        say('Looking up the place…');
+        const now = await placeAt(lat, lon);
+        const before = now && was.own.lat != null && was.own.lon != null ? await placeAt(was.own.lat, was.own.lon) : null;
+        const changes = now ? fillPlace(now, before, { venue: was.venue, address: was.address, city: was.city }) : {};
+        const failed = Object.keys(changes).length ? await updateAdventure(was.id, changes) : null;
+        const filled = Object.entries(changes).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`);
+        say(failed ?? (!now ? 'Place not found' : filled.length ? `Filled in ${filled.join(' · ')}` : ''));
+        return null;
     };
 
     /** Shared props for a plain text field. @param {'title' | 'description' | 'venue' | 'address' | 'city' | 'url' | 'cover_url' | 'costs' | 'rewards'} key */
@@ -287,7 +301,7 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
                 <${Field} label="Rewards" placeholder="What you get out of it" ...${text('rewards')} />
             </div>
 
-            ${isEvent && html`
+            ${placed && html`
                 <${WhenEditor} adventure=${adventure} crawled=${crawled} save=${save} />
                 ${site
                     ? html`

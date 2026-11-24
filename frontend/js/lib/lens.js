@@ -16,9 +16,9 @@ const NOT_LENSES = new Set(['phase', 'review']);
  *  is appended ungrouped, so a new facet still becomes a lens. */
 const LENS_GROUPS = /** @type {[string, LensKey[]][]} */ ([
     ['Basic', ['stage', 'source', 'type']],
-    ['Descriptor', ['tag', 'flag']],
+    ['Descriptor', ['tag', 'flag', 'collaboration', 'leader']],
     ['Place', ['city', 'region', 'metro']],
-    ['Entity', ['deity', 'site', 'contact', 'organization', 'skill']],
+    ['Entity', ['deity', 'site', 'player', 'organization', 'skill']],
 ]);
 
 /** @param {LensKey} key */
@@ -36,7 +36,7 @@ export const LENSES = [
 
 /** Fixed colors where a value has an identity of its own. */
 const SOURCE_COLORS = { luma: '#3ccf8e', '19hz': '#4f8cff', 'ig-collection': '#e1306c', 'ig-profiles': '#f77737' };
-const TYPE_COLORS = { event: '#4fb3ff', item: '#e0a43a', performance: '#c86bf0' };
+const TYPE_COLORS = { event: '#4fb3ff', item: '#e0a43a', performance: '#c86bf0', battle: '#ef4444' };
 /** Everything else: a value keeps the same color across reloads (picked by its text). */
 export const PALETTE = ['#4fb3ff', '#3ccf8e', '#f2b134', '#f0643c', '#c86bf0', '#2fd2c9', '#ff7aa8', '#a3d14b', '#8f8cff', '#ffb27a'];
 
@@ -45,7 +45,7 @@ export function sourceColor(name) {
     return SOURCE_COLORS[/** @type {keyof typeof SOURCE_COLORS} */ (name)] ?? PALETTE[hash(name) % PALETTE.length];
 }
 /** Entity facets: their values are entity ids, coloured by the entity. */
-const ENTITY_LENSES = new Set(['deity', 'site', 'contact', 'organization', 'skill']);
+const ENTITY_LENSES = new Set(['deity', 'site', 'player', 'organization', 'skill']);
 const UNKNOWN_COLOR = '#5b616b';
 /** Value for rows the lens's facet doesn't apply to (raw events under an adventure-only facet). */
 export const NOT_APPLICABLE = 'n/a';

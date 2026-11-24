@@ -8,7 +8,7 @@
  *   NET     foundry floor: harvesters -> centrifuge -> sump; the forge
  *   CORE    raised bench:  hopper -> refinery -> alembic -> crucible -> arena -> treasury
  *           -> archive; necropolis behind (kill manifold)
- *   SANCTUM front: codex, inventory, agora, pantheon, mastery (no pipes yet)
+ *   SANCTUM front: codex, cohort, inventory, agora, pantheon, mastery (no pipes yet)
  *   GALLERY back, raised:  nexus, atlas, calendar, ledger (the viewers)
  *
  * Liquid height = rows held (each zone on its own scale). Pipes lie on the floor, dark
@@ -37,7 +37,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { deferredResize, isResizing, viewOf } from '../resizing.js';
-import { CENTRIFUGE, ENRICHER, FORGE, SANCTUM, SIEVE, MAIN_CHAIN, MANIFOLD, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from '../twinTopology.js';
+import { CENTRIFUGE, COMPLEX, ENRICHER, FORGE, SANCTUM, SIEVE, MAIN_CHAIN, MANIFOLD, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from '../twinTopology.js';
 import { makeMaterials } from './materials.js';
 import { buildZones, zoneRects } from './zones.js';
 import { FOOT, bodyOf, buildMachine, lighter, makeShop } from './machines.js';
@@ -87,6 +87,7 @@ function layout(nodes) {
         [CENTRIFUGE]: [-210, NET_Y, 0], [SUMP]: [-205, NET_Y, -122], [FORGE]: [-215, NET_Y, 118],
         [ENRICHER]: [-295, NET_Y, 118],   // front, between the harvesters and the Forge
         [SIEVE]: [-272, NET_Y, -104],     // back, between the harvesters and the Centrifuge
+        [COMPLEX]: [-40, CORE_Y, 84],      // before the Refinery
         [NECROPOLIS]: [110, CORE_Y, -104],
     };
     const chainX = [-110, -40, 30, 110, 180, 250, 320];

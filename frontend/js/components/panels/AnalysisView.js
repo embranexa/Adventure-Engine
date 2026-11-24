@@ -8,20 +8,29 @@ import {
 import { remaining } from '../../lib/bounty.js';
 import { confirmHere } from '../../lib/windows.js';
 import { safeHttpUrl } from '../../events.js';
+import { FeedbackPane } from '../FeedbackPane.js';
+import { Objectives, suggestedOutcome } from '../Objectives.js';
+import { AftermathPane } from '../AftermathPane.js';
+import { EntityPicker } from '../EntityPicker.js';
 import { GradeIcon } from '../GradeIcon.js';
 
 const SAVE_MS = 700;
+const SKILL = /** @type {EntityType[]} */ (['skill']);
 const ROWS = /** @type {const} */ ([['Exciting', 2], ['Neutral', 1], ['Boring', 0]]);
 const COLS = ['Defeat', 'Draw', 'Success'];
+
+/** @returns {AnalysisMove} */
+const blankPlay = () => ({ text: '', grade: 'good', better: '', spell: null, skills: [] });
 
 /** The stored analysis as an editable copy. @param {AdventureRecord} a @returns {Analysis} */
 function editable(a) {
     const e = a.enshrining;
-    if (!e) return { ...blankAnalysis(), moves: [{ text: '', grade: 'good', better: '', skills: [] }] };
+    if (!e) return { ...blankAnalysis(), moves: [blankPlay()] };
     return {
         verdict: e.verdict, link: e.link ?? '', notes: e.notes,
         gains: e.gains.map((x) => ({ ...x })), losses: e.losses.map((x) => ({ ...x })), discoveries: e.discoveries.map((x) => ({ ...x })),
-        moves: e.moves.map((m) => ({ ...m, better: m.better ?? '', skills: [...m.skills] })),
+        moves: e.moves.map((m) => ({ ...m, better: m.better ?? '', spell: m.spell ?? null, skills: [...m.skills] })),
+        feedback: e.feedback.map((x) => ({ ...x })),
     };
 }
 
@@ -64,19 +73,19 @@ function Lines({ title, cls, rows, editing, placeholder, add, onChange }) {
 }
 
 /**
- * One move: what you did, its grade, the better line, and the skills it used.
- * @param {{ move: AnalysisMove, n: number, editing: boolean, skills: Entity[], open: boolean, onOpen: () => void,
+ * One play: what you did, its grade, the better line, the spell it was, and the skills it used.
+ * @param {{ move: AnalysisMove, n: number, editing: boolean, skills: Entity[], spells: Entity[], open: boolean, onOpen: () => void,
  *           onChange: (c: Partial<AnalysisMove>) => void, onRemove: () => void }} props
  */
-function MoveRow({ move, n, editing, skills, open, onOpen, onChange, onRemove }) {
-    const grade = GRADES[move.grade], used = skills.filter((s) => move.skills.includes(s.id));
+function MoveRow({ move, n, editing, skills, spells, open, onOpen, onChange, onRemove }) {
+    const grade = GRADES[move.grade], used = skills.filter((s) => move.skills.includes(s.id)), spell = spells.find((s) => s.id === move.spell);
     if (!editing) {
         return html`
             <div className="ana-move read" style=${{ '--g': grade.color }}>
                 <span className="ana-n">${n}</span>
                 <${GradeIcon} grade=${move.grade} size=${24} />
                 <div className="ana-text">
-                    <span>${move.text}</span>
+                    <span>${spell && html`<b className="ana-spell">✴ ${spell.name}</b>`}${move.text}</span>
                     ${move.better && html`<em>Better: ${move.better}</em>`}
                     ${used.length > 0 && html`<small>${used.map((s) => `✧ ${s.name}`).join('   ')}</small>`}
                 </div>
@@ -87,10 +96,10 @@ function MoveRow({ move, n, editing, skills, open, onOpen, onChange, onRemove })
     return html`
         <div className="ana-move" style=${{ '--g': grade.color }}>
             <span className="ana-n">${n}</span>
-            <input className="ana-did" type="text" value=${move.text} maxLength=${500} placeholder="The move you made" aria-label=${`Move ${n}`} onInput=${(/** @type {any} */ e) => onChange({ text: e.target.value })} />
-            <button className="ana-grade" aria-expanded=${open} aria-label=${`Grade of move ${n}: ${grade.label}`} onClick=${onOpen}><${GradeIcon} grade=${move.grade} size=${24} /><span>${grade.label}</span></button>
-            <input className="ana-better" type="text" value=${move.better} maxLength=${500} placeholder=${grade.delta < 0 ? 'Better line' : 'Better line, if any'} aria-label=${`Better line for move ${n}`} onInput=${(/** @type {any} */ e) => onChange({ better: e.target.value })} />
-            <button className="pclose" aria-label=${`Remove move ${n}`} onClick=${onRemove}>✕</button>
+            <input className="ana-did" type="text" value=${move.text} maxLength=${500} placeholder="The play you made" aria-label=${`Play ${n}`} onInput=${(/** @type {any} */ e) => onChange({ text: e.target.value })} />
+            <button className="ana-grade" aria-expanded=${open} aria-label=${`Grade of play ${n}: ${grade.label}`} onClick=${onOpen}><${GradeIcon} grade=${move.grade} size=${24} /><span>${grade.label}</span></button>
+            <input className="ana-better" type="text" value=${move.better} maxLength=${500} placeholder=${grade.delta < 0 ? 'Better line' : 'Better line, if any'} aria-label=${`Better line for play ${n}`} onInput=${(/** @type {any} */ e) => onChange({ better: e.target.value })} />
+            <button className="pclose" aria-label=${`Remove play ${n}`} onClick=${onRemove}>✕</button>
             ${open && html`
                 <div className="ana-palette">
                     ${GRADE_KEYS.map((k) => html`
@@ -98,6 +107,18 @@ function MoveRow({ move, n, editing, skills, open, onOpen, onChange, onRemove })
                             <${GradeIcon} grade=${k} size=${28} /><span>${GRADES[k].label}</span>
                         </button>
                     `)}
+                </div>
+            `}
+            ${spells.length > 0 && html`
+                <div className="ana-skills">
+                    <select value=${move.spell ?? ''} aria-label=${`Spell of play ${n}`} onChange=${(/** @type {any} */ e) => {
+                        const next = spells.find((s) => s.id === e.target.value);
+                        // its skills come with it
+                        onChange({ spell: next?.id ?? null, skills: [...new Set([...move.skills, ...(next?.skills ?? [])])] });
+                    }}>
+                        <option value="">✴ No spell</option>
+                        ${spells.map((s) => html`<option key=${s.id} value=${s.id}>✴ ${s.name}</option>`)}
+                    </select>
                 </div>
             `}
             ${skills.length > 0 && html`
@@ -108,6 +129,7 @@ function MoveRow({ move, n, editing, skills, open, onOpen, onChange, onRemove })
                     `)}
                 </div>
             `}
+            <div className="ana-skills ana-newskill"><${EntityPicker} ids=${move.skills} chips=${false} types=${SKILL} placeholder="+ A skill…" onAdd=${(/** @type {string} */ id) => onChange({ skills: [...move.skills, id] })} /></div>
         </div>
     `;
 }
@@ -130,6 +152,8 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
     const [busy, setBusy] = useState(false);
     const editing = !sealed || amending;
     const skills = useMemo(() => entities.filter((e) => e.type === 'skill'), [entities]);
+
+    const spells = useMemo(() => entities.filter((e) => e.type === 'spell'), [entities]);
 
     // a sealed one shows what's stored (it may be amended in another window)
     useEffect(() => { if (sealed && !amending) setRec(editable(adventure)); }, [adventure.enshrining, amending]);
@@ -178,6 +202,7 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
     };
 
     const acc = accuracy(rec.moves), turn = turningPoint(rec.moves), counts = gradeCounts(rec.moves);
+    const suggested = suggestedOutcome(adventure.objectives);
     const type = ADVENTURE_TYPES[adventure.type], link = safeHttpUrl(rec.link);
 
     return html`
@@ -189,23 +214,24 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
             </div>
             <div className="ana-cols">
                 <section className="nec-pane">
-                    <div className="ana-row"><h4>Play by play</h4><span className="ana-score">${acc != null && `accuracy ${acc.toFixed(1)}`}${turn && ` · turning point: move ${turn}`}</span></div>
+                    <div className="ana-row"><h4>Play by play</h4><span className="ana-score">${acc != null && `accuracy ${acc.toFixed(1)}`}${turn && ` · turning point: play ${turn}`}</span></div>
                     <${EvalGraph} moves=${rec.moves} />
                     ${counts.length > 0 && html`<div className="ana-counts">${counts.map(([g, n]) => html`<span key=${g} title=${GRADES[g].label}><${GradeIcon} grade=${g} size=${18} /> ${n}</span>`)}</div>`}
                     <div>
                         ${rec.moves.map((m, i) => html`
-                            <${MoveRow} key=${i} move=${m} n=${i + 1} editing=${editing} skills=${skills} open=${openMove === i}
+                            <${MoveRow} key=${i} move=${m} n=${i + 1} editing=${editing} skills=${skills} spells=${spells} open=${openMove === i}
                                 onOpen=${() => setOpenMove(openMove === i ? null : i)} onChange=${(/** @type {Partial<AnalysisMove>} */ c) => putMove(i, c)}
                                 onRemove=${() => { setOpenMove(null); change({ moves: rec.moves.filter((_, j) => j !== i) }); }} />
                         `)}
-                        ${!editing && !rec.moves.length && html`<p className="nec-dim">No moves recorded.</p>`}
+                        ${!editing && !rec.moves.length && html`<p className="nec-dim">No plays recorded.</p>`}
                     </div>
                     ${editing && html`
-                        <div><button className="cls-layer" onClick=${() => change({ moves: [...rec.moves, { text: '', grade: 'good', better: '', skills: [] }] })}>+ Move</button></div>
-                        <p className="nec-dim">Moves don’t change skill levels: a skill is learned when the move succeeds in live play.${skills.length ? '' : ' Skills you add to the Codex can be tagged here.'}</p>
+                        <div><button className="cls-layer" onClick=${() => change({ moves: [...rec.moves, blankPlay()] })}>+ Play</button></div>
+                        <p className="nec-dim">Plays don’t change skill levels: a skill is learned when the play succeeds in live play.${skills.length ? '' : ' Skills you add to the Codex can be tagged here.'}</p>
                     `}
                 </section>
                 <div className="ana-side">
+                    ${adventure.objectives.length > 0 && html`<section className="nec-pane"><${Objectives} adventure=${adventure} readOnly=${!editing} /></section>`}
                     <section className="nec-pane">
                         <h4>Verdict${editing ? '' : `: ${verdictName(rec.verdict)}`}</h4>
                         <div className="ana-verdict" role="group" aria-label="Verdict">
@@ -218,10 +244,13 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
                             `)}
                             <span></span>${COLS.map((c) => html`<span key=${c}>${c}</span>`)}
                         </div>
+                        ${editing && suggested != null && html`<p className="nec-dim">The objectives suggest: <b>${COLS[suggested].toLowerCase()}</b></p>`}
                         ${adventure.type === 'performance' && (editing
                             ? html`<label className="ana-field"><span>Link to the performance (required)</span><input type="url" value=${rec.link} placeholder="https://" onInput=${(/** @type {any} */ e) => change({ link: e.target.value })} /></label>`
                             : link && html`<a className="cls-layer" href=${link} target="_blank" rel="noreferrer noopener">Watch the performance ↗</a>`)}
                     </section>
+                    <${FeedbackPane} adventure=${adventure} rows=${rec.feedback} editing=${editing} onChange=${(/** @type {FeedbackRow[]} */ feedback) => change({ feedback })} />
+                    <${AftermathPane} adventure=${adventure} editing=${editing} />
                     <section className="nec-pane">
                         <h4>Discovered entities</h4>
                         ${rec.discoveries.map((d, i) => {
@@ -241,7 +270,7 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
                         ${!editing && !rec.discoveries.length && html`<p className="nec-dim">None</p>`}
                         ${editing && html`
                             ${[...new Set(rec.discoveries.map((d) => d.type))].map((t) => html`<datalist key=${t} id=${`found-${t}`}>${entities.filter((e) => e.type === t).map((e) => html`<option key=${e.id} value=${e.name}></option>`)}</datalist>`)}
-                            <div><button className="cls-layer" onClick=${() => change({ discoveries: [...rec.discoveries, { type: 'contact', name: '', entity_id: null }] })}>+ Entity</button></div>
+                            <div><button className="cls-layer" onClick=${() => change({ discoveries: [...rec.discoveries, { type: 'player', name: '', entity_id: null }] })}>+ Entity</button></div>
                         `}
                     </section>
                     <section className="nec-pane">

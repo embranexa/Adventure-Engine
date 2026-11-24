@@ -12,6 +12,8 @@ import { deferredResize, viewOf } from '../lib/resizing.js';
  * @property {number} [points] @property {number} [rings] @property {boolean} [lit]
  * @property {AdventureType} [kind] @property {string | null} [cover]   a vessel's
  * @property {number} [level] @property {number} [marks]   an amphora's
+ * @property {Archetype} [idol]   an idol's
+ * @property {string} [glyph]   a sigil's
  * @property {any} [parts]   a recipe's
  */
 /** @typedef {{ id: string, label: string, sub: any, model: CabinetModel }} CabinetItem */

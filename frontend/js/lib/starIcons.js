@@ -116,6 +116,10 @@ const DRAW = {
         g.beginPath(); g.ellipse(48, 86, 9, 7, -0.4, 0, Math.PI * 2); g.fill();
         g.beginPath(); g.ellipse(78, 78, 9, 7, -0.4, 0, Math.PI * 2); g.fill();
     },
+    'type:battle'(g) {
+        poly(g, [[38, 38], [88, 88]]); poly(g, [[90, 38], [40, 88]]);
+        poly(g, [[38, 76], [52, 90]]); poly(g, [[90, 76], [76, 90]]);
+    },
     // entity types
     deity(g) { poly(g, [[C, 34], [92, 88], [36, 88]], true); poly(g, [[C, 52], [C, 88]]); },
     site(g) {
@@ -125,7 +129,7 @@ const DRAW = {
         for (const t of ticks) poly(g, t);
         g.beginPath(); g.arc(C, C, 5, 0, Math.PI * 2); g.fill();
     },
-    contact(g) {
+    player(g) {
         g.beginPath(); g.arc(C, 50, 13, 0, Math.PI * 2); g.stroke();
         g.beginPath(); g.arc(C, 96, 28, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
     },

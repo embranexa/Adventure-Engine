@@ -8,11 +8,11 @@ from pydantic import BaseModel, Field, model_validator
 
 FilterMode = Literal["include", "exclude"]
 FacetKey = Literal["source", "tag", "city", "region", "metro", "type", "phase", "review", "flag",
-                   "deity", "site", "contact", "organization", "skill"]
+                   "collaboration", "leader", "deity", "site", "player", "organization", "skill"]
 # what colors the matter: "stage" (Matter) or a facet (frontend/js/lib/lens.js)
 LensKey = Literal["none", "stage", "source", "tag", "city", "region", "metro", "type", "flag",
-                  "deity", "site", "contact", "organization", "skill"]
-RENAMED_KEYS = {"pillar": "deity"}  # saved filters may still use the old name
+                  "collaboration", "leader", "deity", "site", "player", "organization", "skill"]
+RENAMED_KEYS = {"pillar": "deity", "contact": "player"}  # saved filters may still use the old name
 FACET_KEYS, LENS_KEYS = set(get_args(FacetKey)), set(get_args(LensKey))
 
 
@@ -68,6 +68,34 @@ class FilterState(BaseModel):
                 data["lens"] = "stage"
         return data
 
+
+
+class Pin(BaseModel):
+    adventure: str = Field(max_length=40)
+    action: str = Field(max_length=40)
+
+
+class Anvil(BaseModel):
+    """Targeted quests (the Crucible), in order."""
+
+    pins: list[Pin] = Field(default_factory=list, max_length=200)
+
+
+class Verbs(BaseModel):
+    """Quest verbs you defined (the Alembic), beside the built-in ones."""
+
+    verbs: list[str] = Field(default_factory=list, max_length=100)
+
+
+class Idol(BaseModel):
+    """What you wrote about an archetype (the Cohort). description null: the built-in one."""
+
+    description: str | None = Field(None, max_length=5000)
+    skills: list[str] = Field(default_factory=list, max_length=40)  # ids of skill entities
+
+
+class Idols(BaseModel):
+    idols: dict[str, Idol] = Field(default_factory=dict)
 
 
 class LayoutPreset(BaseModel):

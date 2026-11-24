@@ -38,8 +38,8 @@ export const verdictName = (v) => (v ? VERDICTS[v[1]][v[0]] : '');
 /** 1 (a slog) .. 5 (a triumph): how many rings its sigil wears. @param {[number, number] | null | undefined} v */
 export const verdictRings = (v) => (v ? 1 + v[0] + v[1] : 0);
 
-/** The moves that say something. @template {{ text: string }} M @param {M[]} moves @returns {M[]} */
-export const played = (moves) => moves.filter((m) => m.text.trim());
+/** The moves that say something. @template {{ text: string, spell?: string | null }} M @param {M[]} moves @returns {M[]} */
+export const played = (moves) => moves.filter((m) => m.text.trim() || m.spell);
 
 /** Mean accuracy of the moves that count, or null. @param {AnalysisMove[]} moves @returns {number | null} */
 export function accuracy(moves) {
@@ -71,4 +71,4 @@ export function gradeCounts(moves) {
 }
 
 /** An empty analysis. @returns {Analysis} */
-export const blankAnalysis = () => ({ verdict: null, link: '', notes: '', gains: [], losses: [], discoveries: [], moves: [] });
+export const blankAnalysis = () => ({ verdict: null, link: '', notes: '', gains: [], losses: [], discoveries: [], moves: [], feedback: [] });

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
-import { ENTITY_TYPES, PHASE_STAGES } from '../../lifecycle.js';
+import { ARCHETYPES, ENTITY_TYPES, UNLINKABLE, PARTY_STATUSES, PHASE_STAGES, STEWARD_ROLES } from '../../lifecycle.js';
 import { PLACE_PLACEHOLDER, coordsText, readPlace } from '../../lib/places.js';
 import { PALETTE, entityColor } from '../../lib/lens.js';
+import { EntityPicker } from '../EntityPicker.js';
+import { PlayerFields } from '../PlayerFields.js';
 import { Field } from './AdventureEditor.js';
+import { mayChange } from '../../lib/archon.js';
 import { confirmHere } from '../../lib/windows.js';
 
 /**
@@ -35,7 +38,7 @@ const TYPE_KEYS = /** @type {EntityType[]} */ (Object.keys(ENTITY_TYPES));
 /** One line under an entity's name in the list. @param {Entity} o */
 function subtitle(o) {
     if (o.type === 'site') return [o.address, o.city].filter(Boolean).join(', ') || (o.lat != null ? 'Pinned' : 'No location');
-    if (o.type === 'contact') return o.details.handle || o.details.email || o.details.phone || '';
+    if (o.type === 'player') return [o.details.archetype && ARCHETYPES[o.details.archetype].label, o.details.handle || o.details.email || o.details.phone].filter(Boolean).join(' · ');
     return o.description?.split('\n')[0] ?? '';
 }
 
@@ -50,6 +53,7 @@ function EntityDetail({ obj, onBack }) {
     const adventures = useWorkspaceStore((s) => s.adventures);
     const itemsById = useWorkspaceStore((s) => s.itemsById);
     const selectItem = useWorkspaceStore((s) => s.selectItem);
+    const selectEntity = useWorkspaceStore((s) => s.selectEntity);
     const anchorRingOnSite = useWorkspaceStore((s) => s.anchorRingOnSite);
     const focusOnAtlas = useWorkspaceStore((s) => s.focusOnAtlas);
     const anchoredId = useWorkspaceStore((s) => s.filters.ring?.center.site_id ?? null);
@@ -58,6 +62,11 @@ function EntityDetail({ obj, onBack }) {
     useEffect(() => setPlaceNote(null), [obj.id]);
 
     const t = ENTITY_TYPES[obj.type];
+    const setWarden = useWorkspaceStore((s) => s.setWarden);
+    const entities = useWorkspaceStore((s) => s.entities);
+    const held = adventures.flatMap((a) => a.stewards.filter((s) => s.id === obj.id).map((s) => ({ a, role: s.role })));
+    const kept = entities.filter((e) => e.wardens.includes(obj.id));
+    const spellSkills = entities.filter((e) => obj.skills.includes(e.id));
     const linked = adventures.filter((a) => a.entities.some((o) => o.id === obj.id));
     const located = obj.lat != null && obj.lon != null;
 
@@ -95,12 +104,13 @@ function EntityDetail({ obj, onBack }) {
             <${ColorPicker} obj=${obj} onChange=${(/** @type {string | null} */ color) => save({ color })} />
 
             <${Field} key=${`${obj.id}-name`} label="Name" ...${text('name')} />
-            ${obj.type === 'contact' && html`
+            ${obj.type === 'player' && html`
                 <div className="ae-pair">
                     <${Field} label="Email" placeholder="name@example.com" ...${detail('email')} />
                     <${Field} label="Phone" ...${detail('phone')} />
                 </div>
                 <${Field} label="Handle" placeholder="@handle" ...${detail('handle')} />
+                <${PlayerFields} player=${obj} save=${save} onError=${setError} />
             `}
             ${obj.type === 'site' && html`
                 <${Field} label="Address" ...${text('address')} />
@@ -121,28 +131,56 @@ function EntityDetail({ obj, onBack }) {
                     <button className=${`btn ${anchoredId === obj.id ? 'on' : ''}`} disabled=${!located} onClick=${() => anchorRingOnSite(obj.id)}
                         title="Center the proximity ring here; it follows the site">◎ ${anchoredId === obj.id ? 'Ring anchored' : 'Anchor ring'}</button>
                 </div>
+                <div className="ol">
+                    <div className="ol-head">Wardens</div>
+                    <${EntityPicker} ids=${obj.wardens} types=${['player', 'organization']} placeholder="+ Who keeps this site…"
+                        onAdd=${async (/** @type {string} */ id) => setError(await setWarden(obj.id, id, true))}
+                        onRemove=${async (/** @type {string} */ id) => setError(await setWarden(obj.id, id, false))} />
+                </div>
             `}
-            <${Field} label=${obj.type === 'contact' ? 'Notes' : 'Description'} kind="textarea" ...${text('description')} />
+            ${obj.type === 'spell' && html`
+                <div className="ol">
+                    <div className="ol-head">Cast with</div>
+                    ${spellSkills.length
+                        ? html`<div className="ol-chips">${spellSkills.map((k) => html`<span key=${k.id} className="ol-chip"><button className="ol-chip-name" onClick=${() => selectEntity(k.id)}><i>✧</i>${k.name}</button></span>`)}</div>`
+                        : html`<div className="cx-empty-line">No skills yet · they come from sealed plays in the Treasury</div>`}
+                </div>
+            `}
+            ${(held.length > 0 || kept.length > 0) && html`
+                <div className="cx-linked">
+                    <div className="cx-linked-head">Stewardships <b>${held.length + kept.length}</b></div>
+                    ${held.map(({ a, role }) => html`
+                        <div key=${a.id + role} className="cx-adv" style=${{ '--c': STEWARD_ROLES[role].color }}>
+                            <button className="cx-adv-name" disabled=${!itemsById[a.id]} onClick=${() => selectItem(a.id, 'codex')}><i></i>${a.title}<em>${STEWARD_ROLES[role].label}</em></button>
+                        </div>`)}
+                    ${kept.map((site) => html`
+                        <div key=${site.id} className="cx-adv" style=${{ '--c': STEWARD_ROLES.warden.color }}>
+                            <button className="cx-adv-name" onClick=${() => selectEntity(site.id)}><i></i>${site.name}<em>${STEWARD_ROLES.warden.label}</em></button>
+                        </div>`)}
+                </div>
+            `}
+            <${Field} label=${obj.type === 'player' ? 'Notes' : 'Description'} kind="textarea" ...${text('description')} />
             <${Field} label="Link" kind="url" placeholder="https://…" ...${text('url')} />
             ${error && html`<div className="nc-error">${error}</div>`}
 
-            <div className="cx-linked">
+            ${!UNLINKABLE.includes(obj.type) && html`<div className="cx-linked">
                 <div className="cx-linked-head">Linked adventures <b>${linked.length}</b></div>
                 ${linked.length === 0 && html`<div className="cx-empty-line">None yet · link it from an adventure in the Refinery</div>`}
                 ${linked.map((a) => {
                     const stage = PHASE_STAGES[a.phase];
                     const pooled = Boolean(itemsById[a.id]);
+                    const status = a.entities.find((o) => o.id === obj.id)?.status;
                     return html`
                         <div key=${a.id} className="cx-adv" style=${{ '--c': stage?.color }}>
                             <button className="cx-adv-name" disabled=${!pooled} onClick=${() => selectItem(a.id, 'codex')}
                                 title=${pooled ? 'Select it' : 'Not in the current pool (Discovery mode)'}>
-                                <i></i>${a.title}<em>${stage?.matter ?? ''}</em>
+                                <i></i>${a.title}${status && html`<small style=${{ color: PARTY_STATUSES[status].color }}>${PARTY_STATUSES[status].label}</small>`}<em>${stage?.matter ?? ''}</em>
                             </button>
-                            <button className="ol-chip-x" onClick=${async () => setError(await unlinkEntity(a.id, obj.id))} title="Unlink" aria-label=${`Unlink ${a.title}`}>✕</button>
+                            <button className="ol-chip-x" onClick=${async () => { if (mayChange(a, obj, null)) setError(await unlinkEntity(a.id, obj.id)); }} title="Unlink" aria-label=${`Unlink ${a.title}`}>✕</button>
                         </div>
                     `;
                 })}
-            </div>
+            </div>`}
 
             <div className="cx-actions">
                 <button className="btn ghost cx-delete" onClick=${remove}>✕ Delete ${t.label.toLowerCase()}</button>
@@ -152,7 +190,7 @@ function EntityDetail({ obj, onBack }) {
 }
 
 /**
- * The Codex: entities (deities, sites, contacts, organizations, skills) that adventures link to. Browse
+ * The Codex: entities (deities, sites, players, organizations, skills, spells) that adventures link to. Browse
  * by type, search, create; open one to edit it and see its adventures. Linking happens
  * in the Refinery; entities show as stars in the Nexus (in their colour), sites as pins on the Atlas.
  */
@@ -222,7 +260,7 @@ export function CodexPanel() {
                 ${shown.length === 0 && html`
                     <div className="nc-empty cx-none">
                         ${entities.length ? 'Nothing matches' : 'The Codex is empty'}
-                        <small>${entities.length ? 'Try another search, or create it above' : 'Deities, sites, contacts, organizations and skills you make here can be linked to adventures'}</small>
+                        <small>${entities.length ? 'Try another search, or create it above' : 'Deities, sites, players, organizations, skills and spells live here; all but spells can be linked to adventures'}</small>
                     </div>
                 `}
                 ${shown.map((o) => html`
