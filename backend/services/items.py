@@ -5,7 +5,8 @@ A model is a recipe: data, never code. It lists named parts made of known shapes
 that makes it. The frontend draws it (frontend/js/lib/cabinet/recipe.js); everything here
 is checked so that a recipe can't hold anything else.
 
-Effects are recorded and shown; nothing applies them yet.
+Effects are rated buffs (or debuffs) to skills. The Arena shows those of a checked preparation;
+nothing else applies them.
 """
 
 import math
@@ -19,7 +20,7 @@ from backend.db.models import Entity, ItemSheet
 from backend.services.triage import InvalidTransition, _get_adventure, broadcast_pools
 
 PURPOSE_LIMIT, EFFECT_LIMIT, MAX_EFFECTS = 5_000, 200, 50
-EFFECT_TARGETS = ("favor", "other")  # or a skill entity's id
+MAX_RATING = 3
 
 MATERIALS = ("steel", "dark", "brass", "copper", "pale", "tint", "glow", "glass", "screen")
 # shape -> the sizes it needs ("pts2" / "pts3": a list of 2D / 3D points)
@@ -118,6 +119,24 @@ def clean_model(parts: Any) -> list[dict[str, Any]] | None:
     return out
 
 
+async def skill_ids(session) -> set[str]:
+    return {str(i) for i in (await session.scalars(select(Entity.id).where(Entity.type == "skill"))).all()}
+
+
+def clean_effects(rows: list[dict[str, Any]], skills: set[str]) -> list[dict[str, Any]]:
+    """Checked effects, one per skill; those whose skill was deleted are dropped."""
+    out: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        skill, text, rating = str(r.get("skill")), str(r.get("text") or "").strip(), r.get("rating", 1)
+        if len(text) > EFFECT_LIMIT:
+            raise InvalidItem(f"an effect is too long (max {EFFECT_LIMIT} characters)")
+        if isinstance(rating, bool) or not isinstance(rating, int) or not 1 <= abs(rating) <= MAX_RATING:
+            raise InvalidItem(f"a rating is 1 to {MAX_RATING}, or -1 to -{MAX_RATING}")
+        if skill in skills:
+            out[skill] = {"skill": skill, "rating": rating, "text": text}
+    return list(out.values())
+
+
 async def save_item(adventure_id: uuid.UUID, changes: dict[str, Any]) -> None:
     """Set an item's purpose, effects and / or model (only the fields sent)."""
     async with SessionLocal() as session:
@@ -137,16 +156,7 @@ async def save_item(adventure_id: uuid.UUID, changes: dict[str, Any]) -> None:
             rows = changes["effects"] or []
             if len(rows) > MAX_EFFECTS:
                 raise InvalidItem(f"too many effects (max {MAX_EFFECTS})")
-            skills = {str(i) for i in (await session.scalars(select(Entity.id).where(Entity.type == "skill"))).all()}
-            effects = []
-            for r in rows:
-                target, text = str(r.get("target") or "other"), str(r.get("text") or "").strip()
-                if len(text) > EFFECT_LIMIT:
-                    raise InvalidItem(f"an effect is too long (max {EFFECT_LIMIT} characters)")
-                if target not in EFFECT_TARGETS and target not in skills:
-                    target = "other"  # its skill was deleted
-                effects.append({"text": text, "target": target, "amount": _num(r.get("amount", 0), "effect amount", -1000, 1000)})
-            sheet.effects = effects
+            sheet.effects = clean_effects(rows, await skill_ids(session))
         if "model" in changes:
             sheet.model = clean_model(changes["model"])
         sheet.updated_at = utcnow()

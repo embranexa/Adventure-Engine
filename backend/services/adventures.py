@@ -7,24 +7,26 @@
     abandon  delete a killed adventure for good, with its links, epitaph and enshrining (a crawled one's
              raw event stays, as dross in the Sump)
 
-Items and performances have no when/where: those fields are refused for them, and cleared when
-a hand-made adventure becomes one.
+Items have no when/where: those fields are refused for them, and cleared when a hand-made
+adventure becomes one. Performances and battles may have one, or none.
+Preparations name owned items of the adventure's gear set (its deities' items) or are free text.
 """
 
 import uuid
 from typing import Any
 from urllib.parse import urlparse
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from backend.db.base import SessionLocal
 from backend.db.models import (
-    ADVENTURE_FLAGS, ADVENTURE_TYPES, OUTSIDE_NODE, PHASE_NODES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure,
-    AdventureEntity, Enshrining, Epitaph, ItemSheet, Move, PartyLog, Steward,
+    ADVENTURE_FLAGS, ADVENTURE_TYPES, ADVERSARY_TYPES, OUTSIDE_NODE, PHASE_NODES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure,
+    AdventureEntity, Enshrining, Entity, Epitaph, ItemSheet, Move, PartyLog, Steward,
 )
 from backend.db.queries import list_adventures
 from backend.services.entities import _delete_links
 from backend.services.hub import hub
+from backend.services.items import InvalidItem, clean_effects, skill_ids
 from backend.services.transitions import record
 from backend.services.triage import InvalidTransition, _get_adventure, broadcast_pools
 
@@ -92,6 +94,10 @@ def _apply(adventure: Adventure, changes: dict[str, Any]) -> None:
         if wanted - set(ADVENTURE_FLAGS):
             raise InvalidAdventure(f"unknown flags: {', '.join(sorted(wanted - set(ADVENTURE_FLAGS)))}")
         adventure.flags = [f for f in ADVENTURE_FLAGS if f in wanted]
+    if "objectives" in changes:
+        rows = [{**o, "text": o["text"].strip()} for o in changes["objectives"] or []]
+        _unique(rows, "objectives")
+        adventure.objectives = [o for o in rows if o["text"]]
     if "all_day" in changes:
         adventure.all_day = bool(changes["all_day"]) or None
     if "recurrence" in changes:
@@ -115,6 +121,68 @@ def _apply(adventure: Adventure, changes: dict[str, Any]) -> None:
         until = adventure.recurrence.get("until")
         if until and start and until < start.date().isoformat():
             raise InvalidAdventure("a weekly event can't end before it starts")
+
+
+def _unique(rows: list[dict[str, Any]], what: str) -> None:
+    if len({r["id"] for r in rows}) != len(rows):
+        raise InvalidAdventure(f"two {what} have the same id")
+
+
+def _uuid(value: Any) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(str(value))
+    except ValueError:
+        return None
+
+
+async def _deities(session, adventure_id: uuid.UUID) -> set[uuid.UUID]:
+    return set((await session.scalars(
+        select(AdventureEntity.entity_id).join(Entity, Entity.id == AdventureEntity.entity_id)
+        .where(AdventureEntity.adventure_id == adventure_id, Entity.type == "deity"))).all())
+
+
+async def _apply_linked(session, adventure: Adventure, changes: dict[str, Any]) -> None:
+    """The fields that name other rows: preparations and adversaries."""
+    if "preparations" in changes:
+        rows, skills = changes["preparations"] or [], await skill_ids(session)
+        _unique(rows, "preparations")
+        had = {p.get("item") for p in adventure.preparations or []}  # already there: kept, even if it left the set
+        clean, seen = [], set()
+        for p in rows:
+            text, item = p["text"].strip(), p["item"]
+            if item:
+                if item in seen:
+                    continue
+                seen.add(item)
+                row = await session.get(Adventure, _uuid(item)) if _uuid(item) else None
+                if row is None:
+                    continue  # abandoned since
+                if item not in had:
+                    if row.type != "item" or row.phase not in ("completed", "decommissioned"):
+                        raise InvalidAdventure("only items you own can be prepared")
+                    if not await _deities(session, adventure.id) & await _deities(session, row.id):
+                        raise InvalidAdventure("that item isn't in this adventure's gear set (it shares no deity)")
+                clean.append({"id": p["id"], "item": item, "text": "", "checked": p["checked"], "effects": []})
+            elif text:
+                try:
+                    effects = clean_effects(p["effects"], skills)
+                except InvalidItem as e:
+                    raise InvalidAdventure(str(e)) from e
+                clean.append({"id": p["id"], "item": None, "text": text, "checked": p["checked"], "effects": effects})
+        adventure.preparations = clean
+    if "adversaries" in changes:
+        rows = changes["adversaries"] or []
+        if rows and adventure.type != "battle":
+            raise InvalidAdventure("only battles have adversaries")
+        clean = []
+        for r in rows:
+            entity = await session.get(Entity, _uuid(r["entity_id"])) if r["entity_id"] and _uuid(r["entity_id"]) else None
+            if entity is not None and entity.type not in ADVERSARY_TYPES:
+                raise InvalidAdventure(f"a {entity.type} can't be an adversary")
+            row = {"entity_id": str(entity.id) if entity else None, "name": entity.name if entity else r["name"].strip()}
+            if row["name"] and row not in clean:
+                clean.append(row)
+        adventure.adversaries = clean
 
 
 def _recurrence(value: Any) -> dict[str, Any] | None:
@@ -141,6 +209,7 @@ async def create_adventure(fields: dict[str, Any]) -> dict[str, Any]:
     async with SessionLocal() as session:
         adventure = Adventure(id=uuid.uuid4(), event_id=None, type="event", phase="queued", stats={})
         _apply(adventure, fields)
+        await _apply_linked(session, adventure, fields)
         if adventure.title is None:
             adventure.title = f"New {adventure.type}"
         session.add(adventure)
@@ -154,6 +223,7 @@ async def update_adventure(adventure_id: uuid.UUID, changes: dict[str, Any]) -> 
     async with SessionLocal() as session:
         adventure = await _get_adventure(session, adventure_id)
         _apply(adventure, changes)
+        await _apply_linked(session, adventure, changes)
         if adventure.event_id is None and adventure.title is None:
             raise InvalidAdventure("a hand-made adventure needs a title")
         await session.commit()

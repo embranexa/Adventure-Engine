@@ -7,6 +7,7 @@ class MemberPayload(BaseModel):
     """Only the fields sent change: send null or "" to clear a note, impact or follow-up."""
 
     status: str | None = None
+    role: str | None = None  # what they do in this adventure
     note: str | None = None
     impact: str | None = None
     follow_up: str | None = None  # "2026-12-01"

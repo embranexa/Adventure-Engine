@@ -5,6 +5,8 @@ import { PHASE_STAGES } from '../../lifecycle.js';
 import { formatEventWhen } from '../../events.js';
 import { partyOf } from '../../lib/complexGraph.js';
 import { EntityPicker } from '../EntityPicker.js';
+import { Objectives } from '../Objectives.js';
+import { Preparations } from '../Preparations.js';
 import { PartyRoster } from '../PartyRoster.js';
 import { QuestCover, dueLabel } from './QuestsPanel.js';
 
@@ -43,7 +45,10 @@ export function ArenaPanel() {
                                     ${a.collaboration && html`<span className="pr-flag" title="Collaboration">☉</span>`}
                                     ${due && html`<span className="ql-due">${due}</span>`}</div>
                                 ${(a.start || a.venue) && html`<div className="ql-due">${[a.start && formatEventWhen({ ...a, kind: 'adventure' }), a.venue || a.city].filter(Boolean).join(' · ')}</div>`}
-                                <${PartyRoster} adventure=${a} stewards=${true} />
+                                ${a.adversaries.length > 0 && html`<div className="pr-foes">⚔ ${a.adversaries.map((x) => x.name).join(', ')}</div>`}
+                                <${Objectives} adventure=${a} />
+                                <${PartyRoster} adventure=${a} stewards=${true} roles=${true} />
+                                <${Preparations} adventure=${a} />
                                 <div className="pr-foot" onClick=${(/** @type {Event} */ e) => e.stopPropagation()}>
                                     <div><${EntityPicker} ids=${partyOf(a).map((m) => m.id)} chips=${false} types=${['player']} placeholder="+ Met here…"
                                         onAdd=${async (/** @type {string} */ id) => setError(await setPartyMember(a.id, id, { status: 'emergent' }))} /></div>

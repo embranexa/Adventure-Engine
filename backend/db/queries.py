@@ -71,6 +71,7 @@ def entity_to_dict(o: Entity, links: list[EntityLink] = ()) -> dict[str, Any]:
         "address": o.address, "city": o.city, "lat": o.lat, "lon": o.lon, "details": o.details or {},
         "color": o.color, "created_at": _iso(o.created_at),
         "affinities": [str(l.to_id) for l in links if l.role == "affinity" and l.from_id == o.id],  # players
+        "skills": [str(l.to_id) for l in links if l.role == "uses" and l.from_id == o.id],           # spells
         "wardens": [str(l.from_id) for l in links if l.role == "warden" and l.to_id == o.id],       # sites
     }
 
@@ -94,7 +95,7 @@ def linked_to_dict(o: Entity, link: AdventureEntity) -> dict[str, Any]:
     """An entity as linked to an adventure; a player's link carries its place in the party."""
     base = {"id": str(o.id), "type": o.type, "name": o.name}
     if o.type == "player":
-        base |= {"status": link.status or "resonant", "status_at": _iso(link.status_at), "note": link.note, "impact": link.impact, "follow_up": link.follow_up}
+        base |= {"status": link.status or "resonant", "status_at": _iso(link.status_at), "role": link.role, "note": link.note, "impact": link.impact, "follow_up": link.follow_up}
     return base
 
 
@@ -108,8 +109,8 @@ def enshrining_to_dict(r: Enshrining, moves: list[Move]) -> dict[str, Any]:
     return {
         "verdict": [r.outcome, r.thrill] if r.outcome is not None and r.thrill is not None else None,
         "link": r.link, "notes": r.notes or "", "gains": r.gains or [], "losses": r.losses or [],
-        "discoveries": r.discoveries or [],
-        "moves": [{"text": m.text, "grade": m.grade, "better": m.better, "skills": m.skills or []} for m in moves],
+        "discoveries": r.discoveries or [], "feedback": r.feedback or [],
+        "moves": [{"text": m.text, "grade": m.grade, "better": m.better, "spell": m.spell, "skills": m.skills or []} for m in moves],
         "sealed_at": _iso(r.sealed_at), "amended_at": _iso(r.amended_at),
     }
 
@@ -165,6 +166,9 @@ def adventure_to_dict(
         "enshrining": enshrining_to_dict(enshrining, moves) if enshrining else None,
         "stats": a.stats,
         "flags": a.flags or [],
+        "objectives": a.objectives or [],
+        "preparations": a.preparations or [],
+        "adversaries": (a.adversaries or []) if a.type == "battle" else [],
         "roadmap": a.roadmap,
         "costs": a.costs,
         "rewards": a.rewards,

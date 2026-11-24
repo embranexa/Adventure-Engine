@@ -116,6 +116,10 @@ const DRAW = {
         g.beginPath(); g.ellipse(48, 86, 9, 7, -0.4, 0, Math.PI * 2); g.fill();
         g.beginPath(); g.ellipse(78, 78, 9, 7, -0.4, 0, Math.PI * 2); g.fill();
     },
+    'type:battle'(g) {
+        poly(g, [[38, 38], [88, 88]]); poly(g, [[90, 38], [40, 88]]);
+        poly(g, [[38, 76], [52, 90]]); poly(g, [[90, 76], [76, 90]]);
+    },
     // entity types
     deity(g) { poly(g, [[C, 34], [92, 88], [36, 88]], true); poly(g, [[C, 52], [C, 88]]); },
     site(g) {
@@ -138,6 +142,10 @@ const DRAW = {
         const pts = [];
         for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 - Math.PI / 2, r = k % 2 ? 12 : 30; pts.push(/** @type {[number, number]} */ ([C + Math.cos(a) * r, C + Math.sin(a) * r])); }
         poly(g, pts, true);
+    },
+    spell(g) {
+        for (let k = 0; k < 4; k++) { const a = (k / 4) * Math.PI; poly(g, [[C - Math.cos(a) * 30, C - Math.sin(a) * 30], [C + Math.cos(a) * 30, C + Math.sin(a) * 30]]); }
+        g.beginPath(); g.arc(C, C, 16, 0, Math.PI * 2); g.stroke();
     },
     // the date range: a calendar page
     date(g) {

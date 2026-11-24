@@ -8,7 +8,7 @@ Rules:
     - moving an adventure back out of the Treasury unseals it (services/triage.py); the
       writing stays as a draft
     - discoveries become entities on seal. One that names an existing entity of its type uses
-      that. They are linked to the adventure, except a site found at an event: an event has
+      that. They are linked to the adventure, except a site found at an event (or a performance or battle): it has
       one site (its where), and a discovery mustn't replace it
 """
 
@@ -67,10 +67,17 @@ def _moves(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if r.get("grade") not in MOVE_GRADES:
             raise InvalidEnshrining(f"a move's grade must be one of {', '.join(MOVE_GRADES)}")
         row = {"text": _text("text", r.get("text")), "grade": r["grade"], "better": _text("better", r.get("better")) or None,
-               "skills": [str(s) for s in r.get("skills") or []][:20]}
-        if row["text"] or row["better"]:
+               "spell": str(r["spell"])[:40] if r.get("spell") else None, "skills": [str(s) for s in r.get("skills") or []][:20]}
+        if row["text"] or row["better"] or row["spell"]:
             clean.append(row)
     return clean
+
+
+def _feedback(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """What was judged, or added after (its key starts with "own:")."""
+    clean = [{"key": r["key"], "label": _text("text", r.get("label")), "skill": r.get("skill"), "rating": max(-9, min(9, int(r.get("rating") or 0))),
+              "result": r.get("result")} for r in rows]
+    return [r for r in clean if r["result"] or (r["key"].startswith("own:") and r["label"])]
 
 
 def _verdict(value: Any) -> tuple[int, int] | None:
@@ -93,11 +100,12 @@ def _is_http(link: str | None) -> bool:
 
 async def save(adventure_id: uuid.UUID, fields: dict[str, Any], seal: bool = False) -> dict[str, Any]:
     """Save the draft, or (seal=True) seal or amend it. Returns {"discovered": [names new to the Codex]}."""
-    for key in ("moves", "gains", "losses", "discoveries"):
+    for key in ("moves", "feedback", "gains", "losses", "discoveries"):
         if len(fields.get(key) or []) > MAX_ROWS:
             raise InvalidEnshrining(f"too many {key} (max {MAX_ROWS})")
     verdict = _verdict(fields.get("verdict"))
     moves, gains, losses = _moves(fields.get("moves") or []), _lines(fields.get("gains") or []), _lines(fields.get("losses") or [])
+    feedback = _feedback(fields.get("feedback") or [])
     discoveries, link, notes = _discoveries(fields.get("discoveries") or []), _link(fields.get("link")), _text("notes", fields.get("notes"))
 
     new: list[str] = []
@@ -119,6 +127,7 @@ async def save(adventure_id: uuid.UUID, fields: dict[str, Any], seal: bool = Fal
             session.add(row)
         row.outcome, row.thrill = verdict if verdict else (None, None)
         row.notes, row.link, row.gains, row.losses, row.discoveries = notes, link, gains, losses, discoveries
+        row.feedback = feedback
         row.updated_at = utcnow()
         if seal:
             if row.sealed_at is None:

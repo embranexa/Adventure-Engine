@@ -3,12 +3,13 @@ backfill the transitions log (once)."""
 
 import json
 import logging
+import uuid
 
 from sqlalchemy import Connection, inspect, select, text, update
 from sqlalchemy.schema import CreateColumn
 
 from backend.db.base import DB_PATH, Base, SessionLocal, engine
-from backend.db.models import AppState, EventSource
+from backend.db.models import AppState, Entity, EventSource
 
 log = logging.getLogger(__name__)
 
@@ -110,6 +111,7 @@ async def init_db(sources: dict[str, str]) -> None:
         await session.commit()
 
     await _migrate_saved_places()
+    await _seed_spells()
 
     async with engine.begin() as conn:
         # the Refiner was renamed the Refinery: logged moves keep working under the new id
@@ -118,6 +120,20 @@ async def init_db(sources: dict[str, str]) -> None:
 
     from backend.services.transitions import backfill  # avoids an import cycle
     await backfill()
+
+
+SPELLS = ("Hook", "Propose", "Combine", "Transition", "Enter", "Exit", "Reflect", "Charge", "Discharge", "Deflect", "Evade")
+
+
+async def _seed_spells() -> None:
+    """Once: the first spells. Deleted ones stay deleted."""
+    async with SessionLocal() as session:
+        if await session.get(AppState, "spells_seeded"):
+            return
+        have = {n.lower() for n in (await session.scalars(select(Entity.name).where(Entity.type == "spell"))).all()}
+        session.add_all(Entity(id=uuid.uuid4(), type="spell", name=n, details={}) for n in SPELLS if n.lower() not in have)
+        session.add(AppState(key="spells_seeded", value=True))
+        await session.commit()
 
 
 async def _migrate_saved_places() -> None:

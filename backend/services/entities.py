@@ -2,13 +2,13 @@
 
     create / update / delete   an entity (deleting also removes its links)
     link / unlink              attach an entity to an adventure, or detach it
-    set_entity_link            between entities: a player's affinity, or a site's warden
+    set_entity_link            between entities: a player's affinity, a site's warden, a spell's skill
 
 Rules:
     - only sites have a location (address, city, lat/lon); players keep email, phone,
       handle, archetype, warmth and tags in `details`
     - a player linked to an adventure joins its party as resonant (services/party.py)
-    - an event links at most one site: linking another replaces it
+    - an event, performance or battle links at most one site: linking another replaces it
     - a hand-made event takes its where from its site, so linking one clears the event's
       own where fields (crawled events keep their source's where; see queries.py)
 
@@ -206,6 +206,8 @@ async def set_entity_link(from_id: uuid.UUID, to_id: uuid.UUID, role: str, on: b
                 raise InvalidEntity(f"a {a.type} can't have an affinity with a {b.type}")
             if role == "warden" and (a.type not in STEWARD_TYPES or b.type != "site"):
                 raise InvalidEntity("a warden is a player or organization, and keeps a site")
+            if role == "uses" and (a.type != "spell" or b.type != "skill"):
+                raise InvalidEntity("a spell uses skills")
             session.add(EntityLink(from_id=from_id, to_id=to_id, role=role))
         elif not on and row is not None:
             await session.delete(row)
@@ -218,7 +220,7 @@ async def link(adventure_id: uuid.UUID, entity_id: uuid.UUID) -> None:
         adventure = await _get_adventure(session, adventure_id)
         entity = await _get_entity(session, entity_id)
         if entity.type == "site" and adventure.type in WHEN_WHERE_TYPES:
-            # an event happens at one site: replace any other
+            # it happens at one site: replace any other
             others = select(Entity.id).where(Entity.type == "site", Entity.id != entity.id)
             await _delete_links(session, AdventureEntity.adventure_id == adventure_id,
                                 AdventureEntity.entity_id.in_(others))

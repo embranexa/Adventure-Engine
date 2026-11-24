@@ -41,6 +41,8 @@ export const FORGE = 'forge';
 export const CODEX = 'codex';
 export const MANIFOLD = 'manifold';
 export const COHORT = 'cohort';
+/** In the Core, before the Refinery; no pipes yet. */
+export const COMPLEX = 'complex';
 export const INVENTORY = 'inventory';
 export const AGORA = 'agora';
 export const PANTHEON = 'pantheon';
@@ -99,6 +101,7 @@ export function twinNodes(sourceNames) {
         core('decomposing', 'processor', 'Alembic', { panel: 'alembic', mode: 'adventures' }),
         core('constructing', 'processor', 'Crucible', { panel: 'quests', mode: 'adventures' }),
         core('consuming', 'processor', 'Arena', { panel: 'arena', mode: 'adventures' }),
+        node({ id: COMPLEX, label: 'Complex', zone: 'core', kind: 'cabinet', action: { panel: 'complex', mode: 'adventures' } }),
         core('completed', 'vessel', 'Treasury', { panel: 'treasury' }),
         core('decommissioned', 'vessel', 'Archive'),
         core('killed', 'vessel', 'Necropolis', { panel: 'necropolis' }),

@@ -1703,3 +1703,55 @@ button.aft-head { cursor: pointer; } button.aft-head:disabled { cursor: default;
 .aft-head em { color: color-mix(in srgb, var(--c) 75%, #fff); font: 500 10px var(--font-mono); font-style: normal; }
 .aft-choices { display: flex; flex-wrap: wrap; gap: 5px; }
 .aft-choices .on { box-shadow: inset 0 0 0 1px var(--c); color: color-mix(in srgb, var(--c) 70%, #fff); }
+
+/* the anvil (Crucible); objectives, preparations, effects; feedback */
+.anvil { flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; padding: 9px 10px; border-radius: 6px; background: linear-gradient(180deg, color-mix(in srgb, var(--alloy) 14%, rgba(5, 6, 8, 0.6)), rgba(5, 6, 8, 0.6)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alloy) 55%, transparent), 0 0 18px color-mix(in srgb, var(--alloy) 14%, transparent); }
+.anvil-head { color: color-mix(in srgb, var(--alloy) 55%, #fff); font: 600 12px var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; }
+.anvil-of { align-self: flex-start; max-width: 100%; padding: 0; border: 0; background: none; cursor: pointer; color: var(--text-dim); font: 500 11px var(--font-body); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.anvil-of:hover:not(:disabled) { color: var(--text-bright); } .anvil-of:disabled { cursor: default; }
+.anvil-btn { flex-shrink: 0; padding: 1px 5px; border: 0; border-radius: 4px; background: none; color: var(--text-dim); cursor: pointer; font-size: 13px; opacity: 0.55; }
+.anvil-btn:hover, .anvil-btn.on { opacity: 1; color: var(--alloy); }
+.anvil-move { flex-shrink: 0; display: flex; flex-direction: column; }
+.anvil-move button { padding: 0 4px; border: 0; background: none; color: var(--text-dim); cursor: pointer; font-size: 8px; line-height: 1.4; }
+.anvil-move button:hover:not(:disabled) { color: #fff; } .anvil-move button:disabled { opacity: 0.2; cursor: default; }
+.obj { display: flex; flex-direction: column; gap: 4px; cursor: default; }
+.obj-row, .prep-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.obj-mark { flex-shrink: 0; width: 20px; height: 20px; padding: 0; border: 1px solid var(--steel-3); border-radius: 50%; background: none; color: var(--text-muted); cursor: pointer; font-size: 11px; line-height: 1; }
+.obj-mark:disabled { cursor: default; }
+.s-achieved .obj-mark { color: #7fd6a0; border-color: #7fd6a0; } .s-failed .obj-mark { color: var(--danger); border-color: var(--danger); }
+.obj-text { flex: 1 1 auto; min-width: 0; color: var(--text); font: 500 13px var(--font-body); overflow-wrap: anywhere; }
+input.obj-text { padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; background: none; }
+input.obj-text:hover { border-color: var(--steel-2); } input.obj-text:focus { outline: none; border-color: var(--steel-5); background: rgba(0, 0, 0, 0.4); }
+.s-failed .obj-text { color: var(--text-dim); text-decoration: line-through; }
+.obj-row small, .prep-row small { flex-shrink: 0; color: var(--text-dim); font: 500 10px var(--font-mono); }
+.obj-row .cls-layer, .prep-row .cls-layer { flex-shrink: 0; padding: 1px 7px; font-size: 10px; }
+.prep { display: flex; flex-direction: column; gap: 6px; }
+.prep-row { flex-wrap: wrap; } .prep-row > span { flex: 1 1 90px; min-width: 0; color: var(--text-muted); font: 500 13px var(--font-body); overflow-wrap: anywhere; }
+.prep.on .prep-row > span { color: var(--text-bright); } .prep.lost { opacity: 0.5; }
+.prep-row input { accent-color: var(--m-animus); }
+.prep-add { display: flex; gap: 6px; } .prep-add .ol-input { flex: 1 1 auto; min-width: 0; } .prep-add .pl-select { flex: 0 1 110px; }
+.fx-rows { display: flex; flex-direction: column; gap: 5px; }
+.fx-row { display: flex; align-items: center; gap: 7px; }
+.fx-row > span { flex: 1 1 auto; min-width: 0; color: var(--text); font: 500 12px var(--font-body); }
+.fx-row .cls-layer { padding: 0 7px; } .fx-row .fx-pips { min-width: 34px; text-align: center; }
+.fx-pips { font: 600 10px var(--font-mono); } .fx-pips.up { color: #7fd6a0; } .fx-pips.down { color: var(--danger); }
+.fx-totals { display: flex; flex-wrap: wrap; gap: 4px; }
+.fx-totals span { padding: 2px 8px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--steel-3); color: var(--text); font: 500 11px var(--font-body); }
+.fb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.fb > span, .fb > input { flex: 1 1 130px; min-width: 0; color: var(--text); font: 500 13px var(--font-body); } .fb small { color: var(--text-dim); font: 500 11px var(--font-body); }
+.fb-choices { display: flex; gap: 4px; align-items: center; } .fb-choices .cls-layer { padding: 2px 8px; font-size: 10px; }
+.r-helped.on, b.r-helped { color: #7fd6a0; } .r-hurt.on, b.r-hurt { color: var(--danger); } b.r-none { color: var(--text-dim); } .fb > b { font: 500 11px var(--font-mono); }
+.ana-spell { margin-right: 8px; color: #d7b8ff; font: 600 12px var(--font-display); letter-spacing: 0.06em; }
+.ol-chip.foe { box-shadow: inset 0 0 0 1px color-mix(in srgb, #ef4444 45%, var(--steel-3)); } .ol-chip.foe i { color: #ef4444; }
+.pr-foes { color: #ff9c94; font: 500 12px var(--font-body); }
+.pr-role { flex-shrink: 0; color: var(--text-muted); font: 500 11px var(--font-body); }
+.pr-rolebox { flex: 0 1 84px; min-width: 50px; padding: 2px 6px; border: 1px solid var(--steel-2); border-radius: 4px; background: rgba(0, 0, 0, 0.35); color: var(--text); font: 400 11px var(--font-body); }
+.pr-rolebox:focus { outline: none; border-color: var(--steel-5); }
+
+/* the Cohort's idols */
+.cohort { display: flex; flex-direction: column; }
+.cohort-modes { position: absolute; z-index: 12; top: 10px; left: 12px; display: flex; gap: 5px; padding: 4px; border-radius: 6px; background: rgba(5, 6, 8, 0.72); }
+.idol-card { flex-shrink: 0; align-self: center; width: min(100%, 300px); aspect-ratio: 480 / 760; border-radius: 16px; box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6); }
+.idol-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 0; font: 400 12.5px/1.4 var(--font-body); }
+.idol-facts dt { color: var(--text-dim); } .idol-facts dd { margin: 0; color: var(--text); }
+.idol-suggest { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; } .idol-suggest small { color: var(--text-dim); font: 500 10px var(--font-mono); }

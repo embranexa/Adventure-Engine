@@ -1,6 +1,6 @@
 """Parties: the players of an adventure and their statuses, and its stewards.
 
-    set_member    add a player, change its status, or write its proposal note, follow-up day and impact
+    set_member    add a player, change its status, or write its role, proposal note, follow-up day and impact
     set_steward   add or remove a herald or commissioner
     history       every status change in an adventure's party
 
@@ -72,6 +72,11 @@ async def set_member(adventure_id: uuid.UUID, player_id: uuid.UUID, changes: dic
                 if text and len(text) > NOTE_LIMIT:
                     raise InvalidParty(f"the {field} is too long (max {NOTE_LIMIT} characters)")
                 setattr(row, field, text)
+        if "role" in changes:
+            text = (changes["role"] or "").strip() or None
+            if text and len(text) > 60:
+                raise InvalidParty("the role is too long (max 60 characters)")
+            row.role = text
         if "follow_up" in changes:
             row.follow_up = _day(changes["follow_up"])
         await session.commit()

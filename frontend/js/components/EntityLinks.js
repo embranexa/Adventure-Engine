@@ -95,7 +95,7 @@ export function EntityLinks({ adventure }) {
                     ref=${inputRef}
                     className="ol-input"
                     value=${query}
-                    placeholder=${'+ Link a deity, site, player, organization or skill…'}
+                    placeholder=${'+ Link a deity, site, player, organization, skill or spell…'}
                     aria-label="Link an entity"
                     onInput=${(/** @type {any} */ e) => { setQuery(e.target.value); setOpen(true); setActive(0); }}
                     onFocus=${() => setOpen(true)}
@@ -123,7 +123,7 @@ export function EntityLinks({ adventure }) {
                 `}
             </div>
             <${PartyRoster} adventure=${adventure} stewards=${true} removable=${true} />
-            ${adventure.type === 'event' && html`<div className="ol-hint">An event has one site: linking another replaces it${adventure.event_id ? '' : ' · its site is its where'}</div>`}
+            ${adventure.type !== 'item' && html`<div className="ol-hint">One site only: linking another replaces it${adventure.event_id ? '' : ' · its site is its where'}</div>`}
             ${error && html`<div className="nc-error">${error}</div>`}
         </div>
     `;

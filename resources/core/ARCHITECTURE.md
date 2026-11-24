@@ -201,9 +201,8 @@ Renamed 2026-11-22 in code, API, database and interface:
 | pillar | **deity** |
 | song | **performance** |
 
-Entity types: deity, site, player (contact until 2026-11-23), organization, skill. Adventure types: event, item,
-performance. A performance can have a date and place (a gig) or none (a song) **[decided, not
-built: code still refuses a when/where on performances]**. The transitions log's `entity` column became `subject`, so *entity* only ever
+Entity types: deity, site, player (contact until 2026-11-23), organization, skill, spell. Adventure types: event, item,
+performance, battle. A performance can have a date and place (a gig) or none (a song) **[decided, built 2026-11-23; battles too]**. The transitions log's `entity` column became `subject`, so *entity* only ever
 means a Codex entity.
 
 ## Build order **[decided]**
@@ -240,3 +239,24 @@ Branch `core-zone`. Each stage is usable on its own.
   can run after any change. Un-ticking an action and breaking a seal reverse; killing and abandoning keep.
   Elixir and nectar are shown locked; nothing spends ambrosia yet.
 - Un-ticking an action of a sealed artifact also breaks its seal (it goes back to the Crucible).
+
+## Upgrades round (2026-11-23) **[decided unless marked]**
+
+From `resources/upgrades.md`. Check: `scripts/check_upgrades.py` (on a database copy).
+
+- **On the anvil** (the Crucible): pinned ready actions from any adventure, in your order (app state `anvil`).
+  Done ones leave it; locked ones can't be pinned.
+- **Objectives** on any adventure: primary or bonus; open, achieved or failed. Set in the Refinery, ticked in
+  the Arena and Treasury. All primary ones settled suggest an outcome; they never set the verdict or bounty.
+- **Battle**: like a performance, plus adversaries (players, organizations, or anything named). No link needed
+  to seal. An adversary isn't in the party; in the Complex they face the adventure on a red edge.
+- **Spell**: a Codex entity, a kind of play cast with skills (`uses` links). *Play* is the Treasury's word for
+  what was a move (the table and API still say `moves`); a play can name one spell, which brings its skills.
+- **Effects** are buffs or debuffs to skills, rated 1-3 (percentages, favor and "other" are gone).
+- **Preparations** (the Arena): free text with effects, or owned items of the adventure's gear set (sharing a
+  deity). They count when checked. Informational: nothing else uses them, and not ambrosia.
+- **Feedback** (the Treasury): each effect at work judged helped / no effect / hurt, plus any added.
+- A player has a free-text **role** per adventure. Archetypes have **no buffs**.
+- **Idols** (the Cohort): a statue and a card per archetype, editable description, skills (app state `idols`).
+  Suggested skills become Codex skills only when clicked.
+- The Complex is a Core machine before the Refinery, with no pipes. The Sanctum's floor follows its machine count.

@@ -96,6 +96,7 @@ export const FACETS = [
     entityFacet('player'),
     entityFacet('organization'),
     entityFacet('skill'),
+    entityFacet('spell'),
 ];
 
 /** Phases the Hermetic Seal hides (on top of anything already past). */
@@ -191,7 +192,7 @@ export function passes(item, filters, mode, now) {
         if (includes && !values.some((v) => settings[v] === 'include')) return false;
     }
 
-    // items and performances have no when/where: date and proximity filters don't apply to them
+    // without a when/where (items, songs), date and proximity filters don't apply
     if (!hasWhenWhere(item)) return true;
     if (filters.date_range) {
         const inside = inDateRange(item, filters.date_range);

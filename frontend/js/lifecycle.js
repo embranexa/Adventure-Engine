@@ -32,7 +32,7 @@ export const PHASE_STAGES = {
 };
 
 /**
- * Adventure types. Only events have a when/where: items and performances are exempt from the
+ * Adventure types. Items have no when/where; a performance or battle may, and without one is exempt from the
  * calendar, map, date/proximity filters and the missed-adventure sweeper (the server
  * sends their when/where as null). Same list in backend/db/models.py.
  * @type {Record<AdventureType, { label: string, glyph: string, hint: string }>}
@@ -40,7 +40,8 @@ export const PHASE_STAGES = {
 export const ADVENTURE_TYPES = {
     event: { label: 'Event', glyph: '◷', hint: 'Happens at a time and place' },
     item: { label: 'Item', glyph: '◆', hint: 'A thing to make or get: no when/where' },
-    performance: { label: 'Performance', glyph: '♪', hint: 'A piece to learn and perform; link the performance: no when/where' },
+    performance: { label: 'Performance', glyph: '♪', hint: 'A piece to learn and perform; a when and where if it’s a gig' },
+    battle: { label: 'Battle', glyph: '⚔', hint: 'A contest against adversaries; a when and where if it has one' },
 };
 
 /** Flags an adventure can carry, any number, set by hand (backend.db.models.ADVENTURE_FLAGS). @type {Record<AdventureFlag, { label: string, glyph: string, color: string }>} */
@@ -74,6 +75,7 @@ export const ENTITY_TYPES = {
     player: { label: 'Player', plural: 'Players', glyph: '☉', hint: 'A person who can join an adventure’s party' },
     organization: { label: 'Organization', plural: 'Organizations', glyph: '⎔', hint: 'An organization or a network' },
     skill: { label: 'Skill', plural: 'Skills', glyph: '✧', hint: 'A skill an adventure uses or builds' },
+    spell: { label: 'Spell', plural: 'Spells', glyph: '✴', hint: 'A kind of play, cast with skills' },
 };
 
 /**
@@ -122,9 +124,14 @@ export const STEWARD_ROLES = {
     warden:       { label: 'Warden',       color: '#38bdf8', hint: 'Keeps the site (on every adventure there)' },
 };
 
-/** True if this item can have a when/where (a raw event, or an event-type adventure). @param {PoolItem} item */
+/**
+ * True if this item happens somewhere or sometime: a raw event, an event, or a performance or
+ * battle that was given a time or place.
+ * @param {PoolItem} item
+ */
 export function hasWhenWhere(item) {
-    return item.kind !== 'adventure' || item.type === 'event';
+    if (item.kind !== 'adventure' || item.type === 'event') return true;
+    return item.type !== 'item' && Boolean(item.start || item.venue || item.address || item.city || item.lat != null);
 }
 
 /** Matter name -> color, for titles that name a matter (e.g. "ore ⟶ essence"). */

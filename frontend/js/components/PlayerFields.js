@@ -54,7 +54,7 @@ export function PlayerFields({ player, save, onError }) {
             onCommit=${(/** @type {string} */ v) => save({ details: { tags: v.split(',').map((t) => t.trim()).filter(Boolean) } })} />
         <div className="ol">
             <div className="ol-head">Resonates with</div>
-            <${EntityPicker} ids=${player.affinities} types=${['deity', 'site', 'organization', 'skill']} placeholder="+ A deity, site, organization or skill…"
+            <${EntityPicker} ids=${player.affinities} types=${['deity', 'site', 'organization', 'skill', 'spell']} placeholder="+ A deity, site, organization, skill or spell…"
                 onAdd=${async (/** @type {string} */ id) => onError(await setAffinity(player.id, id, true))}
                 onRemove=${async (/** @type {string} */ id) => onError(await setAffinity(player.id, id, false))} />
         </div>

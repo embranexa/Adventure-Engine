@@ -46,7 +46,7 @@ function PlayerDetail({ adventure, player, log, onBack }) {
     const done = adventure.phase === 'completed' || adventure.phase === 'decommissioned';
     const roles = adventure.stewards.filter((s) => s.id === player.id).map((s) => s.role);
 
-    /** @param {{ status?: PartyStatus, note?: string | null, follow_up?: string | null }} changes */
+    /** @param {{ status?: PartyStatus, role?: string | null, note?: string | null, follow_up?: string | null }} changes */
     const save = async (changes) => {
         const err = await setPartyMember(adventure.id, player.id, changes);
         setError(err);
@@ -88,6 +88,7 @@ function PlayerDetail({ adventure, player, log, onBack }) {
                             <option key=${s} value=${s} disabled=${!allowed(s)}>${PARTY_STATUSES[s].label}${allowed(s) ? '' : ' (when completed)'}</option>`)}
                     </select>
                 </div>
+                <${Field} key=${`${player.id}-role`} label="Role in this adventure" placeholder="sound, driver…" value=${member?.role ?? ''} onCommit=${(/** @type {string} */ v) => save({ role: v })} />
                 <${Field} key=${`${player.id}-note`} label="Proposal and notes" kind="textarea" value=${member?.note ?? ''} onCommit=${(/** @type {string} */ v) => save({ note: v })} />
                 <label className="ae-field">
                     <span className="ae-label">Follow up</span>

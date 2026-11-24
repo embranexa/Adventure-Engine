@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../../store.js';
 import { PHASE_STAGES } from '../../lifecycle.js';
 import { MATERIALS, activeEffects, adventureColor, gearSets, modelSpec, owned, partMade } from '../../lib/items.js';
 import { confirmHere } from '../../lib/windows.js';
+import { EffectRows, Pips } from '../EffectRows.js';
 import { Cabinet } from '../Cabinet.js';
 import { ModelView } from '../ModelView.js';
 
@@ -152,13 +153,11 @@ function Forge({ adventure, model, onChange }) {
  * @param {{ adventure: AdventureRecord, set: { deity: { id: string, name: string } | null, items: AdventureRecord[] } }} props
  */
 function ItemSheetView({ adventure, set }) {
-    const entities = useWorkspaceStore((s) => s.entities);
     const saveItem = useWorkspaceStore((s) => s.saveItem);
     const [sheet, setSheet] = useState(() => sheetOf(adventure));
     const [error, setError] = useState(/** @type {string | null} */ (null));
     const pending = useRef(/** @type {Partial<ItemSheet>} */ ({}));
     const timer = useRef(/** @type {any} */ (0));
-    const skills = entities.filter((e) => e.type === 'skill');
 
     const flush = async () => {
         clearTimeout(timer.current);
@@ -176,8 +175,6 @@ function ItemSheetView({ adventure, set }) {
         clearTimeout(timer.current);
         timer.current = setTimeout(flush, SAVE_MS);
     };
-    const putEffect = (/** @type {number} */ i, /** @type {Partial<ItemEffect>} */ c) => change({ effects: sheet.effects.map((e, j) => (j === i ? { ...e, ...c } : e)) });
-    const addEffect = (/** @type {number} */ amount) => change({ effects: [...sheet.effects, { text: '', target: 'other', amount }] });
     const have = set.items.filter(owned).length;
 
     return html`
@@ -185,21 +182,9 @@ function ItemSheetView({ adventure, set }) {
             <h3>${adventure.title ?? 'Untitled'}</h3>
             <p className="nec-dim"><${Matter} phase=${adventure.phase} />${set.deity && ` · ⟁ ${set.deity.name}`}</p>
             <label className="ana-field"><span>Purpose</span><textarea className="ana-notes" rows=${2} maxLength=${5000} value=${sheet.purpose} placeholder="What it is for" onInput=${(/** @type {any} */ e) => change({ purpose: e.target.value })}></textarea></label>
-            <h4>Boosts, buffs and debuffs</h4>
-            ${sheet.effects.map((e, i) => html`
-                <div className="inv-fx" key=${i}>
-                    <b className=${e.amount < 0 ? 'down' : 'up'}>${e.amount < 0 ? '▼' : '▲'}</b>
-                    <input type="text" value=${e.text} maxLength=${200} placeholder="Effect" aria-label="Effect" onInput=${(/** @type {any} */ ev) => putEffect(i, { text: ev.target.value })} />
-                    <select value=${e.target} aria-label="Affects" onChange=${(/** @type {any} */ ev) => putEffect(i, { target: ev.target.value })}>
-                        ${skills.map((s) => html`<option key=${s.id} value=${s.id}>✧ ${s.name}</option>`)}
-                        <option value="favor">Favor</option><option value="other">Other</option>
-                    </select>
-                    <input type="number" step="5" min="-1000" max="1000" value=${e.amount} aria-label="Percent" onInput=${(/** @type {any} */ ev) => putEffect(i, { amount: Number(ev.target.value) || 0 })} />
-                    <button className="pclose" aria-label="Remove effect" onClick=${() => change({ effects: sheet.effects.filter((_, j) => j !== i) })}>✕</button>
-                </div>
-            `)}
-            <div className="nec-actions"><button className="cls-layer" onClick=${() => addEffect(10)}>+ Buff</button><button className="cls-layer" onClick=${() => addEffect(-10)}>+ Debuff</button></div>
-            <p className="nec-dim">Percentages, active while the item is an artifact. Recorded for now: nothing applies them yet.</p>
+            <h4>Buffs and debuffs</h4>
+            <${EffectRows} effects=${sheet.effects} onChange=${(/** @type {ItemEffect[]} */ effects) => change({ effects })} />
+            <p className="nec-dim">Rated buffs to skills. They count in an adventure of the same deity once the item is readied there (the Arena).</p>
             ${set.deity && html`
                 <h4>${set.deity.name} set</h4>
                 <div className="inv-set" style=${{ '--c': adventureColor(adventure) }}><i style=${{ width: `${(have / set.items.length) * 100}%` }}></i></div>
@@ -241,7 +226,7 @@ export function InventoryPanel() {
         setPicked(id);
         if (mode === 'adventures') selectItem(id, 'inventory');
     };
-    const nameOf = (/** @type {string} */ target) => (target === 'favor' ? 'Favor' : entities.find((e) => e.id === target)?.name ?? 'Unknown skill');
+    const nameOf = (/** @type {string} */ target) => (entities.find((e) => e.id === target)?.name ?? 'Unknown skill');
 
     if (!shown) return html`<div className="panel-body inventory"><div className="nc-empty">No items yet<small>Item adventures appear here, by the deity they serve</small></div></div>`;
     const set = /** @type {(typeof sets)[number]} */ (sets.find((s) => s.items.includes(shown)));
@@ -250,8 +235,8 @@ export function InventoryPanel() {
             <div className="inv-cab"><${Cabinet} groups=${groups} look=${LOOK} selectedId=${shown.id} onSelect=${pick} label="Items" /></div>
             <div className="inv-side">
                 ${effects.length > 0 && html`
-                    <section className="nec-pane"><h4>Active effects</h4>
-                        <div className="inv-active">${effects.map(([t, n]) => html`<span key=${t} className=${n < 0 ? 'down' : 'up'}>${nameOf(t)} ${n > 0 ? '+' : ''}${n}%</span>`)}</div>
+                    <section className="nec-pane"><h4>Owned effects</h4>
+                        <div className="inv-active">${effects.map(([t, n]) => html`<span key=${t}>${nameOf(t)} <${Pips} rating=${n} /></span>`)}</div>
                     </section>
                 `}
                 <${ItemSheetView} key=${shown.id} adventure=${shown} set=${set} />

@@ -490,6 +490,8 @@ const workspaceStore = (set, get) => ({
             console.error('[state] could not load saved filters', err);
         }
         get().loadLayoutPresets();
+        getJson('/api/state/anvil').then((s) => s && set({ pins: s.pins }));
+        getJson('/api/state/idols').then((s) => s && set({ idols: s.idols }));
         // items become past (and fall behind the Hermetic Seal) as time passes
         setInterval(() => set((state) => withVisible(state, {})), 60_000);
         startFeed(get);
@@ -850,6 +852,19 @@ const workspaceStore = (set, get) => ({
     setWarden: async (siteId, entityId, on) => {
         const res = await sendJson(`/api/entities/${siteId}/wardens/${entityId}`, on ? 'PUT' : 'DELETE');
         return typeof res === 'string' ? res : null;
+    },
+
+    setSpellSkill: async (spellId, skillId, on) => {
+        const res = await sendJson(`/api/entities/${spellId}/skills/${skillId}`, on ? 'PUT' : 'DELETE');
+        return typeof res === 'string' ? res : null;
+    },
+
+    pins: [],
+    setPins: (pins) => { set({ pins }); scheduleSave('anvil', () => ({ pins: get().pins })); },
+    idols: {},
+    setIdol: (id, changes) => {
+        set((s) => ({ idols: { ...s.idols, [id]: { description: null, skills: [], ...s.idols[id], ...changes } } }));
+        scheduleSave('idols', () => ({ idols: get().idols }));
     },
 
     complexFocus: null,

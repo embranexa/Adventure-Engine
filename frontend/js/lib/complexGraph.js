@@ -20,6 +20,7 @@ import { entityColor } from './lens.js';
  * @typedef {{ player: Entity, shared: Entity[], score: number, member: LinkedEntity | null }} Ranked
  */
 
+const ADVERSARY = '#ef4444';
 const BACKBONE = '#f5c542';
 /** The adventure takes its matter's colour. */
 const CORE_COLORS = { site: '#06b6d4', party: '#3b82f6' };
@@ -95,6 +96,13 @@ export function buildComplex(adventure, entities) {
             size: s.stage === 'recruitment' ? 4 : 5.5, dim: status === 'resisted', glow: s.stage !== 'recruitment',
         });
         g.edges.push({ a: `p:${m.id}`, b: 'party', color: s.color, ...BONDS[status] });
+    });
+    // adversaries face the adventure
+    const foes = adventure.adversaries, half = foes.length > 1 ? Math.min(60, foes.length * 14) : 0;
+    arc(foes.length, [0, 0], 100 - half, 100 + half, 78).forEach((pos, i) => {
+        const id = `foe:${foes[i].entity_id ?? foes[i].name}`;
+        g.nodes.push({ id, entityId: foes[i].entity_id, kind: 'steward', label: foes[i].name, sub: '⚔ Adversary', color: ADVERSARY, pos, size: 5, glow: true });
+        g.edges.push({ a: id, b: 'adventure', color: ADVERSARY, width: 0.8, style: 'jagged', arrow: true });
     });
     return g;
 

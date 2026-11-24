@@ -6,6 +6,8 @@ import { centrifugeOrder, useWorkspaceStore } from '../../store.js';
 import { formatEventWhen, formatPrice, safeHttpUrl } from '../../events.js';
 import { ADVENTURE_FLAGS, ADVENTURE_TYPES, MAIN_ROUTE, PHASE_STAGES, hasWhenWhere, stageOf } from '../../lifecycle.js';
 import { AdventureEditor } from './AdventureEditor.js';
+import { Adversaries } from '../Adversaries.js';
+import { Objectives } from '../Objectives.js';
 import { EntityLinks } from '../EntityLinks.js';
 
 // details keys shown in their own rows; any others are listed generically below
@@ -320,6 +322,8 @@ export function NodeCard() {
                         : html`<${ItemActions} item=${event} />`}
                     ${event.kind === 'adventure' && !editing && html`<${FlagToggles} adventure=${event} />`}
                     ${event.kind === 'adventure' && html`<${EntityLinks} adventure=${event} />`}
+                    ${event.kind === 'adventure' && event.type === 'battle' && html`<${Adversaries} key=${`v${event.id}`} adventure=${event} />`}
+                    ${event.kind === 'adventure' && html`<${Objectives} key=${`o${event.id}`} adventure=${event} edit=${true} />`}
                     ${!(event.kind === 'adventure' && editing) && html`<${EventRows} event=${event} />`}
                 `
                 : html`

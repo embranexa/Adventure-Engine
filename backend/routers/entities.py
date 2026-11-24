@@ -77,6 +77,17 @@ async def remove_warden(site_id: uuid.UUID, entity_id: uuid.UUID):
     return await _entity_link(entity_id, site_id, "warden", False)
 
 
+@router.put("/entities/{spell_id}/skills/{skill_id}")
+async def add_spell_skill(spell_id: uuid.UUID, skill_id: uuid.UUID):
+    """A skill the spell is cast with."""
+    return await _entity_link(spell_id, skill_id, "uses", True)
+
+
+@router.delete("/entities/{spell_id}/skills/{skill_id}")
+async def remove_spell_skill(spell_id: uuid.UUID, skill_id: uuid.UUID):
+    return await _entity_link(spell_id, skill_id, "uses", False)
+
+
 @router.put("/adventures/{adventure_id}/entities/{entity_id}")
 async def link_entity(adventure_id: uuid.UUID, entity_id: uuid.UUID):
     """Link an entity to an adventure (an event's site replaces its previous one)."""

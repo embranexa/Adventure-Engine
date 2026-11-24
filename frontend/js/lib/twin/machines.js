@@ -35,7 +35,7 @@ const RIM_COLORS = { include: '#e6ebf2', exclude: '#ff4a3d' };
 const PACE_S = 0.5;          // a mechanism winds up or down in this long
 
 /** Plinth radius per body: the base is sized to the machine. */
-export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, cohort: 9, agora: 9, inventory: 9, pantheon: 10, mastery: 8, nexus: 8, atlas: 7, calendar: 8, ledger: 8, enricher: 8, sieve: 8 };
+export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, cohort: 9, complex: 9, agora: 9, inventory: 9, pantheon: 10, mastery: 8, nexus: 8, atlas: 7, calendar: 8, ledger: 8, enricher: 8, sieve: 8 };
 
 /** Which body a node gets. */
 export function bodyOf(node) {
@@ -730,6 +730,25 @@ const BODIES = {
         for (const s of [-1, 1]) g.add(tube([V(s * 1.4, Y + 11, 0), V(s * 3.6, Y + 11.4, 0), V(s * 4.2, Y + 8.6, 0), V(s * 3.4, Y + 6.8, 0)], 0.28, M.gilt, 24));
         if (node.locked) chain(c, g, 7.6);
         return { group: g, height: Y + 15 };
+    },
+    // an orrery of three linked rings: adventure, site and party (with its players)
+    complex(c) {
+        const { G, M, color, light, cyl, torus, lathe, tube, gem, finial, additive, CIRCLE, mine, ownGlow, busy, a } = c;
+        const g = G(), cy = Y + 13;
+        g.add(lathe([[5.4, Y], [5, Y + 0.8], [2, Y + 1.8], [1.1, Y + 5], [1.7, Y + 6], [0.8, Y + 7]], M.brass, 40));
+        for (let i = 0; i < 3; i++) { const t = (i / 3) * TAU; g.add(tube([V(0, Y + 6, 0), V(Math.cos(t) * 2.6, Y + 7.6, Math.sin(t) * 2.6), V(Math.cos(t) * 4.4, Y + 10, Math.sin(t) * 4.4)], 0.3, M.gilt, 18)); }
+        const spin = G(); spin.position.y = cy; g.add(spin);
+        const rings = [[0, color, 4.6], [TAU / 3, '#06b6d4', 3.8], [(2 * TAU) / 3, '#3b82f6', 3.8]].map(([t, col, R], k) => {
+            const hold = G(); hold.position.set(Math.cos(t) * 3.4, 0, Math.sin(t) * 3.4); hold.rotation.set(0.5 + k, t, 0.35 * k); spin.add(hold);
+            hold.add(torus(R, 0.34, k ? M.brass : M.gilt, 0), torus(R - 0.5, 0.1, mine(ownGlow(col, 1.6)), 0));
+            const disc = new THREE.Mesh(new THREE.CircleGeometry(R - 0.6, 48), mine(additive(CIRCLE.inner, col, 0.5))); disc.rotation.x = -Math.PI / 2; hold.add(disc);
+            const core = gem(col, 1.1); hold.add(core);
+            return { hold, core };
+        });
+        for (let i = 0; i < 5; i++) { const t = (i / 5) * TAU, orb = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10), mine(ownGlow('#9fc2ff', 1.2))); orb.position.set(Math.cos(t) * 3.8, 0, Math.sin(t) * 3.8); rings[2].hold.add(orb); }
+        const f = finial(0.6); f.position.y = cy + 6.6; g.add(f);
+        a.push((dt) => { const k = busy(); spin.rotation.y += dt * 0.22 * k; rings.forEach((r, i) => { r.hold.rotation.y += dt * (0.3 + i * 0.12) * k; r.core.rotation.y -= dt * k; }); });
+        return { group: g, height: Y + 22 };
     },
     // twelve standing figures (the archetypes) around a brazier
     cohort(c) {

@@ -61,6 +61,7 @@ function EntityDetail({ obj, onBack }) {
     useEffect(() => setPlaceNote(null), [obj.id]);
 
     const t = ENTITY_TYPES[obj.type];
+    const setSpellSkill = useWorkspaceStore((s) => s.setSpellSkill);
     const setWarden = useWorkspaceStore((s) => s.setWarden);
     const entities = useWorkspaceStore((s) => s.entities);
     const held = adventures.flatMap((a) => a.stewards.filter((s) => s.id === obj.id).map((s) => ({ a, role: s.role })));
@@ -136,6 +137,14 @@ function EntityDetail({ obj, onBack }) {
                         onRemove=${async (/** @type {string} */ id) => setError(await setWarden(obj.id, id, false))} />
                 </div>
             `}
+            ${obj.type === 'spell' && html`
+                <div className="ol">
+                    <div className="ol-head">Cast with</div>
+                    <${EntityPicker} ids=${obj.skills} types=${['skill']} placeholder="+ A skill it uses…"
+                        onAdd=${async (/** @type {string} */ id) => setError(await setSpellSkill(obj.id, id, true))}
+                        onRemove=${async (/** @type {string} */ id) => setError(await setSpellSkill(obj.id, id, false))} />
+                </div>
+            `}
             ${(held.length > 0 || kept.length > 0) && html`
                 <div className="cx-linked">
                     <div className="cx-linked-head">Stewardships <b>${held.length + kept.length}</b></div>
@@ -180,7 +189,7 @@ function EntityDetail({ obj, onBack }) {
 }
 
 /**
- * The Codex: entities (deities, sites, players, organizations, skills) that adventures link to. Browse
+ * The Codex: entities (deities, sites, players, organizations, skills, spells) that adventures link to. Browse
  * by type, search, create; open one to edit it and see its adventures. Linking happens
  * in the Refinery; entities show as stars in the Nexus (in their colour), sites as pins on the Atlas.
  */
@@ -250,7 +259,7 @@ export function CodexPanel() {
                 ${shown.length === 0 && html`
                     <div className="nc-empty cx-none">
                         ${entities.length ? 'Nothing matches' : 'The Codex is empty'}
-                        <small>${entities.length ? 'Try another search, or create it above' : 'Deities, sites, players, organizations and skills you make here can be linked to adventures'}</small>
+                        <small>${entities.length ? 'Try another search, or create it above' : 'Deities, sites, players, organizations, skills and spells you make here can be linked to adventures'}</small>
                     </div>
                 `}
                 ${shown.map((o) => html`

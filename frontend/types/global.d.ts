@@ -138,6 +138,10 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     collaboration: boolean;
     /** Its linked site, if any; a hand-made event takes its where from it. */
     site_id: string | null;
+    objectives: Objective[];
+    preparations: Preparation[];
+    /** Battles only. */
+    adversaries: Adversary[];
     /** Free text for now (the Agora later). */
     costs: string | null;
     rewards: string | null;
@@ -156,15 +160,25 @@ interface ModelPart {
     act?: string | null;
     [size: string]: unknown;
 }
-/** `target`: "favor", "other" or a skill entity's id; `amount` in percent. */
-interface ItemEffect { text: string; target: string; amount: number }
+/** A buff (or debuff) to a skill, rated 1 to 3 (or -1 to -3). */
+interface ItemEffect { skill: string; rating: number; text: string }
+interface Objective { id: string; text: string; kind: 'primary' | 'bonus'; state: 'open' | 'achieved' | 'failed' }
+/** Something readied: an owned item of the gear set, or free text with its own effects. */
+interface Preparation { id: string; item: string | null; text: string; checked: boolean; effects: ItemEffect[] }
+interface Adversary { entity_id: string | null; name: string }
+/** An effect judged after the fact; keys of ones added by hand start with "own:". */
+interface FeedbackRow { key: string; label: string; skill: string | null; rating: number; result: 'helped' | 'none' | 'hurt' | null }
+/** An action laid on the anvil. */
+interface Pin { adventure: string; action: string }
+/** What you wrote about an archetype; null description: the built-in one. */
+interface IdolNotes { description: string | null; skills: string[] }
 interface ItemSheet { purpose: string; effects: ItemEffect[]; model: ModelPart[] | null; forge: ForgeState | null }
 /** Claude's work on an item's model (backend/services/forge.py). */
 interface ForgeState { status: 'forging' | 'ready' | 'failed'; text: string; at: string; proposal: ModelPart[] | null; error?: string | null }
 
 /** How a move is graded (js/lib/analysis.js GRADES). */
 type MoveGrade = 'brilliant' | 'great' | 'best' | 'excellent' | 'good' | 'book' | 'forced' | 'inaccuracy' | 'mistake' | 'miss' | 'blunder';
-interface AnalysisMove { text: string; grade: MoveGrade; better: string; /** skill entity ids */ skills: string[] }
+interface AnalysisMove { text: string; grade: MoveGrade; better: string; /** a spell entity's id */ spell: string | null; /** skill entity ids */ skills: string[] }
 interface AnalysisLine { name: string; qty: string; unit: string }
 interface Discovery { type: EntityType; name: string; entity_id: string | null }
 /** A completed adventure's analysis, as edited. */
@@ -177,13 +191,14 @@ interface Analysis {
     losses: AnalysisLine[];
     discoveries: Discovery[];
     moves: AnalysisMove[];
+    feedback: FeedbackRow[];
 }
 
 /** Why an adventure died (js/lifecycle.js EPITAPH_CAUSES). */
 type EpitaphCause = 'lost_interest' | 'no_time' | 'too_costly' | 'blocked' | 'superseded' | 'outside_control' | 'missed';
 
-/** event | item | performance; only events have a when/where (js/lifecycle.js ADVENTURE_TYPES). */
-type AdventureType = 'event' | 'item' | 'performance';
+/** event | item | performance | battle; items have no when/where (js/lifecycle.js ADVENTURE_TYPES). */
+type AdventureType = 'event' | 'item' | 'performance' | 'battle';
 
 /** Fields an adventure can set itself (backend/services/adventures.py). */
 interface AdventureOwnFields {
@@ -210,6 +225,7 @@ type AdventureChanges = Partial<{
     venue: string | null; address: string | null; city: string | null; lat: number | null; lon: number | null;
     all_day: boolean | null; recurrence: { days: number[]; until: string | null } | null;
     costs: string | null; rewards: string | null; flags: AdventureFlag[];
+    objectives: Objective[]; preparations: Preparation[]; adversaries: Adversary[];
 }>;
 
 /** An adventure's action roadmap: a dependency graph (backend/services/roadmap.py). */
@@ -277,7 +293,7 @@ interface FilterState {
 }
 
 /** "stage" (Matter) or a facet that can color rows. */
-type LensKey = 'none' | 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'collaboration' | 'type' | 'deity' | 'site' | 'player' | 'organization' | 'skill';
+type LensKey = 'none' | 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'collaboration' | 'type' | 'deity' | 'site' | 'player' | 'organization' | 'skill' | 'spell';
 
 /** One move between signal chain nodes (backend/services/transitions.py). */
 interface TransitionRecord {
@@ -299,7 +315,7 @@ interface FlowRecord {
 }
 
 /** deity | site | player | organization | skill (js/lifecycle.js ENTITY_TYPES); only sites have a location. */
-type EntityType = 'deity' | 'site' | 'player' | 'organization' | 'skill';
+type EntityType = 'deity' | 'site' | 'player' | 'organization' | 'skill' | 'spell';
 
 /** ids in js/lifecycle.js ARCHETYPES */
 type Archetype = 'vanguard' | 'performer' | 'enchanter' | 'juggernaut' | 'rogue' | 'summoner' | 'resonator' | 'merchant' | 'artificer' | 'wizard' | 'cleric' | 'patron';
@@ -307,7 +323,7 @@ interface PlayerDetails { email?: string; phone?: string; handle?: string; arche
 type PartyStatus = 'resonant' | 'charging' | 'attuning' | 'resisted' | 'bonded' | 'emergent' | 'annealed' | 'neutralized' | 'repelled';
 type StewardRole = 'herald' | 'commissioner' | 'warden';
 /** An entity linked to an adventure; a player's link is its place in the party. */
-interface LinkedEntity { id: string; type: EntityType; name: string; status?: PartyStatus; status_at?: string | null; note?: string | null; impact?: string | null; follow_up?: string | null }
+interface LinkedEntity { id: string; type: EntityType; name: string; status?: PartyStatus; status_at?: string | null; role?: string | null; note?: string | null; impact?: string | null; follow_up?: string | null }
 interface PartyLogEntry { id: number; at: string; player_id: string; from: PartyStatus | null; to: PartyStatus | null }
 
 /** An entity (the Codex): something adventures link to (backend/services/entities.py). */
@@ -326,6 +342,8 @@ interface Entity {
     details: PlayerDetails;
     /** players: ids of what it resonates with */
     affinities: string[];
+    /** spells: ids of the skills they're cast with */
+    skills: string[];
     /** sites: ids of the players and organizations that keep it */
     wardens: string[];
     /** "#rrggbb" chosen in the Codex; null = default (entityColor in lib/lens.js) */
@@ -478,10 +496,17 @@ interface WorkspaceState {
     ambrosia: AmbrosiaLedger;
     setAmbrosia(ambrosia: AmbrosiaLedger): void;
     /** Add a player to a party or change its place there. These resolve to an error message, or null. */
-    setPartyMember(adventureId: string, playerId: string, changes: { status?: PartyStatus; note?: string | null; impact?: string | null; follow_up?: string | null }): Promise<string | null>;
+    setPartyMember(adventureId: string, playerId: string, changes: { status?: PartyStatus; role?: string | null; note?: string | null; impact?: string | null; follow_up?: string | null }): Promise<string | null>;
     setSteward(adventureId: string, entityId: string, role: 'herald' | 'commissioner', on: boolean): Promise<string | null>;
     setAffinity(playerId: string, entityId: string, on: boolean): Promise<string | null>;
     setWarden(siteId: string, entityId: string, on: boolean): Promise<string | null>;
+    setSpellSkill(spellId: string, skillId: string, on: boolean): Promise<string | null>;
+    /** Actions laid on the anvil (the Crucible), in order. */
+    pins: Pin[];
+    setPins(pins: Pin[]): void;
+    /** What you wrote about each archetype (the Cohort). */
+    idols: Partial<Record<Archetype, IdolNotes>>;
+    setIdol(id: Archetype, changes: Partial<IdolNotes>): void;
     /** The player the Complex should open (set by openInComplex). */
     complexFocus: { adventureId: string; playerId: string; at: number } | null;
     /** Select an adventure and show one of its players in the Complex. */

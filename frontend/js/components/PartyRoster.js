@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { PARTY_STATUSES, STEWARD_ROLES } from '../lifecycle.js';
@@ -27,12 +27,24 @@ export function StatusSelect({ adventure, member, onError }) {
     `;
 }
 
+/** What a player does in this adventure, saved on leaving the box. @param {{ adventure: AdventureRecord, member: LinkedEntity, onError: (e: string | null) => void }} props */
+function RoleBox({ adventure, member, onError }) {
+    const setPartyMember = useWorkspaceStore((s) => s.setPartyMember);
+    const [draft, setDraft] = useState(member.role ?? '');
+    useEffect(() => setDraft(member.role ?? ''), [member.role]);
+    return html`<input className="pr-rolebox" value=${draft} maxLength=${60} placeholder="Role" aria-label=${`${member.name}’s role`}
+        onInput=${(/** @type {any} */ e) => setDraft(e.target.value)}
+        onKeyDown=${(/** @type {KeyboardEvent} */ e) => { if (e.key === 'Enter') /** @type {HTMLElement} */ (e.target).blur(); if (e.key === 'Escape') setDraft(member.role ?? ''); }}
+        onBlur=${async () => { if (draft.trim() !== (member.role ?? '')) onError(await setPartyMember(adventure.id, member.id, { role: draft })); }} />`;
+}
+
 /**
  * An adventure's players with their statuses (and follow-ups due), compact: the Refinery,
  * Crucible and Arena. A name opens that player in the Complex. Nothing when there's no one.
- * @param {{ adventure: AdventureRecord, stewards?: boolean, removable?: boolean }} props
+ * @param {{ adventure: AdventureRecord, stewards?: boolean, removable?: boolean, roles?: boolean }} props
+ *   roles: a box for what each player in it does here
  */
-export function PartyRoster({ adventure, stewards = false, removable = false }) {
+export function PartyRoster({ adventure, stewards = false, removable = false, roles = false }) {
     const entities = useWorkspaceStore((s) => s.entities);
     const pooled = useWorkspaceStore((s) => Boolean(s.itemsById[adventure.id]));
     const openInComplex = useWorkspaceStore((s) => s.openInComplex);
@@ -58,6 +70,7 @@ export function PartyRoster({ adventure, stewards = false, removable = false }) 
                     <div key=${m.id} className="pr-row" style=${{ '--c': PARTY_STATUSES[m.status ?? 'resonant'].color }}>
                         <i></i>
                         <button className="pr-name" disabled=${!pooled} title=${pooled ? 'Open in the Complex' : 'Not in the current pool'} onClick=${() => openInComplex(adventure.id, m.id)}>${m.name}</button>
+                        ${roles && m.status != null && PARTY_STATUSES[m.status].stage === 'active' ? html`<${RoleBox} adventure=${adventure} member=${m} onError=${setError} />` : m.role && html`<span className="pr-role">${m.role}</span>`}
                         ${due && html`<span className=${`pr-due ${due <= today ? 'late' : ''}`} title="Follow up">◷ ${parseDay(due).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>`}
                         <${StatusSelect} adventure=${adventure} member=${m} onError=${setError} />
                         ${removable && html`<button className="ol-chip-x" aria-label=${`Unlink ${m.name}`} title="Unlink" onClick=${async () => setError(await unlinkEntity(adventure.id, m.id))}>✕</button>`}

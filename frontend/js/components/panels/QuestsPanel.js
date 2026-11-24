@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { PHASE_STAGES } from '../../lifecycle.js';
@@ -61,6 +61,8 @@ export function QuestsPanel() {
     const selectItem = useWorkspaceStore((s) => s.selectItem);
     const hoverItem = useWorkspaceStore((s) => s.hoverItem);
     const saveRoadmap = useWorkspaceStore((s) => s.saveRoadmap);
+    const pins = useWorkspaceStore((s) => s.pins);
+    const setPins = useWorkspaceStore((s) => s.setPins);
     const [completing, setCompleting] = useState(() => new Set(/** @type {string[]} */ ([])));
 
     const groups = useMemo(
@@ -71,6 +73,30 @@ export function QuestsPanel() {
     );
     const questCount = groups.reduce((n, g) => n + g.analysis.bottlenecks.length, 0);
     const crucible = PHASE_STAGES.constructing;
+
+    // the anvil: pinned actions, in order. Done ones (and deleted ones) leave it; locked ones
+    // wait out of sight until they're ready again.
+    useEffect(() => {
+        if (!adventures.length) return;
+        const kept = pins.filter((p) => {
+            const road = adventures.find((a) => a.id === p.adventure)?.roadmap;
+            return road?.actions.some((x) => x.id === p.action) && !road.done.includes(p.action);
+        });
+        if (kept.length !== pins.length) setPins(kept);
+    }, [adventures, pins]);
+    const anvil = pins.flatMap((pin) => {
+        const g = groups.find((x) => x.adventure.id === pin.adventure), quest = g?.analysis.bottlenecks.find((q) => q.id === pin.action);
+        return g && quest ? [{ pin, adventure: g.adventure, quest }] : [];
+    });
+    const pinned = (/** @type {string} */ a, /** @type {string} */ q) => pins.some((p) => p.adventure === a && p.action === q);
+    const lay = (/** @type {string} */ adventure, /** @type {string} */ action) => setPins([...pins, { adventure, action }]);
+    const lift = (/** @type {Pin} */ pin) => setPins(pins.filter((p) => p !== pin));
+    /** Swap with the one shown above or below. @param {number} i @param {1 | -1} way */
+    const move = (i, way) => {
+        const next = [...pins], x = next.indexOf(anvil[i].pin), y = next.indexOf(anvil[i + way].pin);
+        [next[x], next[y]] = [next[y], next[x]];
+        setPins(next);
+    };
 
     /** @param {AdventureRecord} adventure @param {string} actionId */
     const complete = (adventure, actionId) => {
@@ -106,6 +132,29 @@ export function QuestsPanel() {
                 <span>· ${groups.length} ${crucible.matter}</span>
             </div>
             <div className="ql-list">
+                ${anvil.length > 0 && html`
+                    <section className="anvil">
+                        <div className="anvil-head">⚒ On the anvil <b>${anvil.length}</b></div>
+                        ${anvil.map(({ pin, adventure, quest }, i) => {
+                            const pay = nextActionPay(adventure);
+                            return html`
+                                <div key=${`${adventure.id}:${quest.id}`} className=${`ql-quest ${completing.has(`${adventure.id}:${quest.id}`) ? 'completing' : ''}`}>
+                                    <button className="ql-check" onClick=${() => complete(adventure, quest.id)} aria-label=${`Complete ${quest.title}`} title="Complete">
+                                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"></path></svg></button>
+                                    <span className="ql-quest-text">
+                                        <span className="ql-quest-title">${quest.title}</span>
+                                        ${quest.notes && html`<span className="ql-quest-notes">${quest.notes}</span>`}
+                                        <button className="anvil-of" disabled=${!inPool(adventure.id)} onClick=${() => selectItem(adventure.id, 'quests')}>${adventure.title}</button>
+                                    </span>
+                                    ${pay > 0 && html`<span className="ql-pay" title="Ambrosia for the next action">+${pay}</span>`}
+                                    <span className="anvil-move">
+                                        <button disabled=${i === 0} aria-label=${`Move ${quest.title} up`} onClick=${() => move(i, -1)}>▲</button>
+                                        <button disabled=${i === anvil.length - 1} aria-label=${`Move ${quest.title} down`} onClick=${() => move(i, 1)}>▼</button>
+                                    </span>
+                                    <button className="anvil-btn on" aria-label=${`Take ${quest.title} off the anvil`} title="Take off the anvil" onClick=${() => lift(pin)}>⚒</button>
+                                </div>`;
+                        })}
+                    </section>`}
                 ${groups.map(({ adventure, analysis }) => {
                     const due = dueLabel(adventure.start);
                     const target = promotionTarget(adventure.phase);
@@ -140,7 +189,7 @@ export function QuestsPanel() {
                                 <div className="ql-none">No roadmap yet — draft one in the Alembic</div>
                             `}
                             ${analysis.complete && target && html`<${PromoteButton} adventureId=${adventure.id} target=${target} compact=${true} />`}
-                            ${analysis.bottlenecks.map((quest) => {
+                            ${analysis.bottlenecks.filter((q) => !pinned(adventure.id, q.id)).map((quest) => {
                                 const key = `${adventure.id}:${quest.id}`;
                                 return html`
                                     <div key=${quest.id} className=${`ql-quest ${completing.has(key) ? 'completing' : ''}`}>
@@ -153,6 +202,8 @@ export function QuestsPanel() {
                                             ${quest.notes && html`<span className="ql-quest-notes">${quest.notes}</span>`}
                                         </span>
                                         ${pay > 0 && html`<span className="ql-pay" title="Ambrosia for the next action">+${pay}</span>`}
+                                        <button className="anvil-btn" aria-label=${`Lay ${quest.title} on the anvil`} title="Lay on the anvil: to the top"
+                                            onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); lay(adventure.id, quest.id); }}>⚒</button>
                                         <span className="ql-quest-id">${quest.id}</span>
                                     </div>
                                 `;

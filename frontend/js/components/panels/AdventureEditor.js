@@ -203,7 +203,7 @@ export function Field({ label, value, kind = 'text', placeholder = '', overridde
 
 /**
  * Edit an adventure in place: its type (hand-made only), title, description, when/where
- * (events only), link and cover. Each field saves on its own; the card above updates live.
+ * (not items), link and cover. Each field saves on its own; the card above updates live.
  * @param {{ adventure: PoolItem & { kind: 'adventure' }, focusTitle: boolean, onDone: () => void }} props
  */
 export function AdventureEditor({ adventure, focusTitle, onDone }) {
@@ -217,7 +217,7 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
 
     const own = adventure.own;
     const crawled = adventure.event_id != null;
-    const isEvent = adventure.type === 'event';
+    const placed = adventure.type !== 'item'; // items have no when/where
     // a hand-made event with a linked site takes its where from the site
     const site = !crawled && adventure.site_id ? entities.find((o) => o.id === adventure.site_id) ?? null : null;
 
@@ -233,8 +233,8 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
     /** @param {AdventureType} type */
     const setType = (type) => {
         if (type === adventure.type) return;
-        const losesWhenWhere = isEvent && (own.start || own.venue || own.address || own.city || own.lat != null);
-        if (losesWhenWhere && !confirmHere(`A ${type} has no when or where: its time and place will be cleared. Continue?`)) return;
+        const losesWhenWhere = type === 'item' && (own.start || own.venue || own.address || own.city || own.lat != null);
+        if (losesWhenWhere && !confirmHere(`An item has no when or where: its time and place will be cleared. Continue?`)) return;
         save({ type });
     };
 
@@ -287,7 +287,7 @@ export function AdventureEditor({ adventure, focusTitle, onDone }) {
                 <${Field} label="Rewards" placeholder="What you get out of it" ...${text('rewards')} />
             </div>
 
-            ${isEvent && html`
+            ${placed && html`
                 <${WhenEditor} adventure=${adventure} crawled=${crawled} save=${save} />
                 ${site
                     ? html`

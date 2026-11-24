@@ -22,9 +22,9 @@ async def get_adventures(session: AsyncSession = Depends(get_session)):
 
 @router.post("")
 async def create_adventure(payload: AdventureCreate):
-    """A hand-made adventure (event, item or performance) in ore. 422 if a field is invalid."""
+    """A hand-made adventure (event, item, performance or battle) in ore. 422 if a field is invalid."""
     try:
-        return await adventures.create_adventure(payload.model_dump(exclude_unset=True) | {"type": payload.type})
+        return await adventures.create_adventure(payload.sent() | {"type": payload.type})
     except adventures.InvalidAdventure as e:
         raise HTTPException(422, str(e)) from e
 
@@ -32,7 +32,7 @@ async def create_adventure(payload: AdventureCreate):
 @router.patch("/{adventure_id}")
 async def update_adventure(adventure_id: uuid.UUID, payload: AdventureUpdate):
     """Set (or, with null, clear) the adventure's own fields. Only the fields sent change."""
-    changes = payload.model_dump(exclude_unset=True)
+    changes = payload.sent()
     if changes.get("type") is None:
         changes.pop("type", None)
     with triage_errors():
