@@ -83,6 +83,14 @@ def _unlink_spells(conn: Connection) -> None:
     conn.execute(text(f"DELETE FROM entity_links WHERE from_id IN {spells} OR to_id IN {spells}"))
 
 
+def _fix_attributes(conn: Connection) -> None:
+    """2026-11-24: attributes became a fixed list (they were Codex entities for a day), and two
+    archetypes went (their players have none now)."""
+    conn.execute(text("DELETE FROM entities WHERE type = 'attribute'"))
+    conn.execute(text("""UPDATE entities SET details = json_remove(details, '$.archetype')
+        WHERE type = 'player' AND json_extract(details, '$.archetype') IN ('summoner', 'patron')"""))
+
+
 def _give_statuses(conn: Connection) -> None:
     """Players linked before parties existed get a status: emergent if a sealed analysis
     discovered them there, else resonant."""
@@ -109,6 +117,7 @@ async def init_db(sources: dict[str, str]) -> None:
         await conn.run_sync(_add_missing_columns)
         await conn.run_sync(_give_statuses)
         await conn.run_sync(_unlink_spells)
+        await conn.run_sync(_fix_attributes)
 
     async with SessionLocal() as session:
         existing = set((await session.scalars(select(EventSource.name))).all())
@@ -120,6 +129,7 @@ async def init_db(sources: dict[str, str]) -> None:
 
     await _migrate_saved_places()
     await _seed_spells()
+    await _rename_archetypes()
 
     async with engine.begin() as conn:
         # the Refiner was renamed the Refinery: logged moves keep working under the new id
@@ -128,6 +138,25 @@ async def init_db(sources: dict[str, str]) -> None:
 
     from backend.services.transitions import backfill  # avoids an import cycle
     await backfill()
+
+
+ARCHETYPE_RENAMES = {"performer": "bard", "resonator": "cleric", "cleric": "druid", "rogue": "ranger", "warlock": "templar"}
+
+
+async def _rename_archetypes() -> None:
+    """Once (2026-11-24). All at a time: the old cleric is the druid, and the resonator the new cleric."""
+    async with SessionLocal() as session:
+        if await session.get(AppState, "archetypes_renamed"):
+            return
+        for player in (await session.scalars(select(Entity).where(Entity.type == "player"))).all():
+            new = ARCHETYPE_RENAMES.get((player.details or {}).get("archetype"))
+            if new:
+                player.details = {**player.details, "archetype": new}
+        row = await session.get(AppState, "idols")
+        if row:
+            row.value = {"idols": {ARCHETYPE_RENAMES.get(k, k): v for k, v in (row.value or {}).get("idols", {}).items()}}
+        session.add(AppState(key="archetypes_renamed", value=True))
+        await session.commit()
 
 
 SPELLS = ("Hook", "Propose", "Combine", "Transition", "Enter", "Exit", "Reflect", "Charge", "Discharge", "Deflect", "Evade")

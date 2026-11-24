@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
-import { ARCHETYPES, ENTITY_TYPES, UNLINKABLE, PARTY_STATUSES, PHASE_STAGES, STEWARD_ROLES } from '../../lifecycle.js';
+import { ARCHETYPES, ATTRIBUTES, ENTITY_TYPES, UNLINKABLE, PARTY_STATUSES, PHASE_STAGES, STEWARD_ROLES } from '../../lifecycle.js';
 import { PLACE_PLACEHOLDER, coordsText, readPlace } from '../../lib/places.js';
 import { PALETTE, entityColor } from '../../lib/lens.js';
 import { EntityPicker } from '../EntityPicker.js';
@@ -136,6 +136,18 @@ function EntityDetail({ obj, onBack }) {
                     <${EntityPicker} ids=${obj.wardens} types=${['player', 'organization']} placeholder="+ Who keeps this site…"
                         onAdd=${async (/** @type {string} */ id) => setError(await setWarden(obj.id, id, true))}
                         onRemove=${async (/** @type {string} */ id) => setError(await setWarden(obj.id, id, false))} />
+                </div>
+            `}
+            ${obj.type === 'skill' && html`
+                <div className="ae-field">
+                    <span className="ae-label">Fed by <em className="cx-hint">up to two</em></span>
+                    <div className="cx-attrs">
+                        ${/** @type {Attribute[]} */ (Object.keys(ATTRIBUTES)).map((id) => {
+                            const has = obj.details.attributes ?? [], on = has.includes(id);
+                            return html`<button key=${id} className=${`cls-layer ${on ? 'on' : ''}`} aria-pressed=${on} disabled=${!on && has.length >= 2} title=${ATTRIBUTES[id].hint}
+                                onClick=${() => save({ details: { attributes: on ? has.filter((x) => x !== id) : [...has, id] } })}>❖ ${ATTRIBUTES[id].label}</button>`;
+                        })}
+                    </div>
                 </div>
             `}
             ${obj.type === 'spell' && html`

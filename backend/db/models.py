@@ -178,10 +178,15 @@ class Adventure(Base):
 ENTITY_TYPES = ("deity", "site", "player", "organization", "skill", "spell")
 GEO_ENTITY_TYPES = ("site",)
 
-# What a player can be (one or none); names, idols and groups are in frontend/js/lifecycle.js.
-ARCHETYPES = ("vanguard", "performer", "enchanter", "juggernaut", "rogue", "summoner",  # ops
-              "resonator", "merchant", "artificer", "wizard",                           # tech
-              "cleric", "patron")                                                       # staff
+# What a player can be (one or none); names, orders, idols are in frontend/js/lifecycle.js.
+ARCHETYPES = ("juggernaut", "artificer", "terraformer",   # kratos
+              "wizard", "ranger", "merchant",             # logos
+              "enchanter", "druid", "bard",               # pathos
+              "vanguard", "templar", "cleric")            # ethos
+
+# What a person is (skills are what they can do): fixed. Archetypes have two, a skill is governed
+# by up to two, and buffs amplify either. Labels in frontend/js/lifecycle.js.
+ATTRIBUTES = ("strength", "endurance", "dexterity", "perception", "intellect", "charisma", "empathy", "resolve")
 
 # A player's status in an adventure's party (colours in frontend/js/lifecycle.js).
 RECRUITMENT_STATUSES = ("resonant", "charging", "attuning", "resisted")
@@ -196,8 +201,8 @@ STEWARD_ROLES = ("archon", "herald", "commissioner")
 STEWARD_TYPES = ("player", "organization")
 # What players can be linked to; shared links are their resonance with an adventure.
 AFFINITY_TYPES = ("deity", "site", "organization", "skill")
-# Spells are never linked to anything: their skills are those of the sealed plays that name
-# them (queries.spell_skills).
+# Never linked to anything. A spell's skills are those of the sealed plays that name it
+# (queries.spell_skills).
 UNLINKABLE_TYPES = ("spell",)
 ADVERSARY_TYPES = ("player", "organization")
 
@@ -217,7 +222,7 @@ class Entity(Base):
     city: Mapped[str | None] = mapped_column(String(200))
     lat: Mapped[float | None] = mapped_column(Float)
     lon: Mapped[float | None] = mapped_column(Float)
-    # type-specific extras: player {email, phone, handle, archetype, warmth 0-5, tags}
+    # type-specific extras: player {email, phone, handle, archetype, warmth 0-5, tags}; skill {attributes}
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     # "#rrggbb", chosen in the Codex; null = a stable default picked from the id (frontend)
     color: Mapped[str | None] = mapped_column(String(7))
@@ -309,7 +314,7 @@ class ItemSheet(Base):
     adventure_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("adventures.id", ondelete="CASCADE"), primary_key=True)
     purpose: Mapped[str] = mapped_column(Text, default="")
-    effects: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{skill, rating, text}]
+    effects: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{target, rating, text}]: an attribute, or a skill's id
     model: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)  # a recipe: parts
     # cover | model: which one shows when it has both (null: the model; items always show it)
     face: Mapped[str | None] = mapped_column(String(8), nullable=True)
@@ -356,7 +361,7 @@ class Enshrining(Base):
     gains: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)   # spoils: [{name, qty, unit}]
     losses: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # tithes
     discoveries: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # [{type, name, entity_id}]
-    # what helped or hurt: [{key, label, skill, rating, result: helped | none | hurt}]
+    # what helped or hurt: [{key, label, target, rating, result: helped | none | hurt}]
     feedback: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=list, nullable=True)
     sealed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     amended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

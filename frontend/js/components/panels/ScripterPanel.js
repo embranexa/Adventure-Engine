@@ -46,7 +46,7 @@ export function ScripterPanel() {
         // every quest starts with a verb; ones written before that may stay as they were
         const before = new Map(roadmap.actions.map((a) => [a.id, a.title]));
         const bare = result.roadmap.actions.find((a) => !splitTitle(a.title).verb && before.get(a.id) !== a.title);
-        if (bare) { setError(`${bare.id} needs a verb first: ${allVerbs(verbs).join(', ')}`); return; }
+        if (bare) { setError(`${bare.id} needs a verb first: ${allVerbs('quest', verbs).join(', ')}`); return; }
         setError(null);
         setDirty(false);
         saveRoadmap(adventure.id, result.roadmap);

@@ -5,6 +5,7 @@ import { PHASE_STAGES } from '../../lifecycle.js';
 import { analyze, promotionTarget, toggleDone } from '../../lib/roadmap.js';
 import { safeHttpUrl } from '../../events.js';
 import { nextActionPay, remaining } from '../../lib/bounty.js';
+import { onControl } from '../../lib/cards.js';
 import { splitTitle } from '../../lib/quests.js';
 import { modelSpec, showsModel } from '../../lib/items.js';
 import { ModelView } from '../ModelView.js';
@@ -179,7 +180,7 @@ export function QuestsPanel() {
                             key=${adventure.id}
                             className=${className}
                             title=${pooled ? '' : 'Not in the current pool (Discovery mode or filtered out)'}
-                            onClick=${() => pooled && selectItem(adventure.id, 'quests')}
+                            onClick=${(/** @type {MouseEvent} */ e) => pooled && !onControl(e) && selectItem(adventure.id, 'quests')}
                             onPointerEnter=${() => pooled && hoverItem(adventure.id)}
                             onPointerLeave=${() => pooled && hoverItem(null)}
                         >

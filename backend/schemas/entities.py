@@ -16,7 +16,7 @@ class EntityFields(BaseModel):
     city: str | None = None
     lat: float | None = None
     lon: float | None = None
-    # players only: email, phone, handle, archetype, warmth, tags (null clears one)
+    # players: email, phone, handle, archetype, warmth, tags; skills: attributes (null clears one)
     details: dict[str, Any] | None = None
     # "#rrggbb"; null or "" goes back to the default colour
     color: str | None = None

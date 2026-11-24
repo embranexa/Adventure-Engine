@@ -4,13 +4,11 @@ import { useWorkspaceStore } from '../../store.js';
 import {
     addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, roadmapColors, setNotes, toggleDone, toggleLink,
 } from '../../lib/roadmap.js';
-import { FIRST_VERB, allVerbs, cleanVerb, joinTitle, knownVerb, splitTitle } from '../../lib/quests.js';
+import { FIRST_VERB, joinTitle, splitTitle } from '../../lib/quests.js';
 import { BountyControl } from '../BountyControl.js';
+import { VerbSelect } from '../VerbSelect.js';
 import { PromoteButton } from '../PromoteButton.js';
 import { focusedWindow } from '../../lib/windows.js';
-
-/** Entries of the verb menu that aren't verbs. */
-const NEW = '+new', FORGET = '-forget:';   // a verb can't start with these
 
 /**
  * Controls for the selected quest: its verb and subject, complete/undo, link, add the next quest,
@@ -20,16 +18,6 @@ const NEW = '+new', FORGET = '-forget:';   // a verb can't start with these
  *           onAddNext: () => void, onDelete: () => void, autoFocus: boolean }} props
  */
 function ActionBar({ info, linking, pinned, onPin, waiting, onRename, onNotes, onToggle, onLink, onAddNext, onDelete, autoFocus }) {
-    const own = useWorkspaceStore((s) => s.verbs);
-    const setVerbs = useWorkspaceStore((s) => s.setVerbs);
-    // a verb of yours can be forgotten once no quest uses it
-    const adventures = useWorkspaceStore((s) => s.adventures);
-    const unused = useMemo(() => {
-        const used = new Set(adventures.flatMap((a) => a.roadmap?.actions.map((x) => splitTitle(x.title).verb) ?? []));
-        return own.filter((v) => !used.has(v));
-    }, [adventures, own]);
-    const [naming, setNaming] = useState(/** @type {string | null} */ (null));
-    useEffect(() => setNaming(null), [info.id]);
     const { verb, subject } = splitTitle(info.title);
     const [draft, setDraft] = useState(subject);
     const [notes, setNotesDraft] = useState(info.notes);
@@ -54,39 +42,10 @@ function ActionBar({ info, linking, pinned, onPin, waiting, onRename, onNotes, o
         inputRef.current?.focus();
         inputRef.current?.select();
     };
-    /** @param {string} value */
-    const pickVerb = (value) => {
-        if (value === NEW) { setNaming(''); return; }
-        if (value.startsWith(FORGET)) { setVerbs(own.filter((v) => v !== value.slice(FORGET.length))); return; }
-        apply(value);
-    };
-    const nameVerb = () => {
-        if (naming == null) return;
-        const word = cleanVerb(naming), same = word && knownVerb(word);
-        setNaming(null);
-        if (!word) return;
-        if (!same) setVerbs([...own, word]);
-        apply(same || word);
-    };
-
     return html`
         <div className="alm-bar" onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
             <span className=${`alm-bar-id state-${info.state}`}>${info.id}</span>
-            ${naming == null
-                ? html`
-                    <select className=${`alm-verb ${verb ? 'on' : 'missing'}`} value=${verb ?? ''} aria-label="Quest verb" title=${verb ? 'What to do' : 'Every quest needs a verb'} onChange=${(/** @type {any} */ e) => pickVerb(e.target.value)}>
-                        ${!verb && html`<option value="" disabled hidden>Verb…</option>`}
-                        ${allVerbs(own).map((v) => html`<option key=${v} value=${v}>${v}</option>`)}
-                        <option value=${NEW}>+ New verb…</option>
-                        ${unused.map((v) => html`<option key=${`f-${v}`} value=${FORGET + v}>− Forget “${v}”</option>`)}
-                    </select>`
-                : html`
-                    <input className="alm-verb" value=${naming} maxLength=${30} placeholder="New verb" aria-label="New verb" autoFocus=${true}
-                        onInput=${(/** @type {any} */ e) => setNaming(e.target.value)} onBlur=${nameVerb}
-                        onKeyDown=${(/** @type {KeyboardEvent} */ e) => {
-                            if (e.key === 'Enter') { e.preventDefault(); nameVerb(); }
-                            if (e.key === 'Escape') setNaming(null);
-                        }} />`}
+            <${VerbSelect} key=${info.id} kind="quest" verb=${verb} onPick=${apply} />
             <input
                 ref=${inputRef}
                 className="alm-bar-title"

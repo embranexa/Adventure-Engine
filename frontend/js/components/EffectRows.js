@@ -1,41 +1,47 @@
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
-import { EntityPicker } from './EntityPicker.js';
+import { targetLabel } from '../lib/targets.js';
+import { TargetPicker } from './TargetPicker.js';
 
-const MAX_RATING = 3; // same as backend/services/items.py
-const SKILL = /** @type {EntityType[]} */ (['skill']);
+export const MAX_AMP = 5; // same as backend/services/items.py
 
-/** How strong a buff (▲) or debuff (▼) is. @param {{ rating: number }} props */
-export function Pips({ rating }) {
-    const n = Math.abs(rating);
-    return html`<b className=${`fx-pips ${rating < 0 ? 'down' : 'up'}`} title=${`${rating > 0 ? 'Buff' : 'Debuff'} of ${n}`}>${n > 4 ? `${rating < 0 ? '▼' : '▲'}${n}` : (rating < 0 ? '▼' : '▲').repeat(n)}</b>`;
+/** An amp: how much something is amplified, "2/5" (below 0 is a debuff). `total`: several added up, "+7".
+ *  @param {{ rating: number, total?: boolean }} props */
+export function Amp({ rating, total = false }) {
+    const sign = rating < 0 ? '−' : total ? '+' : '';
+    return html`<b className=${`fx-pips ${rating < 0 ? 'down' : 'up'}`} title=${rating < 0 ? 'Debuff' : 'Amp'}>${sign}${Math.abs(rating)}${total ? '' : `/${MAX_AMP}`}</b>`;
+}
+
+/** An amp with steps down and up (past 0: a debuff). @param {{ rating: number, name: string, onChange: (rating: number) => void }} props */
+export function AmpStep({ rating, name, onChange }) {
+    const step = (/** @type {1 | -1} */ way) => onChange(rating + way === 0 ? way : rating + way);
+    return html`
+        <button className="cls-layer amp-step" aria-label=${`Lower ${name}`} disabled=${rating <= -MAX_AMP} onClick=${() => step(-1)}>−</button>
+        <${Amp} rating=${rating} />
+        <button className="cls-layer amp-step" aria-label=${`Raise ${name}`} disabled=${rating >= MAX_AMP} onClick=${() => step(1)}>+</button>
+    `;
 }
 
 /**
- * Buffs and debuffs to skills, each rated 1 to 3 either way.
+ * An item's effects: attributes and skills it amplifies (or dampens).
  * @param {{ effects: ItemEffect[], onChange: (effects: ItemEffect[]) => void }} props
  */
 export function EffectRows({ effects, onChange }) {
     const entities = useWorkspaceStore((s) => s.entities);
-    const put = (/** @type {string} */ skill, /** @type {number} */ rating) => onChange(effects.map((e) => (e.skill === skill ? { ...e, rating } : e)));
-    /** The next rating that way, skipping 0. @param {number} r @param {1 | -1} way */
-    const step = (r, way) => Math.max(-MAX_RATING, Math.min(MAX_RATING, r + way === 0 ? way : r + way));
     return html`
         <div className="fx-rows">
             ${effects.map((e) => {
-                const name = entities.find((x) => x.id === e.skill)?.name ?? 'Unknown skill';
+                const name = targetLabel(e.target, entities);
                 return html`
-                    <div key=${e.skill} className="fx-row">
-                        <span>✧ ${name}</span>
-                        <button className="cls-layer" aria-label=${`Lower ${name}`} disabled=${e.rating <= -MAX_RATING} onClick=${() => put(e.skill, step(e.rating, -1))}>−</button>
-                        <${Pips} rating=${e.rating} />
-                        <button className="cls-layer" aria-label=${`Raise ${name}`} disabled=${e.rating >= MAX_RATING} onClick=${() => put(e.skill, step(e.rating, 1))}>+</button>
-                        <button className="pclose" aria-label=${`Remove ${name}`} onClick=${() => onChange(effects.filter((x) => x.skill !== e.skill))}>✕</button>
+                    <div key=${e.target} className="fx-row">
+                        <span>${name}</span>
+                        <${AmpStep} rating=${e.rating} name=${name} onChange=${(/** @type {number} */ rating) => onChange(effects.map((x) => (x.target === e.target ? { ...x, rating } : x)))} />
+                        <button className="pclose" aria-label=${`Remove ${name}`} onClick=${() => onChange(effects.filter((x) => x.target !== e.target))}>✕</button>
                     </div>
                 `;
             })}
-            <${EntityPicker} ids=${effects.map((e) => e.skill)} chips=${false} types=${SKILL} placeholder="+ A skill it affects…"
-                onAdd=${(/** @type {string} */ skill) => onChange([...effects, { skill, rating: 1, text: '' }])} />
+            <${TargetPicker} ids=${effects.map((e) => e.target)} placeholder="+ An attribute or skill it affects…"
+                onPick=${(/** @type {string} */ target) => onChange([...effects, { target, rating: 1, text: '' }])} />
         </div>
     `;
 }

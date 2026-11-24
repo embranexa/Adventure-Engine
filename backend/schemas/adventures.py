@@ -40,7 +40,7 @@ class Feedback(BaseModel):
 
     key: str = Field(max_length=100)
     label: str = ""
-    skill: str | None = None
+    target: str | None = None
     rating: int = 0
     result: Literal["helped", "none", "hurt"] | None = None
 
@@ -60,8 +60,8 @@ class EnshriningPayload(BaseModel):
 
 
 class Effect(BaseModel):
-    skill: str       # a skill entity's id
-    rating: int = 1  # -3 (strong debuff) to 3 (strong buff), not 0
+    target: str      # an attribute (backend.db.models.ATTRIBUTES), or a skill entity's id
+    rating: int = 1  # its amp: 1 to 5, or -1 to -5 (a debuff)
     text: str = ""
 
 

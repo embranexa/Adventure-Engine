@@ -17,6 +17,7 @@ import { disposeGroup, makeKit, studio } from './kit.js';
 import { alcoveFrame, carcass, inside } from './frames.js';
 import { MODELS } from './models.js';
 import { sigilCanvas } from './sigil.js';
+import { THEMES } from './themes.js';
 
 const DIST = 1050;          // from the camera to the cabinet's face
 const PARALLAX = 120;       // how far the camera shifts sideways with the pointer
@@ -107,9 +108,15 @@ export class CabinetScene {
             const g = new THREE.Group();
             g.position.set(c.x + c.w / 2, -(c.y + c.h / 2), 0);
             this.frame.add(g);
-            return { cell: c, gem: alcoveFrame(this.kit, g, this.style.shape, c.w, c.h) };
+            return { cell: c, gem: alcoveFrame(this.kit, g, THEMES[c.theme]?.shape ?? this.style.shape, c.w, c.h, this._rune(c)) };
         });
         this.seal = carcass(this.kit, this.frame, layout, { sealTexture: this.sealTexture, sealColor: this.style.sealColor }).seal;
+    }
+
+    /** An idol's alcove wears its archetype's rune. */
+    _rune(c) {
+        const m = c.id != null ? this.models.get(c.id) : null;
+        return m?.idol ? { id: m.idol, color: m.color } : null;
     }
 
     /** The gem over an alcove lights in its model's colour. */

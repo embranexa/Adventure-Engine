@@ -160,14 +160,14 @@ interface ModelPart {
     act?: string | null;
     [size: string]: unknown;
 }
-/** A buff (or debuff) to a skill, rated 1 to 3 (or -1 to -3). */
-interface ItemEffect { skill: string; rating: number; text: string }
+/** A buff (or debuff) to an attribute, or a skill (its id). `rating` is its amp: 1 to 5 (or -1 to -5). */
+interface ItemEffect { target: string; rating: number; text: string }
 interface Objective { id: string; text: string; kind: 'primary' | 'bonus'; state: 'open' | 'achieved' | 'failed' }
-/** Something readied: an owned item of the gear set, or free text with its own effects. */
+/** A buff: an owned item of the gear set, or your own (`text`: a verb and a subject). */
 interface Preparation { id: string; item: string | null; text: string; checked: boolean; effects: ItemEffect[] }
 interface Adversary { entity_id: string | null; name: string }
 /** An effect judged after the fact; keys of ones added by hand start with "own:". */
-interface FeedbackRow { key: string; label: string; skill: string | null; rating: number; result: 'helped' | 'none' | 'hurt' | null }
+interface FeedbackRow { key: string; label: string; target: string | null; rating: number; result: 'helped' | 'none' | 'hurt' | null }
 /** A targeted quest. */
 interface Pin { adventure: string; action: string }
 /** What you wrote about an archetype; null description: the built-in one. */
@@ -319,8 +319,10 @@ interface FlowRecord {
 type EntityType = 'deity' | 'site' | 'player' | 'organization' | 'skill' | 'spell';
 
 /** ids in js/lifecycle.js ARCHETYPES */
-type Archetype = 'vanguard' | 'performer' | 'enchanter' | 'juggernaut' | 'rogue' | 'summoner' | 'resonator' | 'merchant' | 'artificer' | 'wizard' | 'cleric' | 'patron';
-interface PlayerDetails { email?: string; phone?: string; handle?: string; archetype?: Archetype; warmth?: number; tags?: string[] }
+type Archetype = 'juggernaut' | 'artificer' | 'terraformer' | 'wizard' | 'ranger' | 'merchant' | 'enchanter' | 'druid' | 'bard' | 'vanguard' | 'templar' | 'cleric';
+type Order = 'kratos' | 'logos' | 'pathos' | 'ethos';
+type Attribute = 'strength' | 'endurance' | 'dexterity' | 'perception' | 'intellect' | 'charisma' | 'empathy' | 'resolve';
+interface PlayerDetails { email?: string; phone?: string; handle?: string; archetype?: Archetype; warmth?: number; tags?: string[]; /** skills: what governs it */ attributes?: Attribute[] }
 type PartyStatus = 'resonant' | 'charging' | 'attuning' | 'resisted' | 'bonded' | 'emergent' | 'annealed' | 'neutralized' | 'repelled';
 type StewardRole = 'archon' | 'herald' | 'commissioner' | 'warden';
 /** An entity linked to an adventure; a player's link is its place in the party. */
@@ -339,7 +341,7 @@ interface Entity {
     city: string | null;
     lat: number | null;
     lon: number | null;
-    /** players only */
+    /** players; skills have attributes */
     details: PlayerDetails;
     /** players: ids of what it resonates with */
     affinities: string[];
@@ -506,9 +508,10 @@ interface WorkspaceState {
     setPins(pins: Pin[]): void;
     /** Target a quest, or stop. */
     togglePin(adventureId: string, actionId: string): void;
-    /** Quest verbs you defined. */
+    /** Verbs you defined, for quests and for buffs. */
     verbs: string[];
-    setVerbs(verbs: string[]): void;
+    buffVerbs: string[];
+    setVerbs(kind: 'quest' | 'buff', verbs: string[]): void;
     /** What you wrote about each archetype (the Cohort). */
     idols: Partial<Record<Archetype, IdolNotes>>;
     setIdol(id: Archetype, changes: Partial<IdolNotes>): void;

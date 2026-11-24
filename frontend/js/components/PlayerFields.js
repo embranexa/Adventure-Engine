@@ -1,10 +1,10 @@
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
-import { ARCHETYPES, ARCHETYPE_GROUPS } from '../lifecycle.js';
+import { ARCHETYPES, ATTRIBUTES, ORDERS } from '../lifecycle.js';
 import { EntityPicker } from './EntityPicker.js';
 import { Field } from './panels/AdventureEditor.js';
 
-const GROUPS = /** @type {(keyof typeof ARCHETYPE_GROUPS)[]} */ (Object.keys(ARCHETYPE_GROUPS));
+const GROUPS = /** @type {Order[]} */ (Object.keys(ORDERS));
 
 /** Warmth, 0 to 5: click a pip to set it, the last lit one to lower it. Never set reads as none.
  *  @param {{ value: number | undefined, onChange?: (v: number) => void }} props */
@@ -12,8 +12,8 @@ export function Warmth({ value, onChange }) {
     const v = value ?? 0;
     return html`
         <span className="pl-warmth" title=${value == null ? 'Warmth not set' : `Warmth ${value} of 5`}>
-            ${[1, 2, 3, 4, 5].map((n) => html`<button key=${n} type="button" disabled=${!onChange} className=${n <= v ? 'on' : ''}
-                aria-label=${`Warmth ${n}`} onClick=${() => onChange?.(n === v ? n - 1 : n)}></button>`)}
+            ${[1, 2, 3, 4, 5].map((n) => (!onChange ? html`<i key=${n} className=${n <= v ? 'on' : ''}></i>` : html`<button key=${n} type="button" className=${n <= v ? 'on' : ''}
+                aria-label=${`Warmth ${n}`} onClick=${() => onChange(n === v ? n - 1 : n)}></button>`))}
         </span>
     `;
 }
@@ -22,7 +22,7 @@ export function Warmth({ value, onChange }) {
 export function ArchetypeBadge({ id }) {
     if (!id) return html`<span className="pl-arch none">No archetype</span>`;
     const a = ARCHETYPES[id];
-    return html`<span className=${`pl-arch g-${a.group}`} title=${`${a.idol} · ${a.operator} · ${a.medium}`}>${a.glyph} ${a.label}</span>`;
+    return html`<span className="pl-arch" style=${{ '--g': ORDERS[a.order].color }} title=${`${ORDERS[a.order].label} · ${a.idol} · ${a.operator}`}>${a.glyph} ${a.label} <small>${a.verb}</small></span>`;
 }
 
 /**
@@ -39,8 +39,8 @@ export function PlayerFields({ player, save, onError }) {
                 <select className="pl-select" value=${d.archetype ?? ''} onChange=${(/** @type {any} */ e) => save({ details: { archetype: e.target.value || null } })}>
                     <option value="">None</option>
                     ${GROUPS.map((g) => html`
-                        <optgroup key=${g} label=${ARCHETYPE_GROUPS[g]}>
-                            ${Object.entries(ARCHETYPES).filter(([, a]) => a.group === g).map(([id, a]) => html`<option key=${id} value=${id}>${a.glyph} ${a.label} (${a.operator.toLowerCase()})</option>`)}
+                        <optgroup key=${g} label=${`${ORDERS[g].label} (${ORDERS[g].is})`}>
+                            ${Object.entries(ARCHETYPES).filter(([, a]) => a.order === g).map(([id, a]) => html`<option key=${id} value=${id}>${a.glyph} ${a.label}: ${a.verb}</option>`)}
                         </optgroup>`)}
                 </select>
             </label>
@@ -49,7 +49,7 @@ export function PlayerFields({ player, save, onError }) {
                 <${Warmth} value=${d.warmth} onChange=${(/** @type {number} */ warmth) => save({ details: { warmth } })} />
             </div>
         </div>
-        ${arch && html`<span className="ae-hint">${arch.glyph} ${arch.idol} · medium: ${arch.medium.toLowerCase()}</span>`}
+        ${arch && html`<span className="ae-hint">${arch.glyph} ${arch.idol} · works ${arch.medium.toLowerCase()} · ${arch.attributes.map((x) => ATTRIBUTES[x].label).join(', ')}</span>`}
         <${Field} label="Tags" placeholder="comma, separated" value=${(d.tags ?? []).join(', ')}
             onCommit=${(/** @type {string} */ v) => save({ details: { tags: v.split(',').map((t) => t.trim()).filter(Boolean) } })} />
         <div className="ol">

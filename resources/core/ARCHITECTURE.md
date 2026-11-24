@@ -254,13 +254,21 @@ From `resources/upgrades.md`. Check: `scripts/check_upgrades.py` (on a database 
 - **Spell**: a Codex entity, a kind of play. It can't be linked to anything: its skills are those of the sealed plays that name it, so
   they come from the Treasury alone. *Play* is the Treasury's word for
   what was a move (the table and API still say `moves`); a play can name one spell, which fills in its known skills.
-- **Effects** are buffs or debuffs to skills, rated 1-3 (percentages, favor and "other" are gone).
-- **Preparations** (the Arena): free text with effects, or owned items of the adventure's gear set (sharing a
+- **Attribute, skill, spell, play** (2026-11-24): an attribute is what you are (passive; 8, fixed), a skill what you can
+  do (a Codex entity, fed by up to two attributes; for Mastery), a spell a way of doing it, a play one time you did.
+  Buffs amplify either of the first two; an attribute's buff names the skills it feeds, but nothing flows through.
+- **Archetypes**: 12, three to each **order** (Kratos power, Logos reason, Pathos feeling, Ethos character), each with
+  an idol, a verb, an organ (together one body), a medium (what they work on, outside themselves), a unique pair of
+  attributes, and suggested skills. Table: lifecycle.js. "Order" is the working name; idols, names, verbs and media
+  are **[decided]**, organs and grouping may move.
+- **Effects** are buffs or debuffs to attributes or skills, by an **amp** of 1-5 (percentages, favor and "other" are gone).
+- **Buffs** (the Arena; stored as `preparations`): your own, a verb (mandatory) and a subject with what it amplifies
+  ("Consume coffee ~ stamina, 2/5"), or equipped, owned items of the adventure's gear set (sharing a
   deity). They count when checked. Informational: nothing else uses them, and not ambrosia.
 - **Feedback** (the Treasury): each effect at work judged helped / no effect / hurt, plus any added.
 - A player has a free-text **role** per adventure. Archetypes have **no buffs**.
-- **Idols** (the Cohort): a statue and a card per archetype, editable description, skills (app state `idols`).
-  Suggested skills become Codex skills only when clicked.
+- **Idols** (the Cohort): a statue and a card per archetype, editable description, skills (app state
+  `idols`). Suggested ones become Codex skills only when picked.
 - The **Combinator** (was the Complex panel and machine; id still `complex`; adventure -> collaboration) is a Core machine before the Refinery, with no pipes. The Sanctum's floor follows its machine count.
 - **Models for every adventure type** (reverses "only items have models"): forged in the Refinery, under the card's
   Cover / Model switch (saved per adventure; items always show theirs). They show in the Refinery, Crucible, Arena,

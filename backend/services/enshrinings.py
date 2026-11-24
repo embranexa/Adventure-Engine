@@ -75,7 +75,7 @@ def _moves(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _feedback(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """What was judged, or added after (its key starts with "own:")."""
-    clean = [{"key": r["key"], "label": _text("text", r.get("label")), "skill": r.get("skill"), "rating": max(-9, min(9, int(r.get("rating") or 0))),
+    clean = [{"key": r["key"], "label": _text("text", r.get("label")), "target": r.get("target"), "rating": max(-9, min(9, int(r.get("rating") or 0))),
               "result": r.get("result")} for r in rows]
     return [r for r in clean if r["result"] or (r["key"].startswith("own:") and r["label"])]
 

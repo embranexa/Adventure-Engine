@@ -21,6 +21,7 @@ export function EntityLinks({ adventure }) {
 
     const [query, setQuery] = useState('');
     const [open, setOpen] = useState(false);
+    const closing = useRef(/** @type {any} */ (0)); // closes a moment after focus leaves, unless it returns
     const [active, setActive] = useState(0);
     const [error, setError] = useState(/** @type {string | null} */ (null));
     const inputRef = useRef(/** @type {HTMLInputElement | null} */ (null));
@@ -95,8 +96,8 @@ export function EntityLinks({ adventure }) {
                     placeholder=${'+ Link a deity, site, player, organization or skill…'}
                     aria-label="Link an entity"
                     onInput=${(/** @type {any} */ e) => { setQuery(e.target.value); setOpen(true); setActive(0); }}
-                    onFocus=${() => setOpen(true)}
-                    onBlur=${() => setTimeout(() => setOpen(false), 120)}
+                    onFocus=${() => { clearTimeout(closing.current); setOpen(true); }}
+                    onBlur=${() => { closing.current = setTimeout(() => setOpen(false), 120); }}
                     onKeyDown=${onKeyDown}
                 />
                 ${open && options.length > 0 && html`

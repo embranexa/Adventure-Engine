@@ -6,7 +6,8 @@
 
 Rules:
     - only sites have a location (address, city, lat/lon); players keep email, phone,
-      handle, archetype, warmth and tags in `details`
+      handle, archetype, warmth and tags in `details`; skills
+      the attributes that govern them
     - a player linked to an adventure joins its party as resonant (services/party.py)
     - an event, performance or battle links at most one site: linking another replaces it
     - a hand-made event takes its where from its site, so linking one clears the event's
@@ -26,7 +27,7 @@ from sqlalchemy import delete, select
 
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import (
-    AFFINITY_TYPES, ARCHETYPES, CODEX_NODE, GEO_ENTITY_TYPES, ENTITY_TYPES, PHASE_NODES, STEWARD_TYPES, UNLINKABLE_TYPES, WHEN_WHERE_TYPES,
+    AFFINITY_TYPES, ARCHETYPES, ATTRIBUTES, CODEX_NODE, GEO_ENTITY_TYPES, ENTITY_TYPES, PHASE_NODES, STEWARD_TYPES, UNLINKABLE_TYPES, WHEN_WHERE_TYPES,
     AdventureEntity, Entity, EntityLink, PartyLog, Steward,
 )
 from backend.db.queries import list_adventures, get_entity, list_entities
@@ -52,8 +53,14 @@ def _text(field: str, value: Any, limit: int) -> str | None:
     return text
 
 
-def _player_detail(entity_type: str, key: str, value: Any) -> Any:
+def _detail(entity_type: str, key: str, value: Any) -> Any:
     """One checked `details` value (None clears it)."""
+    if entity_type == "skill" and key == "attributes":
+        if value in (None, []):
+            return None
+        if not isinstance(value, list) or len(value) > 2 or any(v not in ATTRIBUTES for v in value):
+            raise InvalidEntity(f"a skill has up to two attributes of {', '.join(ATTRIBUTES)}")
+        return list(dict.fromkeys(value))
     if entity_type != "player" or key not in (*PLAYER_DETAILS, "archetype", "warmth", "tags"):
         raise InvalidEntity(f"a {entity_type} has no {key}")
     if key in PLAYER_DETAILS:
@@ -118,7 +125,7 @@ def _apply(entity: Entity, changes: dict[str, Any]) -> None:
     if "details" in changes:
         details = dict(entity.details or {})
         for key, value in (changes["details"] or {}).items():
-            clean = _player_detail(entity.type, key, value)
+            clean = _detail(entity.type, key, value)
             if clean in (None, []):
                 details.pop(key, None)
             else:

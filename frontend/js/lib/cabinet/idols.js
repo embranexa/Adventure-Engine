@@ -52,7 +52,7 @@ const MAKE = {
         K.ball(2.2, trim, g, h.left.x, h.left.y + 9.5, h.left.z + 1); const beak = K.mesh(new THREE.ConeGeometry(0.7, 2.4, 6), lit(), g, h.left.x, h.left.y + 9.6, h.left.z + 3.8); beak.rotation.x = Math.PI / 2;
         return (t) => { bolt.material.emissiveIntensity = 1.1 + 0.5 * Math.sin(t / 130) * Math.sin(t / 410); };
     }],
-    performer: [{ left: 'out', right: 'chest' }, ({ K, g, h, trim, lit }) => {
+    bard: [{ left: 'out', right: 'chest' }, ({ K, g, h, trim, lit }) => {
         const sun = new THREE.Group(); sun.position.set(0, 81, -6); g.add(sun);
         K.ring(10, 0.5, trim, sun, 0, 0, 0, false);
         for (let i = 0; i < 16; i++) { const a = (i / 16) * TAU, l = i % 2 ? 4 : 6.5, r = K.mesh(new THREE.ConeGeometry(0.8, l, 4), lit(), sun, Math.cos(a) * (11 + l / 2), Math.sin(a) * (11 + l / 2)); r.rotation.z = a - Math.PI / 2; }
@@ -77,7 +77,7 @@ const MAKE = {
         K.ring(12, 0.9, trim, sh, 0, 0, 0, false); K.ring(7, 0.5, lit(), sh, 0, 0, 2, false); K.gem(2, lit(), sh, 0, 0, 4, 1);
         for (const s of [-1, 1]) K.ball(4.6, trim, g, s * 11.6, 67.5, 0);
     }],
-    rogue: [{ left: 'out', right: 'chest' }, ({ K, g, h, trim, lit }) => {
+    ranger: [{ left: 'out', right: 'chest' }, ({ K, g, h, trim, lit }) => {
         const moon = K.mesh(new THREE.TorusGeometry(4.4, 0.8, 8, 30, Math.PI), lit(), g, 0, 92, 0); moon.rotation.z = Math.PI;
         const x = h.left.x - 1, y = h.left.y, z = h.left.z;
         K.tube([V(x + 5, y + 25, z), V(x - 3, y + 15, z), V(x - 5, y, z), V(x - 3, y - 15, z), V(x + 5, y - 25, z)], 0.9, trim, g, 40);
@@ -85,15 +85,19 @@ const MAKE = {
         const arrow = K.cyl(0.4, 0.4, 30, trim, g, x + 4, y, z); arrow.rotation.z = Math.PI / 2; const tip = K.mesh(new THREE.ConeGeometry(1.4, 4, 6), lit(), g, x - 12, y, z); tip.rotation.z = Math.PI / 2;
         const q = K.cyl(2.6, 2, 18, trim, g, 6, 66, -8); q.rotation.z = -0.45; for (let i = 0; i < 4; i++) K.tube([V(8 + i, 73, -8), V(11 + i * 1.2, 82, -8)], 0.3, K.M.bright, g, 4);
     }],
-    summoner: [{ left: 'out', right: 'chest' }, ({ K, g, h, trim, lit }) => {
-        for (const s of [-1, 1]) K.tube([V(s * 2.6, 85), V(s * 6, 90, -1), V(s * 8.6, 95, -2), V(s * 6.6, 99, 0)], 1.1, trim, g, 24);
-        for (let i = 0; i < 6; i++) { const l = 13 - i * 1.5; K.cyl(1, 1, l, trim, g, h.right.x - 6 + i * 2.1, h.right.y + 6 - l / 2 + 4, h.right.z + 3); }
-        K.cyl(0.6, 0.6, 14, lit(), g, h.right.x - 1, h.right.y + 5, h.right.z + 4.4).rotation.z = Math.PI / 2;
-        const swarm = new THREE.Group(); swarm.position.set(0, 66, 0); g.add(swarm);
-        for (let i = 0; i < 5; i++) { const a = (i / 5) * TAU, d = new THREE.Group(); d.position.set(Math.cos(a) * 25, Math.sin(i * 2.2) * 9, Math.sin(a) * 18); swarm.add(d); K.gem(2, lit(), d, 0, 0, 0, 0.7); K.ring(3.4, 0.3, trim, d); }
-        return (t) => { swarm.rotation.y = t / 2600; swarm.children.forEach((d, i) => { d.position.y = Math.sin(t / 700 + i * 2.2) * 8; }); };
+    terraformer: [{ left: 'out', right: 'out', broad: 0.24 }, ({ K, g, h, body, trim, lit }) => {
+        const x = h.right.x, z = h.right.z; rod(K, g, x, z, 15, 86, 0.9, trim);
+        K.tube([V(x - 6, 98, z), V(x - 5.6, 88, z), V(x, 84, z), V(x + 5.6, 88, z), V(x + 6, 98, z)], 0.9, trim, g, 30); rod(K, g, x, z, 84, 99, 0.9, trim);
+        for (const s of [-1, 0, 1]) K.mesh(new THREE.ConeGeometry(1.5, 5, 6), lit(), g, x + s * 6, 101, z);
+        const wheel = new THREE.Group(); wheel.position.set(h.left.x - 1, h.left.y - 12, h.left.z); g.add(wheel);   // a cart wheel
+        K.ring(10.5, 1.2, trim, wheel, 0, 0, 0, false); K.ring(2.4, 0.9, lit(), wheel, 0, 0, 0, false);
+        for (let i = 0; i < 8; i++) { const s = K.cyl(0.45, 0.45, 8.4, body, wheel); s.position.set(Math.cos((i / 8) * TAU) * 6, Math.sin((i / 8) * TAU) * 6, 0); s.rotation.z = (i / 8) * TAU - Math.PI / 2; }
+        for (let i = 0; i < 5; i++) { const a = (i / 5) * TAU + 0.4; K.gem(4.4 - (i % 2), K.M.stone, g, Math.cos(a) * 19, 15.5, Math.sin(a) * 15, 1.6); }   // raised ground
+        for (let i = 0; i < 7; i++) K.mesh(new THREE.ConeGeometry(0.8, 4 + (i % 2) * 2, 5), trim, g, Math.cos((i / 7) * TAU) * 4.4, 87.4, Math.sin((i / 7) * TAU) * 4.4); K.ring(4.6, 0.7, trim, g, 0, 85);
+        K.tube([V(-3, 76, 4), V(-2, 70, 6.4), V(0, 65, 7), V(2, 70, 6.4), V(3, 76, 4)], 1.3, body, g, 24);   // a beard
+        return (t) => { wheel.rotation.z = -t / 1800; };
     }],
-    resonator: [{ left: 'out', right: 'out' }, ({ K, g, body, trim, lit }) => {
+    cleric: [{ left: 'out', right: 'out' }, ({ K, g, body, trim, lit }) => {
         const fan = new THREE.Group(); fan.position.set(0, 48, -9); g.add(fan);
         for (let i = 0; i < 13; i++) {
             const a = 0.12 + (i / 12) * (Math.PI - 0.24), x = Math.cos(a), y = Math.sin(a), l = i % 2 ? 37 : 43;
@@ -134,19 +138,26 @@ const MAKE = {
         const beak = K.mesh(new THREE.ConeGeometry(0.6, 1.6, 5), trim, g, x, y + 10.6, z + 4.2); beak.rotation.x = Math.PI;
         return (t) => { orb.material.emissiveIntensity = 1 + 0.4 * Math.sin(t / 800); };
     }],
-    cleric: [{ left: 'chest', right: 'chest', veil: true }, ({ K, g, h, trim, lit, glowOf }) => {
+    druid: [{ left: 'chest', right: 'chest', veil: true }, ({ K, g, h, trim, lit, glowOf }) => {
         const bowl = K.lathe([[0, 0], [2.4, 0.4], [6.4, 4], [7.4, 7], [6.8, 7.2], [5.4, 4.8], [0, 3.6]], trim, g); bowl.position.set(0, h.left.y - 1, 15);
         const flames = [[0, 0, 9], [-2.4, 0.5, 6], [2.4, -0.4, 6.6]].map(([x, z, l]) => K.mesh(new THREE.ConeGeometry(1.9, l, 10), lit(), g, x, h.left.y + 5 + l / 2, 15 + z));
         K.mesh(new THREE.PlaneGeometry(38, 38), K.light(K.tex.haze, glowOf, 0.5), g, 0, h.left.y + 10, 16);
         K.ring(12, 0.5, lit(), g, 0, 84, -5, false); K.ring(13.6, 0.3, trim, g, 0, 84, -5, false);
         return (t) => flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(t / 110 + i * 2) * 0.14; });
     }],
-    patron: [{ left: 'out', right: 'out', broad: 0.06 }, ({ K, g, h, body, trim, lit }) => {
+    templar: [{ left: 'up', right: 'out', broad: 0.06 }, ({ K, g, h, body, trim, lit }) => {
         for (const s of [-1, 1]) { rod(K, g, s * 15, -10, 14, 84, 1.5, body); K.gem(2.6, lit(), g, s * 15, 88, -10); }
         plate(K, [[-15, 0], [15, 0], [15, 30], [8, 34], [0, 42], [-8, 34], [-15, 30]], 1.6, K.M.steel, g, 0, 46, -11);
         const x = h.right.x, z = h.right.z; rod(K, g, x, z, 15, 80, 0.8, trim); K.tube([V(x - 4.6, 96, z), V(x - 4.4, 84, z), V(x, 79, z), V(x + 4.4, 84, z), V(x + 4.6, 96, z)], 0.9, trim, g, 30); for (const s of [-1, 1]) K.mesh(new THREE.ConeGeometry(1.3, 4, 6), lit(), g, x + s * 4.6, 97.6, z);
-        const kx = h.left.x, ky = h.left.y, kz = h.left.z + 1; K.ring(3.4, 0.8, lit(), g, kx, ky - 5, kz, false); rod(K, g, kx, kz, ky - 24, ky - 8, 0.8, lit()); for (const d of [0, 3.6]) K.mesh(new THREE.BoxGeometry(4, 1.4, 1.2), lit(), g, kx + 2, ky - 22 + d, kz);
+        // the scales, held up
+        const scales = new THREE.Group(); scales.position.set(h.left.x, h.left.y + 1, h.left.z + 2); g.add(scales);
+        K.cyl(0.6, 0.6, 24, trim, scales).rotation.z = Math.PI / 2; K.gem(1.8, lit(), scales, 0, 1.6, 0, 1.4);
+        for (const s of [-1, 1]) { for (const d of [-3.4, 3.4]) K.tube([V(s * 11.6, 0), V(s * 11.6 + d, -11)], 0.22, trim, scales, 4); const pan = K.lathe([[0, 0], [3, 0.4], [4.6, 2]], trim, scales); pan.position.set(s * 11.6, -13, 0); K.cyl(2, 2, 1.4, lit(), scales, s * 11.6, -11.6, 0); }
+        // the pact: a sealed scroll at the belt, and the chain that binds
+        const scroll = K.cyl(1.6, 1.6, 12, K.M.wax, g, 3, 47, 9.4); scroll.rotation.z = 1.2; K.cyl(1.9, 1.9, 1.4, lit(), g, 3, 47, 9.4).rotation.z = 1.2;
+        for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU, l = K.ring(1.5, 0.4, trim, g, Math.cos(a) * 12, 30 + Math.sin(a * 2) * 2, Math.sin(a) * 9, false); l.rotation.set(i % 2 ? 1.2 : 0, -a, 0); }
         for (let i = 0; i < 5; i++) K.mesh(new THREE.ConeGeometry(0.9, 5, 5), trim, g, -4.4 + i * 2.2, 88.6 - Math.abs(i - 2) * 0.9, 2); K.ring(4.9, 0.8, trim, g, 0, 85.4);
+        return (t) => { scales.rotation.z = Math.sin(t / 1500) * 0.09; };
     }],
 };
 

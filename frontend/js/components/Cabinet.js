@@ -22,9 +22,10 @@ import { deferredResize, viewOf } from '../lib/resizing.js';
 /**
  * A 3D cabinet: a scrolling grid of alcoves, each a button, with the cabinet drawn behind
  * them (lib/cabinet/cabinetScene.js). `children` follow the cabinet and scroll with it.
- * @param {{ groups: { title?: string | null, items: CabinetItem[] }[], look: CabinetStyle, selectedId: string | null,
+ * @param {{ groups: { title?: string | null, theme?: string, accent?: string, items: CabinetItem[] }[], look: CabinetStyle, selectedId: string | null,
  *           onSelect: (id: string) => void, label: string, options?: Parameters<typeof cabinetLayout>[2], children?: any }} props
- *   `look` is read once; `options` (the layout's) should be a constant
+ *   `look` is read once; `options` (the layout's) should be a constant; a group's
+ *   `theme` is its housing's (lib/cabinet/themes.js), `accent` its title's colour
  */
 export function Cabinet({ groups, look, selectedId, onSelect, label, options, children }) {
     const rootRef = useRef(/** @type {HTMLDivElement | null} */ (null));
@@ -37,7 +38,7 @@ export function Cabinet({ groups, look, selectedId, onSelect, label, options, ch
     const items = useMemo(() => groups.flatMap((g) => g.items), [groups]);
     const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
     const layout = useMemo(
-        () => (width ? cabinetLayout(width, groups.map((g) => ({ title: g.title, ids: g.items.map((i) => i.id) })), options) : null),
+        () => (width ? cabinetLayout(width, groups.map((g) => ({ title: g.title, theme: g.theme, ids: g.items.map((i) => i.id) })), options) : null),
         [width, groups, options],
     );
 
@@ -91,7 +92,7 @@ export function Cabinet({ groups, look, selectedId, onSelect, label, options, ch
             <div className="cab-scroll" ref=${scrollRef} onScroll=${(/** @type {any} */ e) => sceneRef.current?.setScroll(e.currentTarget.scrollTop)}>
                 <div className="cab-grid" role="group" aria-label=${label} style=${{ height: layout?.height ?? 0 }}>
                     ${layout?.groups.map((g, i) => g.title && html`
-                        <div key=${`t${i}`} className="cab-title" style=${{ top: g.y - 34, left: layout.x0, width: layout.width - 2 * layout.x0 }}>${g.title}</div>
+                        <div key=${`t${i}`} className="cab-title" style=${{ top: g.y - 34, left: layout.x0, width: layout.width - 2 * layout.x0, ...(groups[i]?.accent ? { color: groups[i].accent, top: g.y - 52 } : {}) }}>${g.title}</div>
                     `)}
                     ${layout?.cells.map((c) => {
                         const item = c.id != null ? byId.get(c.id) : null;

@@ -5,7 +5,7 @@ A model is a recipe: data, never code. It lists named parts made of known shapes
 that makes it. The frontend draws it (frontend/js/lib/cabinet/recipe.js); everything here
 is checked so that a recipe can't hold anything else.
 
-Effects are rated buffs (or debuffs) to skills. The Arena shows those of a checked preparation;
+Effects are rated buffs (or debuffs) to attributes or skills. The Arena shows those of a checked preparation;
 nothing else applies them.
 """
 
@@ -16,11 +16,11 @@ from typing import Any
 from sqlalchemy import select
 
 from backend.db.base import SessionLocal, utcnow
-from backend.db.models import Entity, ItemSheet
+from backend.db.models import ATTRIBUTES, Entity, ItemSheet
 from backend.services.triage import InvalidTransition, _get_adventure, broadcast_pools
 
 PURPOSE_LIMIT, EFFECT_LIMIT, MAX_EFFECTS = 5_000, 200, 50
-MAX_RATING = 3
+MAX_RATING = 5   # an amp
 
 MATERIALS = ("steel", "dark", "brass", "copper", "pale", "tint", "glow", "glass", "screen")
 # shape -> the sizes it needs ("pts2" / "pts3": a list of 2D / 3D points)
@@ -119,21 +119,22 @@ def clean_model(parts: Any) -> list[dict[str, Any]] | None:
     return out
 
 
-async def skill_ids(session) -> set[str]:
-    return {str(i) for i in (await session.scalars(select(Entity.id).where(Entity.type == "skill"))).all()}
+async def effect_targets(session) -> set[str]:
+    """What an effect can amplify: the attributes, and every skill's id."""
+    return set(ATTRIBUTES) | {str(i) for i in (await session.scalars(select(Entity.id).where(Entity.type == "skill"))).all()}
 
 
-def clean_effects(rows: list[dict[str, Any]], skills: set[str]) -> list[dict[str, Any]]:
-    """Checked effects, one per skill; those whose skill was deleted are dropped."""
+def clean_effects(rows: list[dict[str, Any]], targets: set[str]) -> list[dict[str, Any]]:
+    """Checked effects, one per target; those whose skill was deleted are dropped."""
     out: dict[str, dict[str, Any]] = {}
     for r in rows:
-        skill, text, rating = str(r.get("skill")), str(r.get("text") or "").strip(), r.get("rating", 1)
+        target, text, rating = str(r.get("target")), str(r.get("text") or "").strip(), r.get("rating", 1)
         if len(text) > EFFECT_LIMIT:
             raise InvalidItem(f"an effect is too long (max {EFFECT_LIMIT} characters)")
         if isinstance(rating, bool) or not isinstance(rating, int) or not 1 <= abs(rating) <= MAX_RATING:
             raise InvalidItem(f"a rating is 1 to {MAX_RATING}, or -1 to -{MAX_RATING}")
-        if skill in skills:
-            out[skill] = {"skill": skill, "rating": rating, "text": text}
+        if target in targets:
+            out[target] = {"target": target, "rating": rating, "text": text}
     return list(out.values())
 
 
@@ -156,7 +157,7 @@ async def save_item(adventure_id: uuid.UUID, changes: dict[str, Any]) -> None:
             rows = changes["effects"] or []
             if len(rows) > MAX_EFFECTS:
                 raise InvalidItem(f"too many effects (max {MAX_EFFECTS})")
-            sheet.effects = clean_effects(rows, await skill_ids(session))
+            sheet.effects = clean_effects(rows, await effect_targets(session))
         if "face" in changes:
             sheet.face = changes["face"]
         if "model" in changes:

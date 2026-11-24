@@ -492,7 +492,7 @@ const workspaceStore = (set, get) => ({
         }
         get().loadLayoutPresets();
         getJson('/api/state/anvil').then((s) => s && set({ pins: s.pins }));
-        getJson('/api/state/verbs').then((s) => { if (s) { setOwnVerbs(s.verbs); set({ verbs: s.verbs }); } });
+        getJson('/api/state/verbs').then((s) => { if (s) { setOwnVerbs('quest', s.verbs); setOwnVerbs('buff', s.buff_verbs); set({ verbs: s.verbs, buffVerbs: s.buff_verbs }); } });
         getJson('/api/state/idols').then((s) => s && set({ idols: s.idols }));
         // items become past (and fall behind the Hermetic Seal) as time passes
         setInterval(() => set((state) => withVisible(state, {})), 60_000);
@@ -863,7 +863,12 @@ const workspaceStore = (set, get) => ({
         setPins(on ? pins.filter((p) => p.adventure !== adventure || p.action !== action) : [...pins, { adventure, action }]);
     },
     verbs: [],
-    setVerbs: (verbs) => { setOwnVerbs(verbs); set({ verbs }); scheduleSave('verbs', () => ({ verbs: get().verbs })); },
+    buffVerbs: [],
+    setVerbs: (kind, verbs) => {
+        setOwnVerbs(kind, verbs);
+        set(kind === 'quest' ? { verbs } : { buffVerbs: verbs });
+        scheduleSave('verbs', () => ({ verbs: get().verbs, buff_verbs: get().buffVerbs }));
+    },
     idols: {},
     setIdol: (id, changes) => {
         set((s) => ({ idols: { ...s.idols, [id]: { description: null, skills: [], ...s.idols[id], ...changes } } }));
@@ -1131,7 +1136,7 @@ const workspaceStore = (set, get) => ({
             return;
         }
         const firstLeafId = findFirstLeafId(currentTree);
-        const nextTree = insertPanelAtTarget(currentTree, firstLeafId, panelId, 'right');
+        const nextTree = insertPanelAtTarget(currentTree, firstLeafId, panelId, 'center'); // a tab of the leftmost dock
         get().persistLayout(nextTree);
     },
 

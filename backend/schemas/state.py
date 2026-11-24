@@ -82,9 +82,10 @@ class Anvil(BaseModel):
 
 
 class Verbs(BaseModel):
-    """Quest verbs you defined (the Alembic), beside the built-in ones."""
+    """Verbs you defined for quests and buffs, beside the built-in ones."""
 
     verbs: list[str] = Field(default_factory=list, max_length=100)
+    buff_verbs: list[str] = Field(default_factory=list, max_length=100)
 
 
 class Idol(BaseModel):

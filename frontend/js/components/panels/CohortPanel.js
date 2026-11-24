@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
-import { ARCHETYPES, ARCHETYPE_GROUPS, PARTY_STATUSES, STEWARD_ROLES } from '../../lifecycle.js';
+import { ARCHETYPES, ATTRIBUTES, ORDERS, PARTY_STATUSES, STEWARD_ROLES } from '../../lifecycle.js';
 import { entityColor } from '../../lib/lens.js';
 import { IDOLS } from '../../lib/idols.js';
 import { drawIdolCard } from '../../lib/idolCard.js';
@@ -62,9 +62,9 @@ function PlayerSheet({ player }) {
     `;
 }
 
-const GROUPS = /** @type {(keyof typeof ARCHETYPE_GROUPS)[]} */ (Object.keys(ARCHETYPE_GROUPS));
+const GROUPS = /** @type {Order[]} */ (Object.keys(ORDERS));
 const IDOL_LOOK = /** @type {import('../Cabinet.js').CabinetStyle} */ ({ shape: 'arch', sealColor: '#f2c14e', seed: 'idols', points: 12 });
-const IDOL_SIZE = { minW: 170, cellH: 290 };
+const IDOL_SIZE = { cellH: 290, minCols: 3, maxCols: 3 };   // an order is three, so no spare alcoves
 const SKILL = /** @type {EntityType[]} */ (['skill']);
 const MODES = /** @type {const} */ ({ players: 'Players', idols: 'Idols' });
 
@@ -88,25 +88,27 @@ function IdolSheet({ id, players, onPlayer }) {
     const setIdol = useWorkspaceStore((s) => s.setIdol);
     const createEntity = useWorkspaceStore((s) => s.createEntity);
     const [error, setError] = useState(/** @type {string | null} */ (null));
-    const a = ARCHETYPES[id], d = IDOLS[id];
+    const a = ARCHETYPES[id], d = IDOLS[id], order = ORDERS[a.order];
     const skills = (notes?.skills ?? []).filter((s) => entities.some((e) => e.id === s));
     const linked = new Set(skills.map((s) => entities.find((e) => e.id === s)?.name.toLowerCase()));
     const suggested = d.skills.filter((s) => !linked.has(s.toLowerCase()));
     const add = (/** @type {string} */ skill) => setIdol(id, { skills: [...skills, skill] });
-    /** Link the Codex skill of that name, making it if needed. @param {string} name */
+    /** Link the Codex skill of that name, making it (fed by this archetype's attributes) if needed. @param {string} name */
     const take = async (name) => {
         const known = entities.find((e) => e.type === 'skill' && e.name.toLowerCase() === name.toLowerCase());
-        const res = known ?? await createEntity('skill', { name });
+        const res = known ?? await createEntity('skill', { name, details: { attributes: a.attributes } });
         if (typeof res === 'string') setError(res);
         else { setError(null); add(res.id); }
     };
     return html`
         <${IdolCard} id=${id} />
         <section className="nec-pane" style=${{ '--c': d.color }}>
-            <h3>${a.glyph} ${a.label}</h3>
+            <h3>${a.glyph} ${a.label} <em className="idol-verb">${a.verb}</em></h3>
             <dl className="idol-facts">
-                <dt>Idol</dt><dd>${a.idol}</dd><dt>Operator</dt><dd>${a.operator}</dd><dt>Medium</dt><dd>${a.medium}</dd>
-                <dt>Characters</dt><dd>${d.characters}</dd><dt>Emblem</dt><dd>${d.emblem}</dd>
+                <dt>Idol</dt><dd>${a.idol}</dd><dt>Order</dt><dd>${order.label}: ${order.is}</dd>
+                <dt>Organ</dt><dd>${a.organ}</dd><dt>Medium</dt><dd>${a.medium}</dd>
+                <dt>Operator</dt><dd>${a.operator}</dd><dt>Characters</dt><dd>${d.characters}</dd>
+                <dt>Attributes</dt><dd>${a.attributes.map((x) => html`<span key=${x} className="idol-attr" title=${ATTRIBUTES[x].hint}>❖ ${ATTRIBUTES[x].label}</span>`)}</dd>
             </dl>
             <${Field} label="Description" kind="textarea" value=${notes?.description ?? d.description}
                 onCommit=${(/** @type {string} */ v) => { setIdol(id, { description: v.trim() && v.trim() !== d.description ? v.trim().slice(0, 5000) : null }); return null; }} />
@@ -123,15 +125,15 @@ function IdolSheet({ id, players, onPlayer }) {
     `;
 }
 
-/** The twelve idols, by group. @param {{ onPlayer: (id: string) => void }} props */
+/** The twelve idols, by order. @param {{ onPlayer: (id: string) => void }} props */
 function IdolGallery({ onPlayer }) {
     const entities = useWorkspaceStore((s) => s.entities);
     const [picked, setPicked] = useState(/** @type {Archetype} */ ('vanguard'));
     const of = (/** @type {Archetype} */ id) => entities.filter((e) => e.type === 'player' && e.details.archetype === id);
     const groups = useMemo(() => GROUPS.map((group) => ({
-        title: ARCHETYPE_GROUPS[group],
-        items: IDS.filter((id) => ARCHETYPES[id].group === group).map((id) => ({
-            id, label: ARCHETYPES[id].label, sub: ARCHETYPES[id].idol,
+        title: `${ORDERS[group].label} · ${ORDERS[group].is}`, theme: group, accent: ORDERS[group].color,
+        items: IDS.filter((id) => ARCHETYPES[id].order === group).map((id) => ({
+            id, label: ARCHETYPES[id].label, sub: ARCHETYPES[id].verb,
             model: { type: 'idol', id, idol: id, color: IDOLS[id].color, on: of(id).length > 0, points: IDS.indexOf(id) + 3, rings: 2 },
         })),
     })), [entities]);
@@ -164,7 +166,7 @@ export function CohortPanel() {
             };
         };
         const shelf = (/** @type {Archetype | undefined} */ id) => players.filter((p) => p.details.archetype === id).map(item);
-        return [...IDS.map((id) => ({ title: `${ARCHETYPE_GROUPS[ARCHETYPES[id].group]} · ${ARCHETYPES[id].label}`, items: shelf(id) })), { title: 'No archetype', items: shelf(undefined) }]
+        return [...IDS.map((id) => ({ title: `${ORDERS[ARCHETYPES[id].order].label} · ${ARCHETYPES[id].label} ${ARCHETYPES[id].verb}`, items: shelf(id) })), { title: 'No archetype', items: shelf(undefined) }]
             .filter((g) => g.items.length);
     }, [entities, adventures]);
 

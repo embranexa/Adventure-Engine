@@ -18,7 +18,7 @@ SCHEMAS: dict[str, type[BaseModel]] = {
     "filters": FilterState,        # applied: what the calendar and map show
     "filters_draft": FilterState,  # the Nexus's pending edits, until "pass through"
     "anvil": Anvil,                # the Crucible's targets (services/targets.py)
-    "verbs": Verbs,                # your own quest verbs
+    "verbs": Verbs,                # your own quest and buff verbs
     "idols": Idols,                # the Cohort's archetypes
     "layout_presets": LayoutPresets,  # the user's saved dock arrangements (Layouts menu)
 }

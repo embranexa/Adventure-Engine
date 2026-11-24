@@ -1,7 +1,7 @@
 // An archetype's card (the Cohort), drawn on a canvas: an ornate frame, a magic circle, rays,
 // and the idol's emblem in gilt line. See idols.js (what it says) and cabinet/idols.js (the statue).
 
-import { ARCHETYPES, ARCHETYPE_GROUPS } from '../lifecycle.js';
+import { ARCHETYPES, ORDERS } from '../lifecycle.js';
 import { sigilCanvas } from './cabinet/sigil.js';
 import { magicCircleCanvases } from './magicCircle.js';
 import { IDOLS } from './idols.js';
@@ -23,7 +23,7 @@ const EMBLEMS = {
         path(g, [[-10, -118], [26, -118], [8, -36], [34, -36], [-22, 120], [-6, 6], [-32, 6]], true, true);
         both(g, () => { for (let i = 0; i < 6; i++) { g.save(); g.translate(30 + i * 13, 102 - i * 15); g.rotate(-0.8 - i * 0.08); g.beginPath(); g.ellipse(0, 0, 15, 5.5, 0, 0, TAU); g.fill(); g.stroke(); g.restore(); } });
     },
-    performer(g) {
+    bard(g) {
         for (let i = 0; i < 24; i++) { const a = (i / 24) * TAU, r = i % 2 ? 100 : 118; path(g, [[Math.cos(a - 0.05) * 78, Math.sin(a - 0.05) * 78], [Math.cos(a) * r, Math.sin(a) * r], [Math.cos(a + 0.05) * 78, Math.sin(a + 0.05) * 78]]); }
         circle(g, 0, 0, 74, true);
         both(g, () => curve(g, 'M0 58 C46 54 56 18 34 -8 C22 -26 34 -46 54 -50 C42 -58 18 -50 20 -22 C22 4 40 22 20 38 L0 44', true));
@@ -42,20 +42,21 @@ const EMBLEMS = {
         for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU; path(g, [[Math.cos(a) * 22, 8 + Math.sin(a) * 22], [Math.cos(a + 0.26) * 40, 8 + Math.sin(a + 0.26) * 40], [Math.cos(a) * 56, 8 + Math.sin(a) * 56]]); }
         curve(g, 'M-22 24 L-22 -2 C-22 -26 22 -26 22 -2 L22 24 L10 24 L10 8 L3 2 L3 26 L-3 26 L-3 2 L-10 8 L-10 24 Z', true);
     },
-    rogue(g) {
+    ranger(g) {
         curve(g, 'M-34 -66 A44 44 0 1 0 34 -66 A34 34 0 1 1 -34 -66 Z', true);
         curve(g, 'M-96 60 C-70 -44 70 -44 96 60 C62 -14 -62 -14 -96 60 Z', true);
         path(g, [[-96, 60], [0, 96], [96, 60]]);
         path(g, [[0, 112], [0, -74]]); path(g, [[-10, -62], [0, -96], [10, -62], [0, -70]], true, true);
         both(g, () => { path(g, [[0, 100], [12, 112]]); path(g, [[0, 92], [12, 104]]); });
     },
-    summoner(g) {
-        both(g, () => curve(g, 'M14 -52 C40 -60 62 -82 50 -112 C76 -88 70 -44 24 -30 Z', true));
-        for (let i = 0; i < 7; i++) { const x = -54 + i * 16, l = 132 - i * 13; curve(g, `M${x} -34 L${x} ${-34 + l} A7 5 0 0 0 ${x + 14} ${-34 + l} L${x + 14} -34 Z`, true); g.beginPath(); g.ellipse(x + 7, -34, 7, 4, 0, 0, TAU); g.fill(); g.stroke(); }
-        path(g, [[-58, -8], [62, -8], [62, 6], [-58, 6]], true, true);
-        for (const [x, y] of [[-96, -10], [96, -20], [-84, 78], [92, 62]]) { circle(g, x, y, 9, true); for (const s of [-1, 1]) { g.beginPath(); g.ellipse(x + s * 15, y - 4, 9, 3, 0, 0, TAU); g.stroke(); } }
+    terraformer(g) {
+        for (let i = 0; i < 3; i++) { const y = 60 + i * 18; curve(g, `M-112 ${y} C-92 ${y - 24} -72 ${y - 24} -56 ${y} C-40 ${y + 20} -20 ${y + 20} 0 ${y} C20 ${y - 24} 40 ${y - 24} 56 ${y} C72 ${y + 20} 92 ${y + 20} 112 ${y}`); }
+        path(g, [[-104, 44], [-62, -26], [-36, 12], [0, -50], [36, 12], [62, -26], [104, 44]], false);
+        path(g, [[-5, 100], [-5, -66], [5, -66], [5, 100]], true, true);
+        both(g, () => curve(g, 'M0 -48 C40 -48 46 -70 44 -100 L54 -84 L44 -122 L32 -86 L38 -92 C38 -72 30 -60 5 -60', true));
+        path(g, [[-10, -92], [0, -126], [10, -92], [0, -80]], true, true);
     },
-    resonator(g) {
+    cleric(g) {
         for (let i = 0; i < 13; i++) { const a = Math.PI + 0.1 + (i / 12) * (Math.PI - 0.2), r = i % 2 ? 90 : 112, x = Math.cos(a) * r, y = 40 + Math.sin(a) * r * 1.2; path(g, [[0, 44], [x, y]]); g.save(); g.translate(x, y); g.rotate(a + Math.PI / 2); g.beginPath(); g.ellipse(0, 0, 10, 15, 0, 0, TAU); g.fill(); g.stroke(); circle(g, 0, 2, 5); circle(g, 0, 2, 1.5); g.restore(); }
         curve(g, 'M0 -34 C-10 -34 -14 -22 -8 -14 C-12 6 -34 28 -26 62 C-18 92 18 92 26 62 C34 28 12 6 8 -14 C14 -22 10 -34 0 -34 Z', true);
         path(g, [[-6, -24], [-2, -14], [2, -24]]); for (const x of [-8, 0, 8]) { path(g, [[x * 0.4, -34], [x, -50]]); circle(g, x, -53, 3, true); }
@@ -82,18 +83,21 @@ const EMBLEMS = {
         for (let r = 0; r < 4; r++) for (let i = -2 + (r % 2) / 2; i <= 2; i++) curve(g, `M${i * 12 - 6} ${4 + r * 17} Q${i * 12} ${16 + r * 17} ${i * 12 + 6} ${4 + r * 17}`);
         path(g, [[-90, 100], [90, 100]]); both(g, () => { for (const x of [8, 14, 20]) path(g, [[x, 88], [x, 104]]); });
     },
-    cleric(g) {
+    druid(g) {
         curve(g, 'M0 -116 C30 -70 54 -50 46 -10 C42 18 22 30 0 30 C-22 30 -42 18 -46 -10 C-50 -36 -26 -44 -18 -74 C-8 -62 -8 -52 -4 -42 C6 -62 6 -88 0 -116 Z', true);
         curve(g, 'M0 -44 C16 -20 24 -10 20 6 C16 20 6 24 0 24 C-6 24 -16 20 -20 6 C-24 -10 -8 -20 0 -44 Z', true);
         curve(g, 'M-78 34 L78 34 C74 66 44 78 0 78 C-44 78 -74 66 -78 34 Z', true); path(g, [[-84, 26], [84, 26], [84, 36], [-84, 36]], true, true);
         for (const x of [-48, -16, 16, 48]) curve(g, `M${x - 12} 46 Q${x} 66 ${x + 12} 46`);
         path(g, [[-20, 78], [-32, 112], [32, 112], [20, 78]], true, true);
     },
-    patron(g) {
-        curve(g, 'M-46 -116 C-50 -62 -32 -46 0 -44 C32 -46 50 -62 46 -116 L36 -96 C38 -68 24 -58 0 -58 C-24 -58 -38 -68 -36 -96 Z', true);
-        path(g, [[-4, -46], [-4, 118], [4, 118], [4, -46]], true, true);
-        g.save(); g.rotate(-0.95); circle(g, 0, -70, 24, true); circle(g, 0, -70, 13); path(g, [[-5, -46], [5, -46], [5, 78], [-5, 78]], true, true); path(g, [[5, 46], [28, 46], [28, 54], [16, 54], [16, 62], [28, 62], [28, 72], [5, 72]], true, true); g.restore();
-        for (const [x, y] of [[-52, 52], [-70, 74], [-40, 82]]) { circle(g, x, y, 13, true); circle(g, x, y, 8); }
+    templar(g) {
+        path(g, [[-4, -70], [-4, 112], [4, 112], [4, -70]], true, true);
+        curve(g, 'M-34 -122 C-38 -86 -24 -76 0 -74 C24 -76 38 -86 34 -122 L26 -106 C27 -90 18 -84 0 -84 C-18 -84 -27 -90 -26 -106 Z', true);
+        curve(g, 'M-92 -36 C-60 -52 -30 -44 0 -46 C30 -44 60 -52 92 -36'); circle(g, 0, -46, 8, true);
+        both(g, () => { path(g, [[92, -36], [64, 34]]); path(g, [[92, -36], [116, 34]]); curve(g, 'M58 34 L122 34 C118 60 62 60 58 34 Z', true); });
+        for (const [x, y] of [[80, 26], [94, 22], [104, 28]]) circle(g, x, y, 7, true);
+        path(g, [[-108, 30], [-108, 4], [-74, 4], [-74, 30]], true, true); for (const y of [11, 17, 23]) path(g, [[-102, y], [-80, y]]);
+        curve(g, 'M-34 112 L34 112 L26 98 L-26 98 Z', true);
     },
 };
 
@@ -149,8 +153,9 @@ export function drawIdolCard(canvas, id) {
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = gold;
     g.font = '600 25px "Saira Condensed", sans-serif'; g.fillText(d.numeral, cx, 56);
     g.beginPath(); g.moveTo(44, 566); g.lineTo(W - 44, 566); g.moveTo(44, 570); g.lineTo(W - 44, 570); g.stroke();
-    g.fillStyle = '#f6efe0'; g.font = '600 52px "Saira Condensed", sans-serif'; g.letterSpacing = '8px'; g.fillText(a.label.toUpperCase(), cx + 4, 614);
-    g.fillStyle = d.color; g.font = '500 21px "Saira Condensed", sans-serif'; g.letterSpacing = '4px'; g.fillText(`${a.idol.toUpperCase()}  ·  ${ARCHETYPE_GROUPS[a.group].toUpperCase()}`, cx + 2, 658);
-    g.fillStyle = '#a9a496'; g.letterSpacing = '1px'; g.font = '500 18px "Saira Condensed", sans-serif'; g.fillText(a.medium, cx, 692);
+    g.fillStyle = '#f6efe0'; g.font = '600 52px "Saira Condensed", sans-serif'; g.letterSpacing = '8px'; g.fillText(a.label.toUpperCase(), cx + 4, 612);
+    g.fillStyle = '#e9dcc0'; g.font = 'italic 500 27px "Saira Condensed", sans-serif'; g.letterSpacing = '3px'; g.fillText(a.verb, cx + 2, 654);
+    g.fillStyle = d.color; g.font = '500 20px "Saira Condensed", sans-serif'; g.letterSpacing = '3px'; g.fillText(`${a.idol.toUpperCase()}  ·  ${ORDERS[a.order].label.toUpperCase()}`, cx + 2, 688);
+    g.fillStyle = '#a9a496'; g.letterSpacing = '1px'; g.font = '500 17px "Saira Condensed", sans-serif'; g.fillText(`${a.organ}  ·  ${a.medium}`, cx, 716);
     g.letterSpacing = '0px';
 }

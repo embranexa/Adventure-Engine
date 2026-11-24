@@ -40,7 +40,7 @@ export function Objectives({ adventure, edit = false, readOnly = false }) {
     const sorted = [...list].sort((a, b) => Number(a.kind === 'bonus') - Number(b.kind === 'bonus'));
 
     return html`
-        <div className="obj" onClick=${(/** @type {Event} */ e) => e.stopPropagation()}>
+        <div className="obj">
             <div className="ol-head">Objectives${list.length > 0 && html` <b>${list.filter((o) => o.state === 'achieved').length}/${list.length}</b>`}</div>
             ${sorted.map((o) => html`
                 <div key=${o.id} className=${`obj-row s-${o.state} ${o.kind}`}>

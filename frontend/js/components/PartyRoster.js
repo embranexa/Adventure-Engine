@@ -29,7 +29,7 @@ export function StatusSelect({ adventure, member, onError }) {
 }
 
 /** What a player does in this adventure, saved on leaving the box. @param {{ adventure: AdventureRecord, member: LinkedEntity, onError: (e: string | null) => void }} props */
-function RoleBox({ adventure, member, onError }) {
+export function RoleBox({ adventure, member, onError }) {
     const setPartyMember = useWorkspaceStore((s) => s.setPartyMember);
     const [draft, setDraft] = useState(member.role ?? '');
     useEffect(() => setDraft(member.role ?? ''), [member.role]);
@@ -40,12 +40,11 @@ function RoleBox({ adventure, member, onError }) {
 }
 
 /**
- * An adventure's players with their statuses (and follow-ups due), compact: the Refinery,
- * Crucible and Arena. A name opens that player in the Combinator. Nothing when there's no one.
- * @param {{ adventure: AdventureRecord, stewards?: boolean, removable?: boolean, roles?: boolean }} props
- *   roles: a box for what each player in it does here
+ * An adventure's players with their statuses (and follow-ups due), compact: the Refinery
+ * and Crucible. A name opens that player in the Combinator. Nothing when there's no one.
+ * @param {{ adventure: AdventureRecord, stewards?: boolean, removable?: boolean }} props
  */
-export function PartyRoster({ adventure, stewards = false, removable = false, roles = false }) {
+export function PartyRoster({ adventure, stewards = false, removable = false }) {
     const entities = useWorkspaceStore((s) => s.entities);
     const pooled = useWorkspaceStore((s) => Boolean(s.itemsById[adventure.id]));
     const openInComplex = useWorkspaceStore((s) => s.openInComplex);
@@ -57,7 +56,7 @@ export function PartyRoster({ adventure, stewards = false, removable = false, ro
     if (!party.length && !held.length) return null;
 
     return html`
-        <div className="pr" onClick=${(/** @type {Event} */ e) => e.stopPropagation()}>
+        <div className="pr">
             ${held.length > 0 && html`
                 <div className="pr-stewards">
                     ${held.map((s) => html`<button key=${s.role + s.id} disabled=${!pooled} style=${{ '--c': STEWARD_ROLES[s.role].color }} title=${STEWARD_ROLES[s.role].hint}
@@ -71,7 +70,7 @@ export function PartyRoster({ adventure, stewards = false, removable = false, ro
                     <div key=${m.id} className="pr-row" style=${{ '--c': PARTY_STATUSES[m.status ?? 'resonant'].color }}>
                         ${m.id === archonOf(adventure) ? html`<span className="pr-crown" title="Archon: leads the adventure">♛</span>` : html`<i></i>`}
                         <button className="pr-name" disabled=${!pooled} title=${pooled ? 'Open in the Combinator' : 'Not in the current pool'} onClick=${() => openInComplex(adventure.id, m.id)}>${m.name}</button>
-                        ${roles && m.status != null && PARTY_STATUSES[m.status].stage === 'active' ? html`<${RoleBox} adventure=${adventure} member=${m} onError=${setError} />` : m.role && html`<span className="pr-role">${m.role}</span>`}
+                        ${m.role && html`<span className="pr-role">${m.role}</span>`}
                         ${due && html`<span className=${`pr-due ${due <= today ? 'late' : ''}`} title="Follow up">◷ ${parseDay(due).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>`}
                         <${StatusSelect} adventure=${adventure} member=${m} onError=${setError} />
                         ${removable && html`<button className="ol-chip-x" aria-label=${`Unlink ${m.name}`} title="Unlink" onClick=${async () => { if (mayChange(adventure, m, null)) setError(await unlinkEntity(adventure.id, m.id)); }}>✕</button>`}

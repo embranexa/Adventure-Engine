@@ -26,7 +26,7 @@ from backend.db.models import (
 from backend.db.queries import list_adventures
 from backend.services.entities import _delete_links
 from backend.services.hub import hub
-from backend.services.items import InvalidItem, clean_effects, skill_ids
+from backend.services.items import InvalidItem, clean_effects, effect_targets
 from backend.services.transitions import record
 from backend.services.triage import InvalidTransition, _get_adventure, broadcast_pools
 
@@ -144,7 +144,7 @@ async def _deities(session, adventure_id: uuid.UUID) -> set[uuid.UUID]:
 async def _apply_linked(session, adventure: Adventure, changes: dict[str, Any]) -> None:
     """The fields that name other rows: preparations and adversaries."""
     if "preparations" in changes:
-        rows, skills = changes["preparations"] or [], await skill_ids(session)
+        rows, targets = changes["preparations"] or [], await effect_targets(session)
         _unique(rows, "preparations")
         had = {p.get("item") for p in adventure.preparations or []}  # already there: kept, even if it left the set
         clean, seen = [], set()
@@ -165,7 +165,7 @@ async def _apply_linked(session, adventure: Adventure, changes: dict[str, Any]) 
                 clean.append({"id": p["id"], "item": item, "text": "", "checked": p["checked"], "effects": []})
             elif text:
                 try:
-                    effects = clean_effects(p["effects"], skills)
+                    effects = clean_effects(p["effects"], targets)
                 except InvalidItem as e:
                     raise InvalidAdventure(str(e)) from e
                 clean.append({"id": p["id"], "item": None, "text": text, "checked": p["checked"], "effects": effects})

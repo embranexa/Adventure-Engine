@@ -3,7 +3,8 @@ import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { PHASE_STAGES } from '../../lifecycle.js';
 import { activeEffects, adventureColor, gearSets, modelSpec, owned, sheetOf } from '../../lib/items.js';
-import { EffectRows, Pips } from '../EffectRows.js';
+import { Amp, EffectRows } from '../EffectRows.js';
+import { targetLabel } from '../../lib/targets.js';
 import { Forge } from '../Forge.js';
 import { Cabinet } from '../Cabinet.js';
 
@@ -51,7 +52,7 @@ function ItemSheetView({ adventure, set }) {
             <label className="ana-field"><span>Purpose</span><textarea className="ana-notes" rows=${2} maxLength=${5000} value=${sheet.purpose} placeholder="What it is for" onInput=${(/** @type {any} */ e) => change({ purpose: e.target.value })}></textarea></label>
             <h4>Buffs and debuffs</h4>
             <${EffectRows} effects=${sheet.effects} onChange=${(/** @type {ItemEffect[]} */ effects) => change({ effects })} />
-            <p className="nec-dim">Rated buffs to skills. They count in an adventure of the same deity once the item is readied there (the Arena).</p>
+            <p className="nec-dim">Attributes and skills it amplifies. They count in an adventure of the same deity once it's equipped there (the Arena).</p>
             ${set.deity && html`
                 <h4>${set.deity.name} set</h4>
                 <div className="inv-set" style=${{ '--c': adventureColor(adventure) }}><i style=${{ width: `${(have / set.items.length) * 100}%` }}></i></div>
@@ -93,7 +94,7 @@ export function InventoryPanel() {
         setPicked(id);
         if (mode === 'adventures') selectItem(id, 'inventory');
     };
-    const nameOf = (/** @type {string} */ target) => (entities.find((e) => e.id === target)?.name ?? 'Unknown skill');
+    const nameOf = (/** @type {string} */ target) => targetLabel(target, entities);
 
     if (!shown) return html`<div className="panel-body inventory"><div className="nc-empty">No items yet<small>Item adventures appear here, by the deity they serve</small></div></div>`;
     const set = /** @type {(typeof sets)[number]} */ (sets.find((s) => s.items.includes(shown)));
@@ -103,7 +104,7 @@ export function InventoryPanel() {
             <div className="inv-side">
                 ${effects.length > 0 && html`
                     <section className="nec-pane"><h4>Owned effects</h4>
-                        <div className="inv-active">${effects.map(([t, n]) => html`<span key=${t}>${nameOf(t)} <${Pips} rating=${n} /></span>`)}</div>
+                        <div className="inv-active">${effects.map(([t, n]) => html`<span key=${t}>${nameOf(t)} <${Amp} rating=${n} total=${true} /></span>`)}</div>
                     </section>
                 `}
                 <${ItemSheetView} key=${shown.id} adventure=${shown} set=${set} />

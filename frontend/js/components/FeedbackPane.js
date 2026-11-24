@@ -1,7 +1,8 @@
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { effectsAtWork } from '../lib/items.js';
-import { Pips } from './EffectRows.js';
+import { targetLabel } from '../lib/targets.js';
+import { Amp } from './EffectRows.js';
 
 const RESULTS = /** @type {const} */ ([['helped', 'Helped'], ['none', 'No effect'], ['hurt', 'Hurt']]);
 
@@ -25,12 +26,12 @@ export function FeedbackPane({ adventure, rows, editing, onChange }) {
         <section className="nec-pane">
             <h4>Buffs and debuffs</h4>
             ${all.map((r) => {
-                const own = r.key.startsWith('own:'), skill = r.skill && entities.find((e) => e.id === r.skill)?.name;
+                const own = r.key.startsWith('own:'), target = r.target && targetLabel(r.target, entities);
                 return html`
                     <div key=${r.key} className="fb">
                         ${own && editing
                             ? html`<input type="text" value=${r.label} maxLength=${500} placeholder="What helped or hurt" aria-label="What helped or hurt" onInput=${(/** @type {any} */ e) => put(r, { label: e.target.value })} />`
-                            : html`<span>${r.label}${skill && html` <small>✧ ${skill} <${Pips} rating=${r.rating} /></small>`}</span>`}
+                            : html`<span>${r.label}${target && html` <small>${target} <${Amp} rating=${r.rating} /></small>`}</span>`}
                         ${editing
                             ? html`<div className="fb-choices" role="group" aria-label=${`How ${r.label || 'it'} went`}>
                                 ${RESULTS.map(([k, label]) => html`<button key=${k} className=${`cls-layer r-${k} ${r.result === k ? 'on' : ''}`} aria-pressed=${r.result === k} onClick=${() => put(r, { result: r.result === k ? null : k })}>${label}</button>`)}
@@ -39,7 +40,7 @@ export function FeedbackPane({ adventure, rows, editing, onChange }) {
                     </div>
                 `;
             })}
-            ${editing && html`<div><button className="cls-layer" onClick=${() => onChange([...rows, { key: `own:${Date.now().toString(36)}`, label: '', skill: null, rating: 0, result: null }])}>+ Buff or debuff</button></div>`}
+            ${editing && html`<div><button className="cls-layer" onClick=${() => onChange([...rows, { key: `own:${Date.now().toString(36)}`, label: '', target: null, rating: 0, result: null }])}>+ Buff or debuff</button></div>`}
         </section>
     `;
 }

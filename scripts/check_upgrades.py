@@ -78,18 +78,18 @@ with TestClient(app) as c:
     call("PUT", f"/adventures/{b}/entities/{deity}")
     call("PUT", f"/adventures/{item}/entities/{deity}")
     call("PUT", f"/adventures/{stranger}/entities/{other}")
-    prep = [{"id": "g", "item": item, "checked": True}, {"id": "s", "text": "Slept", "checked": True, "effects": [{"skill": skill, "rating": 2}]}]
+    prep = [{"id": "g", "item": item, "checked": True}, {"id": "s", "text": "Slept", "checked": True, "effects": [{"target": "charisma", "rating": 2}]}]
     call("PATCH", f"/adventures/{b}", {"preparations": prep}, want=422)  # not owned yet
     for i in (item, stranger):
         call("PUT", f"/adventures/{i}/phase", {"phase": "completed"})
     call("PATCH", f"/adventures/{b}", {"preparations": [{"id": "x", "item": stranger}]}, want=422)
     call("PATCH", f"/adventures/{b}", {"preparations": prep})
     assert [x["checked"] for x in get(b)["preparations"]] == [True, True]
-    for rating in (0, 4):
-        call("PATCH", f"/adventures/{b}", {"preparations": [{"id": "s", "text": "x", "effects": [{"skill": skill, "rating": rating}]}]}, want=422)
-        call("PUT", f"/adventures/{item}/item", {"effects": [{"skill": skill, "rating": rating}]}, want=422)
-    call("PUT", f"/adventures/{item}/item", {"effects": [{"skill": skill, "rating": -3}, {"skill": "gone", "rating": 1}]})
-    assert get(item)["item"]["effects"] == [{"skill": skill, "rating": -3, "text": ""}]
+    for rating in (0, 6):
+        call("PATCH", f"/adventures/{b}", {"preparations": [{"id": "s", "text": "x", "effects": [{"target": "charisma", "rating": rating}]}]}, want=422)
+        call("PUT", f"/adventures/{item}/item", {"effects": [{"target": "charisma", "rating": rating}]}, want=422)
+    call("PUT", f"/adventures/{item}/item", {"effects": [{"target": "charisma", "rating": -3}, {"target": "gone", "rating": 1}]})
+    assert get(item)["item"]["effects"] == [{"target": "charisma", "rating": -3, "text": ""}]
 
     # roles; feedback and spells in the analysis; a battle seals without a link
     call("PUT", f"/adventures/{b}/party/{entity('player', 'T ally')}", {"status": "bonded", "role": " sound "})
@@ -109,6 +109,14 @@ with TestClient(app) as c:
     call("PUT", f"/adventures/{b}/phase", {"phase": "consuming"})
     assert taught() == []
     call("PUT", f"/adventures/{b}/phase", {"phase": "completed"})
+
+    # attributes: fixed; a skill has up to two; effects amplify either
+    call("POST", "/entities", {"type": "attribute", "name": "x"}, want=422)
+    call("PATCH", f"/entities/{skill}", {"details": {"attributes": ["charisma", "intellect"]}})
+    for bad in (["luck"], ["charisma", "intellect", "resolve"], "charisma"):
+        call("PATCH", f"/entities/{skill}", {"details": {"attributes": bad}}, want=422)
+    call("PUT", f"/adventures/{item}/item", {"effects": [{"target": skill, "rating": 5}]})
+    assert get(item)["item"]["effects"][0]["target"] == skill
 
     # pins and idols
     call("PUT", "/state/anvil", {"pins": [{"adventure": b, "action": "A1"}]})

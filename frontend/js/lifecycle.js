@@ -77,30 +77,57 @@ export const ENTITY_TYPES = {
     site: { label: 'Site', plural: 'Sites', glyph: '⌖', hint: 'A place: shows on the Atlas, anchors the proximity ring' },
     player: { label: 'Player', plural: 'Players', glyph: '☉', hint: 'A person who can join an adventure’s party' },
     organization: { label: 'Organization', plural: 'Organizations', glyph: '⎔', hint: 'An organization or a network' },
-    skill: { label: 'Skill', plural: 'Skills', glyph: '✧', hint: 'A skill an adventure uses or builds' },
+    skill: { label: 'Skill', plural: 'Skills', glyph: '✧', hint: 'A craft you learn, like soldering or coding' },
     spell: { label: 'Spell', plural: 'Spells', glyph: '✴', hint: 'A kind of play; its skills come from the Treasury' },
 };
 
 /**
- * What a player can be: one archetype, or none. Grouped ops / tech / staff; the idol is only
- * a label, not a Codex deity. Same ids in backend/db/models.py.
- * @type {Record<Archetype, { label: string, group: 'ops' | 'tech' | 'staff', idol: string, operator: string, medium: string, glyph: string }>}
+ * What a person is, fixed (backend.db.models.ATTRIBUTES). Skills are what they can do: an
+ * attribute is passive, a skill is used on purpose, and the first feeds the second.
+ * @type {Record<Attribute, { label: string, hint: string }>}
+ */
+export const ATTRIBUTES = {
+    strength:   { label: 'Strength',   hint: 'Force: lifting, pushing, striking' },
+    endurance:  { label: 'Endurance',  hint: 'Stamina and toughness: lasting' },
+    dexterity:  { label: 'Dexterity',  hint: 'Agility, speed and precision' },
+    perception: { label: 'Perception', hint: 'Noticing: senses and intuition' },
+    intellect:  { label: 'Intellect',  hint: 'Reason, knowledge and wisdom' },
+    charisma:   { label: 'Charisma',   hint: 'Charm and presence' },
+    empathy:    { label: 'Empathy',    hint: 'Feeling what others feel' },
+    resolve:    { label: 'Resolve',    hint: 'Courage, discipline and will' },
+};
+
+/**
+ * The four orders: the groups of archetypes.
+ * @type {Record<Order, { label: string, is: string, color: string }>}
+ */
+export const ORDERS = {
+    kratos: { label: 'Kratos', is: 'power', color: '#ff9a7a' },
+    logos:  { label: 'Logos',  is: 'reason', color: '#a9c8ee' },
+    pathos: { label: 'Pathos', is: 'feeling', color: '#f2a0cc' },
+    ethos:  { label: 'Ethos',  is: 'character', color: '#f0d490' },
+};
+
+/**
+ * What a player can be: one archetype, or none. `verb`: what they do ("leads"); `organ`: their
+ * part of the one body a party makes; `medium`: what they work on, outside themselves. The
+ * idol is only a label, not a Codex deity. Same ids in backend/db/models.py.
+ * @type {Record<Archetype, { label: string, order: Order, idol: string, glyph: string, verb: string, organ: string, operator: string, medium: string, attributes: [Attribute, Attribute] }>}
  */
 export const ARCHETYPES = {
-    vanguard:   { label: 'Vanguard',   group: 'ops',   idol: 'Jupiter', glyph: '♃', operator: 'Leader, commander', medium: 'Willpower' },
-    performer:  { label: 'Performer',  group: 'ops',   idol: 'Apollo',  glyph: '☀', operator: 'Comedian, host', medium: 'Attention' },
-    enchanter:  { label: 'Enchanter',  group: 'ops',   idol: 'Venus',   glyph: '♀', operator: 'Social engineer', medium: 'Desire' },
-    juggernaut: { label: 'Juggernaut', group: 'ops',   idol: 'Mars',    glyph: '♂', operator: 'Tank', medium: 'Firepower' },
-    rogue:      { label: 'Rogue',      group: 'ops',   idol: 'Diana',   glyph: '☽', operator: 'Hacker, tracker', medium: 'Stealth' },
-    summoner:   { label: 'Summoner',   group: 'ops',   idol: 'Faunus',  glyph: '♑', operator: 'Drone operator', medium: 'Autonomy' },
-    resonator:  { label: 'Resonator',  group: 'tech',  idol: 'Juno',    glyph: '⚵', operator: 'Community builder', medium: 'Rapport' },
-    merchant:   { label: 'Merchant',   group: 'tech',  idol: 'Mercury', glyph: '☿', operator: 'Arbiter, broker', medium: 'Commerce' },
-    artificer:  { label: 'Artificer',  group: 'tech',  idol: 'Vulcan',  glyph: '⚒', operator: 'Engineer, scientist', medium: 'Matter, technology' },
-    wizard:     { label: 'Wizard',     group: 'tech',  idol: 'Minerva', glyph: '⚴', operator: 'Tactician, navigator', medium: 'Information' },
-    cleric:     { label: 'Cleric',     group: 'staff', idol: 'Vesta',   glyph: '⚶', operator: 'Site keeper', medium: 'Sanctuary' },
-    patron:     { label: 'Patron',     group: 'staff', idol: 'Pluto',   glyph: '♇', operator: 'Investor, benefactor', medium: 'Capital' },
+    juggernaut: { label: 'Juggernaut', order: 'kratos', idol: 'Mars', glyph: '♂', verb: 'destroys', organ: 'Muscle', operator: 'Athlete, fighter, security', medium: 'Impact', attributes: ['strength', 'resolve'] },
+    artificer: { label: 'Artificer', order: 'kratos', idol: 'Vulcan', glyph: '⚒', verb: 'builds', organ: 'Hands', operator: 'Engineer, designer, maker, repair tech', medium: 'Matter', attributes: ['intellect', 'dexterity'] },
+    terraformer: { label: 'Terraformer', order: 'kratos', idol: 'Neptune', glyph: '♆', verb: 'transports', organ: 'Blood', operator: 'Driver, set builder, stagehand', medium: 'Space', attributes: ['strength', 'endurance'] },
+    wizard: { label: 'Wizard', order: 'logos', idol: 'Minerva', glyph: '⚴', verb: 'weaves', organ: 'Brain', operator: 'Strategist, tactician, researcher, planner', medium: 'Information', attributes: ['intellect', 'resolve'] },
+    ranger: { label: 'Ranger', order: 'logos', idol: 'Diana', glyph: '☽', verb: 'discovers', organ: 'Eyes', operator: 'Scout, detective, spy, investigator, hacker', medium: 'Secrets', attributes: ['dexterity', 'perception'] },
+    merchant: { label: 'Merchant', order: 'logos', idol: 'Mercury', glyph: '☿', verb: 'exchanges', organ: 'Glands', operator: 'Broker, producer, sourcer', medium: 'Value', attributes: ['charisma', 'intellect'] },
+    enchanter: { label: 'Enchanter', order: 'pathos', idol: 'Venus', glyph: '♀', verb: 'attracts', organ: 'Loins', operator: 'Marketer, salesperson, promoter', medium: 'Desire', attributes: ['charisma', 'empathy'] },
+    druid: { label: 'Druid', order: 'pathos', idol: 'Vesta', glyph: '⚶', verb: 'restores', organ: 'Heart', operator: 'Host, caretaker, medic, site keeper', medium: 'Morale', attributes: ['empathy', 'endurance'] },
+    bard: { label: 'Bard', order: 'pathos', idol: 'Apollo', glyph: '☀', verb: 'captivates', organ: 'Voice', operator: 'Performer, artist, musician, comedian, dancer, videographer', medium: 'Attention', attributes: ['charisma', 'dexterity'] },
+    vanguard: { label: 'Vanguard', order: 'ethos', idol: 'Jupiter', glyph: '♃', verb: 'leads', organ: 'Spine', operator: 'Leader, captain, director, organizer', medium: 'Momentum', attributes: ['resolve', 'charisma'] },
+    templar: { label: 'Templar', order: 'ethos', idol: 'Pluto', glyph: '♇', verb: 'binds', organ: 'Ligament', operator: 'Lawyer, judge, accountant, permit runner, grant writer', medium: 'Obligation', attributes: ['perception', 'resolve'] },
+    cleric: { label: 'Cleric', order: 'ethos', idol: 'Juno', glyph: '⚵', verb: 'reconciles', organ: 'Fascia', operator: 'Diplomat, mediator, community builder, facilitator', medium: 'Rapport', attributes: ['empathy', 'perception'] },
 };
-export const ARCHETYPE_GROUPS = /** @type {const} */ ({ ops: 'Ops', tech: 'Tech', staff: 'Staff' });
 
 /**
  * A player's status in a party, in order. `next`: the natural steps from it, offered first

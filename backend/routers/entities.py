@@ -21,7 +21,7 @@ async def get_entities(session: AsyncSession = Depends(get_session)):
 
 @router.post("/entities")
 async def create_entity(payload: EntityCreate):
-    """A new deity, site, player, organization or skill. 422 if a field is invalid."""
+    """A new deity, site, player, organization, skill or spell. 422 if a field is invalid."""
     try:
         return await entities.create_entity(payload.model_dump(exclude_unset=True) | {"type": payload.type})
     except entities.InvalidEntity as e:

@@ -70,16 +70,16 @@ export function gearSets(adventures) {
     return [...sets.values()].sort((x, y) => Number(!x.deity) - Number(!y.deity) || (x.deity?.name ?? '').localeCompare(y.deity?.name ?? ''));
 }
 
-/** Owned items' effects added up by skill. @param {AdventureRecord[]} adventures @returns {[string, number][]} */
+/** Owned items' effects added up by what they amplify. @param {AdventureRecord[]} adventures @returns {[string, number][]} */
 export function activeEffects(adventures) {
-    return sumBySkill(adventures.filter((a) => a.type === 'item' && a.phase === 'completed').flatMap((a) => a.item?.effects ?? []));
+    return sumByTarget(adventures.filter((a) => a.type === 'item' && a.phase === 'completed').flatMap((a) => a.item?.effects ?? []));
 }
 
-/** @param {{ skill: string, rating: number }[]} effects @returns {[string, number][]} */
-export function sumBySkill(effects) {
+/** @param {{ target: string, rating: number }[]} effects @returns {[string, number][]} */
+export function sumByTarget(effects) {
     /** @type {Map<string, number>} */
     const sum = new Map();
-    for (const e of effects) sum.set(e.skill, (sum.get(e.skill) ?? 0) + e.rating);
+    for (const e of effects) sum.set(e.target, (sum.get(e.target) ?? 0) + e.rating);
     return [...sum].filter(([, n]) => n);
 }
 
@@ -107,6 +107,6 @@ export function readied(adventure, adventures) {
  *  @param {AdventureRecord} adventure @param {AdventureRecord[]} adventures */
 export function effectsAtWork(adventure, adventures) {
     return readied(adventure, adventures).filter((r) => r.prep.checked).flatMap((r) => (r.effects.length
-        ? r.effects.map((e) => ({ key: `${r.prep.id}:${e.skill}`, label: r.label, skill: /** @type {string | null} */ (e.skill), rating: e.rating }))
-        : [{ key: r.prep.id, label: r.label, skill: null, rating: 0 }]));
+        ? r.effects.map((e) => ({ key: `${r.prep.id}:${e.target}`, label: r.label, target: /** @type {string | null} */ (e.target), rating: e.rating }))
+        : [{ key: r.prep.id, label: r.label, target: null, rating: 0 }]));
 }

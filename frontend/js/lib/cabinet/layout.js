@@ -2,8 +2,8 @@
 // buttons (components/Cabinet.js) and the 3D cabinet behind them (cabinetScene.js) both use
 // it, so they always line up.
 
-/** @typedef {{ id: string | null, x: number, y: number, w: number, h: number }} CabinetCell  top-left corner; id null = an empty alcove */
-/** @typedef {{ y: number, h: number, title: string | null, rows: number[] }} CabinetGroup  `rows`: each row's top; `y`/`h` span the rows */
+/** @typedef {{ id: string | null, x: number, y: number, w: number, h: number, theme?: string }} CabinetCell  top-left corner; id null = an empty alcove */
+/** @typedef {{ y: number, h: number, title: string | null, rows: number[], theme?: string }} CabinetGroup  `rows`: each row's top; `y`/`h` span the rows */
 /**
  * @typedef {object} CabinetLayout
  * @property {number} width
@@ -18,13 +18,13 @@
  */
 
 export const LABEL_H = 60;      // the band under each alcove's shelf
-const CREST_H = 98, FOOT_H = 22, TITLE_H = 44;
+const CREST_H = 98, FOOT_H = 22, TITLE_H = 44, THEME_H = 18;   // a themed housing's ornament stands taller
 
 /**
  * Lay groups of items out in alcoves. Each group starts a new row, under its title if it
  * has one; its last row is filled up with empty alcoves.
  * @param {number} width  of the panel's content
- * @param {{ title?: string | null, ids: string[] }[]} groups
+ * @param {{ title?: string | null, ids: string[], theme?: string }[]} groups   theme: of its housing (themes.js)
  * @param {{ minW?: number, cellH?: number, minCols?: number, maxCols?: number }} [options]
  * @returns {CabinetLayout}
  */
@@ -39,11 +39,11 @@ export function cabinetLayout(width, groups, { minW = 176, cellH = 246, minCols 
     const placed = [];
     let y = CREST_H;
     for (const g of groups) {
-        if (g.title) y += TITLE_H;
+        if (g.title) y += TITLE_H + (g.theme ? THEME_H : 0);
         const rows = Math.max(1, Math.ceil(g.ids.length / n));
-        placed.push({ y, h: rows * cellH, title: g.title ?? null, rows: Array.from({ length: rows }, (_, i) => y + i * cellH) });
+        placed.push({ y, h: rows * cellH, title: g.title ?? null, theme: g.theme, rows: Array.from({ length: rows }, (_, i) => y + i * cellH) });
         for (let i = 0; i < rows * n; i++) {
-            cells.push({ id: g.ids[i] ?? null, x: pad + (i % n) * cellW, y: y + Math.floor(i / n) * cellH, w: cellW, h: cellH });
+            cells.push({ id: g.ids[i] ?? null, x: pad + (i % n) * cellW, y: y + Math.floor(i / n) * cellH, w: cellW, h: cellH, theme: g.theme });
         }
         y += rows * cellH + FOOT_H;
     }

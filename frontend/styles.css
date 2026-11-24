@@ -1620,13 +1620,9 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .pl-select:focus { outline: none; border-color: var(--steel-5); }
 .pl-select option, .pl-select optgroup { background: #0c0d10; color: var(--text); }
 .pl-warmth { display: inline-flex; gap: 4px; padding: 6px 0; }
-.pl-warmth button { width: 13px; height: 13px; padding: 0; border: 1px solid var(--steel-4); border-radius: 50%; background: transparent; cursor: pointer; }
-.pl-warmth button:disabled { cursor: default; }
-.pl-warmth button.on { border-color: #f0643c; background: radial-gradient(circle at 40% 35%, #ffb27a, #f0643c); box-shadow: 0 0 7px rgba(240, 100, 60, 0.6); }
+.pl-warmth button, .pl-warmth i { width: 13px; height: 13px; padding: 0; border: 1px solid var(--steel-4); border-radius: 50%; background: transparent; cursor: pointer; }
+.pl-warmth .on { border-color: #f0643c; background: radial-gradient(circle at 40% 35%, #ffb27a, #f0643c); box-shadow: 0 0 7px rgba(240, 100, 60, 0.6); }
 .pl-arch { --g: var(--text-dim); color: var(--g); font: 600 11px var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; }
-.pl-arch.g-ops { --g: #ff9a8a; }
-.pl-arch.g-tech { --g: #7fd8f0; }
-.pl-arch.g-staff { --g: #f3d48a; }
 
 .complex { padding: 0; container-type: size; }
 .cpx { display: flex; width: 100%; height: 100%; min-height: 0; }
@@ -1679,7 +1675,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 
 /* party rosters (Refinery, Crucible, Arena), aftermath (Treasury, Cohort) */
 .arena { --alloy: var(--m-animus); }
-.pr { display: flex; flex-direction: column; gap: 3px; cursor: default; }
+.pr { display: flex; flex-direction: column; gap: 3px; }
 .pr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-width: 0; }
 .pr-row i, .aft-head i { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 7px var(--c); }
 .pr-name { flex: 1 1 70px; min-width: 0; padding: 2px 0; border: 0; background: none; cursor: pointer; text-align: left; color: var(--text); font: 600 12px var(--font-display); letter-spacing: 0.05em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1693,7 +1689,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .pr-stewards { display: flex; flex-wrap: wrap; gap: 4px; }
 .pr-stewards button { padding: 2px 8px; border: 0; border-radius: 4px; background: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 40%, var(--steel-2)); color: var(--text); cursor: pointer; font: 500 11px var(--font-body); }
 .pr-stewards small { margin-right: 5px; color: var(--c); font: 500 9px var(--font-mono); text-transform: uppercase; }
-.pr-foot { display: flex; align-items: center; gap: 8px; margin-top: 4px; cursor: default; }
+.pr-foot { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .pr-foot > div { flex: 1 1 auto; min-width: 0; }
 .pr-foot .btn { flex-shrink: 0; padding: 4px 11px; font-size: 11px; border-radius: 4px; }
 .aft { display: flex; flex-direction: column; gap: 7px; }
@@ -1714,7 +1710,7 @@ button.aft-head { cursor: pointer; } button.aft-head:disabled { cursor: default;
 .anvil-move { flex-shrink: 0; display: flex; flex-direction: column; }
 .anvil-move button { padding: 0 4px; border: 0; background: none; color: var(--text-dim); cursor: pointer; font-size: 8px; line-height: 1.4; }
 .anvil-move button:hover:not(:disabled) { color: #fff; } .anvil-move button:disabled { opacity: 0.2; cursor: default; }
-.obj { display: flex; flex-direction: column; gap: 4px; cursor: default; }
+.obj { display: flex; flex-direction: column; gap: 4px; }
 .obj-row, .prep-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .obj-mark { flex-shrink: 0; width: 20px; height: 20px; padding: 0; border: 1px solid var(--steel-3); border-radius: 50%; background: none; color: var(--text-muted); cursor: pointer; font-size: 11px; line-height: 1; }
 .obj-mark:disabled { cursor: default; }
@@ -1799,3 +1795,58 @@ input.obj-text:hover { border-color: var(--steel-2); } input.obj-text:focus { ou
 .node-card > .nec-pane { margin-top: 12px; }
 .tcard-accept { position: absolute; left: 7px; top: 7px; padding: 3px 10px; border: 1px solid var(--accent); border-radius: 4px; background: rgba(5, 6, 8, 0.85); color: var(--accent-light); cursor: pointer; font: 600 11px var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; }
 .tcard-accept:hover { background: color-mix(in srgb, var(--accent) 25%, #050608); }
+.prep { padding: 3px 0; }
+.prep-title { flex: 1 1 90px; min-width: 0; padding: 0; border: 0; background: none; cursor: text; text-align: left; color: var(--text-muted); font: 500 13px var(--font-body); overflow-wrap: anywhere; }
+.prep.on .prep-title { color: var(--text-bright); }
+.prep-row .ol-input { flex: 1 1 90px; min-width: 0; }
+.buff-skill { padding-left: 22px; }
+.buff-fx { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font: 500 12px var(--font-body); }
+.amp-step { padding: 0 6px !important; font-size: 11px; line-height: 1.4; }
+.prep-add { flex-wrap: wrap; } .prep-add .alm-verb { flex: 0 0 96px; }
+.arena .alm-verb { --todo: var(--m-animus); }
+.pr-foot { justify-content: flex-end; }
+/* a buff on one line when there's room: check, title, skill and amp, remove */
+.prep { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 7px; }
+.prep .prep-row { display: contents; }
+.prep .prep-row > .ol-chip-x { order: 2; }
+.prep .buff-skill { order: 1; flex: 0 1 auto; padding-left: 0; min-width: 150px; }
+.prep .prep-title { flex: 1 1 110px; }
+.prep .prep-row > .ol-input, .prep-add .ol-input { flex: 1 1 110px; width: auto; min-width: 0; }
+
+/* the Arena's party: who's in it, what they do, what they share with it */
+.ap { display: flex; flex-direction: column; gap: 6px; }
+.ap-card { --c: var(--steel-4); display: flex; flex-direction: column; gap: 5px; padding: 7px 10px; border-radius: 5px; border-left: 3px solid var(--c); background: rgba(12, 13, 16, 0.6); box-shadow: inset 0 0 0 1px var(--steel-2); }
+.ap-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 9px; }
+.ap-top .pr-name { flex: 0 1 auto; font-size: 14px; }
+.ap-top .pr-rolebox { flex: 1 1 110px; font-size: 12px; }
+.ap-res { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ap-res > b { color: #f5c542; font: 600 11px var(--font-mono); }
+.ap-res span { padding: 1px 7px; border-radius: 4px; box-shadow: inset 0 0 0 1px color-mix(in srgb, #f5c542 40%, transparent); color: #f5dfa0; font: 500 11px var(--font-body); }
+.ap-waiting { display: flex; flex-direction: column; gap: 3px; }
+.buff-new { display: grid; grid-template-columns: 96px minmax(0, 1.2fr) minmax(0, 1fr) auto auto; gap: 6px; align-items: center; }
+.buff-new .ol-input { width: 100%; min-width: 0; }
+.buff-new .amp { display: inline-flex; align-items: center; gap: 4px; }
+.buff-new .ol-chip { justify-self: start; min-width: 0; }
+.buff-copy { width: auto; align-self: flex-start; max-width: 100%; }
+@container (max-width: 430px) { .buff-new { grid-template-columns: 96px minmax(0, 1fr); } .buff-new .attr { grid-column: 1 / -1; } }
+.buffs { container-type: inline-size; }
+.buff-new .alm-verb { width: 100%; }
+.prep .buff-skill { display: inline-flex; align-items: center; gap: 6px; }
+.prep-add .buff-copy { flex: 0 1 auto; padding-right: 22px; }
+
+/* adventure cards (Crucible, Arena): the border is drawn over the cover or model, which fills
+   the card's left edge; disabled controls don't swallow the pointer */
+.ql-group { position: relative; box-shadow: none; --edge: inset 0 0 0 1px var(--steel-2); }
+.ql-group::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; pointer-events: none; box-shadow: var(--edge); transition: box-shadow .15s; }
+.ql-group.hovered { box-shadow: none; --edge: inset 0 0 0 1px var(--steel-4); }
+.ql-group.selected { box-shadow: 0 0 14px color-mix(in srgb, var(--alloy) 22%, transparent); --edge: inset 0 0 0 1px color-mix(in srgb, var(--alloy) 75%, transparent); }
+.ql-group.selected.hovered { box-shadow: 0 0 18px color-mix(in srgb, var(--alloy) 30%, transparent); --edge: inset 0 0 0 1px var(--alloy); }
+.ql-cover { border-radius: 6px 0 0 6px; border-right: 1px solid var(--steel-2); background: radial-gradient(circle at 50% 50%, #14161b, #07080a 75%); }
+.ql-cover::after { border-radius: inherit; }
+.ql-group :disabled { pointer-events: none; }
+.pl-arch small { color: var(--text-dim); font: italic 500 11px var(--font-body); letter-spacing: 0; text-transform: none; }
+.idol-verb { color: var(--c); font: italic 500 15px var(--font-body); letter-spacing: 0; }
+.idol-attr { margin-right: 10px; white-space: nowrap; }
+.cx-attrs { display: flex; flex-wrap: wrap; gap: 5px; } .cx-attrs .cls-layer:disabled { opacity: 0.4; cursor: default; }
+.ae-label em.cx-hint { color: var(--text-dim); }
+.fx-totals small { color: var(--text-dim); font: 400 10px var(--font-body); }
