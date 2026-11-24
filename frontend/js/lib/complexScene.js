@@ -159,7 +159,7 @@ export class ComplexScene {
         group.position.set(...n.pos);
         group.scale.setScalar(grown ? 1 : 0.01);
         const size = n.kind === 'core' ? n.size * 0.32 : n.size;
-        const geometry = n.kind === 'core' || n.kind === 'entity' ? S.gem : n.kind === 'steward' ? S.prism : S.orb;
+        const geometry = n.kind === 'core' || n.kind === 'entity' || n.kind === 'archon' ? S.gem : n.kind === 'steward' ? S.prism : S.orb;
         const body = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
             color: color.clone().multiplyScalar(0.5), emissive: color, emissiveIntensity: n.dim ? 0.25 : n.glow || n.kind === 'core' ? 0.75 : 0.45,
             roughness: 0.35, metalness: 0.25, transparent: n.dim, opacity: n.dim ? 0.55 : 1,

@@ -78,7 +78,7 @@ const PANEL_HELP = {
     alembic: 'How to do it: the adventure’s roadmap, a graph of actions. Completing the first action turns distillate into alloy.',
     scripter: 'The roadmap as text: one statement per line, e.g. A1[Buy tickets] --> A2[Pack].',
     codex: 'The entities adventures link to: deities (demand signals), sites (places), players (people), organizations, skills, and spells (kinds of play).',
-    complex: 'Who: how players connect to the selected adventure. Its site and party stand beside it; stewards hold it, and the cohort gathers around the party, each bond coloured by status. Resonance ranks every player by the Codex entities they share with it.',
+    complex: 'Who: how players connect to the selected adventure. Its site and party stand beside it; the ministry holds it, and players gather around the party, each bond coloured by status. Resonance ranks every player by the Codex entities they share with it.',
     arena: 'Every adventure under way and who is in it. Tick objectives, ready preparations and see the skills they boost. Change a player’s status, add someone you just met as emergent, and complete it into an artifact.',
     cohort: 'Every player in a cabinet, by archetype. A sigil’s points are its archetype and its rings its warmth; it lights once you have collaborated. Idols shows the archetypes: a statue and a card each, with their skills. Open a player to edit the profile and see what you have done together.',
     quests: 'What can I do right now: the next actions of every alloy adventure, ready to tick off. Lay an action on the anvil to keep it at the top.',

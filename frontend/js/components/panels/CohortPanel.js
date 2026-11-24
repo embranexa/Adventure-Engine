@@ -51,7 +51,7 @@ function PlayerSheet({ player }) {
             ${!record.length && html`<p className="nec-dim">No adventures yet</p>`}
             ${record.map(({ a, m, status }) => html`
                 <div key=${a.id} className="aft" style=${{ '--c': PARTY_STATUSES[status].color }}>
-                    <button className="aft-head" disabled=${!itemsById[a.id]} title=${itemsById[a.id] ? 'Open in the Complex' : 'Not in the current pool'} onClick=${() => openInComplex(a.id, player.id)}>
+                    <button className="aft-head" disabled=${!itemsById[a.id]} title=${itemsById[a.id] ? 'Open in the Combinator' : 'Not in the current pool'} onClick=${() => openInComplex(a.id, player.id)}>
                         <i></i><b>${a.title}</b><em>${PARTY_STATUSES[status].label}</em></button>
                     ${m.impact && html`<p className="ana-notes-read">${m.impact}</p>`}
                 </div>

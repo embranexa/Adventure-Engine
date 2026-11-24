@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
-import { ENTITY_TYPES } from '../lifecycle.js';
+import { ENTITY_TYPES, UNLINKABLE } from '../lifecycle.js';
 import { PartyRoster } from './PartyRoster.js';
 
 const MAX_SUGGESTIONS = 8;
@@ -33,13 +33,13 @@ export function EntityLinks({ adventure }) {
     const options = useMemo(() => {
         /** @type {({ kind: 'link', obj: Entity } | { kind: 'create', type: EntityType })[]} */
         const list = entities
-            .filter((o) => !linkedIds.has(o.id) && (!q || o.name.toLowerCase().includes(q)))
+            .filter((o) => !UNLINKABLE.includes(o.type) && !linkedIds.has(o.id) && (!q || o.name.toLowerCase().includes(q)))
             .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name))
             .slice(0, MAX_SUGGESTIONS)
             .map((obj) => ({ kind: /** @type {const} */ ('link'), obj }));
-        const exact = entities.some((o) => o.name.toLowerCase() === q);
+        const exact = entities.some((o) => !UNLINKABLE.includes(o.type) && o.name.toLowerCase() === q);
         if (q && !exact) {
-            for (const type of /** @type {EntityType[]} */ (Object.keys(ENTITY_TYPES))) list.push({ kind: 'create', type });
+            for (const type of /** @type {EntityType[]} */ (Object.keys(ENTITY_TYPES))) if (!UNLINKABLE.includes(type)) list.push({ kind: 'create', type });
         }
         return list;
     }, [entities, q, adventure.entities]);
@@ -74,7 +74,7 @@ export function EntityLinks({ adventure }) {
     return html`
         <div className="ol">
             <div className="ol-head">Links
-                <button className="cls-layer ol-complex" onClick=${() => showPanel('complex')} title="Its players and stewards">${adventure.collaboration ? '☉ Collaboration' : 'Complex'} ⟶</button>
+                <button className="cls-layer ol-complex" onClick=${() => showPanel('complex')} title="Its players and stewards">${adventure.collaboration ? '☉ Collaboration' : 'Combinator'} ⟶</button>
             </div>
             ${byType.length > 0 && html`
                 <div className="ol-chips">
@@ -95,7 +95,7 @@ export function EntityLinks({ adventure }) {
                     ref=${inputRef}
                     className="ol-input"
                     value=${query}
-                    placeholder=${'+ Link a deity, site, player, organization, skill or spell…'}
+                    placeholder=${'+ Link a deity, site, player, organization or skill…'}
                     aria-label="Link an entity"
                     onInput=${(/** @type {any} */ e) => { setQuery(e.target.value); setOpen(true); setActive(0); }}
                     onFocus=${() => setOpen(true)}

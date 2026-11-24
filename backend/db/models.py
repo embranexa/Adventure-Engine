@@ -191,10 +191,14 @@ PARTY_STATUSES = RECRUITMENT_STATUSES + ACTIVE_STATUSES + AFTERMATH_STATUSES
 COLLABORATING = ACTIVE_STATUSES + AFTERMATH_STATUSES  # anyone here makes it a collaboration
 
 # Stewards of an adventure. Wardens belong to its site instead (EntityLink).
-STEWARD_ROLES = ("herald", "commissioner")
+# The archon leads it: one at most, a player, always in the party (bonded or beyond). None: you lead.
+STEWARD_ROLES = ("archon", "herald", "commissioner")
 STEWARD_TYPES = ("player", "organization")
 # What players can be linked to; shared links are their resonance with an adventure.
-AFFINITY_TYPES = ("deity", "site", "organization", "skill", "spell")
+AFFINITY_TYPES = ("deity", "site", "organization", "skill")
+# Spells are never linked to anything: their skills are those of the sealed plays that name
+# them (queries.spell_skills).
+UNLINKABLE_TYPES = ("spell",)
 ADVERSARY_TYPES = ("player", "organization")
 
 
@@ -247,19 +251,19 @@ class AdventureEntity(Base):
 
 class EntityLink(Base):
     """A link between two entities. affinity: a player to what it resonates with
-    (AFFINITY_TYPES). warden: a player or organization to the site it keeps. uses: a spell to a
-    skill it's cast with."""
+    (AFFINITY_TYPES). warden: a player or organization to the site it keeps."""
 
     __tablename__ = "entity_links"
 
     from_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
     to_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
-    role: Mapped[str] = mapped_column(String(10), primary_key=True)  # affinity | warden | uses
+    role: Mapped[str] = mapped_column(String(10), primary_key=True)  # affinity | warden
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class Steward(Base):
-    """A player or organization that brought (herald) or issued (commissioner) an adventure."""
+    """A player or organization that brought (herald) or issued (commissioner) an adventure, or
+    the player leading it (archon)."""
 
     __tablename__ = "stewards"
 

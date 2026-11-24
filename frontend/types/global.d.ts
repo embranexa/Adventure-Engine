@@ -132,8 +132,8 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     roadmap: Roadmap | null;
     /** Linked entities (the Codex). */
     entities: LinkedEntity[];
-    /** Heralds and commissioners; wardens are its site's. */
-    stewards: { id: string; type: EntityType; name: string; role: 'herald' | 'commissioner' }[];
+    /** The archon (one at most; none: you lead), heralds and commissioners; wardens are its site's. */
+    stewards: { id: string; type: EntityType; name: string; role: 'archon' | 'herald' | 'commissioner' }[];
     /** Someone is bonded, emergent or in the aftermath. */
     collaboration: boolean;
     /** Its linked site, if any; a hand-made event takes its where from it. */
@@ -268,7 +268,7 @@ type ExcludedFate = 'siphon' | 'purge' | 'keep';
 
 type AdventureFlag = 'important' | 'urgent' | 'favorite' | 'maybe' | 'waiting';
 
-type FacetKey = 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'collaboration' | 'type' | 'phase' | 'review';
+type FacetKey = 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'collaboration' | 'leader' | 'type' | 'phase' | 'review';
 
 /** Local calendar days, inclusive. */
 interface DateRange { start: string; end: string; mode: FilterMode }
@@ -293,7 +293,7 @@ interface FilterState {
 }
 
 /** "stage" (Matter) or a facet that can color rows. */
-type LensKey = 'none' | 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'collaboration' | 'type' | 'deity' | 'site' | 'player' | 'organization' | 'skill' | 'spell';
+type LensKey = 'none' | 'stage' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'collaboration' | 'leader' | 'type' | 'deity' | 'site' | 'player' | 'organization' | 'skill';
 
 /** One move between signal chain nodes (backend/services/transitions.py). */
 interface TransitionRecord {
@@ -321,7 +321,7 @@ type EntityType = 'deity' | 'site' | 'player' | 'organization' | 'skill' | 'spel
 type Archetype = 'vanguard' | 'performer' | 'enchanter' | 'juggernaut' | 'rogue' | 'summoner' | 'resonator' | 'merchant' | 'artificer' | 'wizard' | 'cleric' | 'patron';
 interface PlayerDetails { email?: string; phone?: string; handle?: string; archetype?: Archetype; warmth?: number; tags?: string[] }
 type PartyStatus = 'resonant' | 'charging' | 'attuning' | 'resisted' | 'bonded' | 'emergent' | 'annealed' | 'neutralized' | 'repelled';
-type StewardRole = 'herald' | 'commissioner' | 'warden';
+type StewardRole = 'archon' | 'herald' | 'commissioner' | 'warden';
 /** An entity linked to an adventure; a player's link is its place in the party. */
 interface LinkedEntity { id: string; type: EntityType; name: string; status?: PartyStatus; status_at?: string | null; role?: string | null; note?: string | null; impact?: string | null; follow_up?: string | null }
 interface PartyLogEntry { id: number; at: string; player_id: string; from: PartyStatus | null; to: PartyStatus | null }
@@ -342,7 +342,7 @@ interface Entity {
     details: PlayerDetails;
     /** players: ids of what it resonates with */
     affinities: string[];
-    /** spells: ids of the skills they're cast with */
+    /** spells: ids of the skills of the sealed plays that name them */
     skills: string[];
     /** sites: ids of the players and organizations that keep it */
     wardens: string[];
@@ -497,10 +497,9 @@ interface WorkspaceState {
     setAmbrosia(ambrosia: AmbrosiaLedger): void;
     /** Add a player to a party or change its place there. These resolve to an error message, or null. */
     setPartyMember(adventureId: string, playerId: string, changes: { status?: PartyStatus; role?: string | null; note?: string | null; impact?: string | null; follow_up?: string | null }): Promise<string | null>;
-    setSteward(adventureId: string, entityId: string, role: 'herald' | 'commissioner', on: boolean): Promise<string | null>;
+    setSteward(adventureId: string, entityId: string, role: 'archon' | 'herald' | 'commissioner', on: boolean): Promise<string | null>;
     setAffinity(playerId: string, entityId: string, on: boolean): Promise<string | null>;
     setWarden(siteId: string, entityId: string, on: boolean): Promise<string | null>;
-    setSpellSkill(spellId: string, skillId: string, on: boolean): Promise<string | null>;
     /** Actions laid on the anvil (the Crucible), in order. */
     pins: Pin[];
     setPins(pins: Pin[]): void;

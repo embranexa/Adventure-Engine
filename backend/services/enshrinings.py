@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import (
-    ENTITY_TYPES, MOVE_GRADES, WHEN_WHERE_TYPES, Adventure, AdventureEntity, Enshrining, Entity, Move,
+    ENTITY_TYPES, MOVE_GRADES, UNLINKABLE_TYPES, WHEN_WHERE_TYPES, Adventure, AdventureEntity, Enshrining, Entity, Move,
 )
 from backend.db.queries import list_entities
 from backend.services import ledger
@@ -139,7 +139,8 @@ async def save(adventure_id: uuid.UUID, fields: dict[str, Any], seal: bool = Fal
         await session.flush()
         paid = await ledger.settle(session, adventure)
         await session.commit()
-        if new:
+        if seal:
+            # new discoveries, and the skills its plays teach their spells
             await hub.broadcast("entities", entities=await list_entities(session))
     await broadcast_pools()
     if paid:
@@ -167,6 +168,8 @@ async def _discover(session: AsyncSession, adventure: Adventure, discoveries: li
             await session.flush()
             new.append(entity.name)
         d["entity_id"], d["name"] = str(entity.id), entity.name
+        if entity.type in UNLINKABLE_TYPES:
+            continue
         if entity.type == "site" and adventure.type in WHEN_WHERE_TYPES:
             continue
         if await session.get(AdventureEntity, (adventure.id, entity.id)) is None:

@@ -8,10 +8,10 @@ from pydantic import BaseModel, Field, model_validator
 
 FilterMode = Literal["include", "exclude"]
 FacetKey = Literal["source", "tag", "city", "region", "metro", "type", "phase", "review", "flag",
-                   "collaboration", "deity", "site", "player", "organization", "skill", "spell"]
+                   "collaboration", "leader", "deity", "site", "player", "organization", "skill"]
 # what colors the matter: "stage" (Matter) or a facet (frontend/js/lib/lens.js)
 LensKey = Literal["none", "stage", "source", "tag", "city", "region", "metro", "type", "flag",
-                  "collaboration", "deity", "site", "player", "organization", "skill", "spell"]
+                  "collaboration", "leader", "deity", "site", "player", "organization", "skill"]
 RENAMED_KEYS = {"pillar": "deity", "contact": "player"}  # saved filters may still use the old name
 FACET_KEYS, LENS_KEYS = set(get_args(FacetKey)), set(get_args(LensKey))
 

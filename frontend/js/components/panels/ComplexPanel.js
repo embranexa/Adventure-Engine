@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { ENTITY_TYPES, PARTY_STATUSES, STEWARD_ROLES } from '../../lifecycle.js';
-import { buildComplex, buildResonance, partyOf, rankPlayers, wardensOf } from '../../lib/complexGraph.js';
+import { mayChange } from '../../lib/archon.js';
+import { archonOf, buildComplex, buildResonance, partyOf, rankPlayers, wardensOf } from '../../lib/complexGraph.js';
 import { EntityPicker } from '../EntityPicker.js';
 import { ArchetypeBadge, Warmth } from '../PlayerFields.js';
 import { Field } from './AdventureEditor.js';
 
 const STATUSES = /** @type {PartyStatus[]} */ (Object.keys(PARTY_STATUSES));
-const MODES = /** @type {const} */ ({ complex: 'Complex', resonance: 'Resonance' });
+const MODES = /** @type {const} */ ({ complex: 'Molecule', resonance: 'Resonance' });
 const STAGES = /** @type {const} */ ({ recruitment: 'Recruitment', active: 'Active', aftermath: 'Aftermath' });
 
 /** @param {string} iso */
@@ -48,6 +49,7 @@ function PlayerDetail({ adventure, player, log, onBack }) {
 
     /** @param {{ status?: PartyStatus, role?: string | null, note?: string | null, follow_up?: string | null }} changes */
     const save = async (changes) => {
+        if (changes.status && !mayChange(adventure, player, changes.status)) return null;
         const err = await setPartyMember(adventure.id, player.id, changes);
         setError(err);
         return err;
@@ -96,21 +98,21 @@ function PlayerDetail({ adventure, player, log, onBack }) {
                 </label>
             `}
 
-            <div className="cx-linked-head">Steward</div>
+            <div className="cx-linked-head">Ministry</div>
             <div className="cpx-steps">
-                ${/** @type {('herald' | 'commissioner')[]} */ (['herald', 'commissioner']).map((role) => html`
+                ${/** @type {('archon' | 'herald' | 'commissioner')[]} */ (['archon', 'herald', 'commissioner']).map((role) => html`
                     <button key=${role} className=${`cls-layer ${roles.includes(role) ? 'on' : ''}`} title=${STEWARD_ROLES[role].hint}
                         style=${roles.includes(role) ? { color: STEWARD_ROLES[role].color } : undefined}
                         onClick=${async () => setError(await setSteward(adventure.id, player.id, role, !roles.includes(role)))}>${STEWARD_ROLES[role].label}</button>`)}
             </div>
             <${History} log=${log} playerId=${player.id} />
             ${error && html`<div className="nc-error" role="alert">${error}</div>`}
-            ${status && html`<div className="cx-actions"><button className="btn ghost cx-delete" onClick=${async () => setError(await unlinkEntity(adventure.id, player.id))}>✕ Remove from party</button></div>`}
+            ${status && html`<div className="cx-actions"><button className="btn ghost cx-delete" onClick=${async () => { if (mayChange(adventure, player, null)) setError(await unlinkEntity(adventure.id, player.id)); }}>✕ Remove from party</button></div>`}
         </div>
     `;
 }
 
-/** The stewards and cohort, editable. @param {{ adventure: AdventureRecord, onOpen: (playerId: string) => void }} props */
+/** The ministry (archon, heralds, commissioners, wardens) and the party, editable. @param {{ adventure: AdventureRecord, onOpen: (playerId: string) => void }} props */
 function Roster({ adventure, onOpen }) {
     const entities = useWorkspaceStore((s) => s.entities);
     const setPartyMember = useWorkspaceStore((s) => s.setPartyMember);
@@ -118,24 +120,18 @@ function Roster({ adventure, onOpen }) {
     const setWarden = useWorkspaceStore((s) => s.setWarden);
     const [error, setError] = useState(/** @type {string | null} */ (null));
     const party = partyOf(adventure), site = entities.find((e) => e.id === adventure.site_id) ?? null;
-    const wardens = wardensOf(adventure, entities);
+    const wardens = wardensOf(adventure, entities), lead = archonOf(adventure);
 
     return html`
         <div className="cpx-detail">
-            <div className="cx-linked-head">Cohort <b>${party.length}</b></div>
-            ${Object.entries(STAGES).map(([stage, label]) => {
-                const rows = party.filter((m) => PARTY_STATUSES[m.status ?? 'resonant'].stage === stage);
-                return rows.length > 0 && html`
-                    <div key=${stage} className="cpx-group"><small>${label}</small>
-                        ${rows.map((m) => {
-                            const s = PARTY_STATUSES[m.status ?? 'resonant'];
-                            return html`<button key=${m.id} className="cpx-row" style=${{ '--c': s.color }} onClick=${() => onOpen(m.id)}><i></i><b>${m.name}</b><em>${s.label}</em></button>`;
-                        })}
-                    </div>`;
-            })}
-            <${EntityPicker} ids=${party.map((m) => m.id)} chips=${false} types=${['player']} placeholder="+ Add a player as resonant…"
-                onAdd=${async (/** @type {string} */ id) => setError(await setPartyMember(adventure.id, id, {}))} />
-
+            <div className="cpx-section">Ministry</div>
+            <div className="ol">
+                <div className="cx-linked-head" style=${{ color: STEWARD_ROLES.archon.color }}>♛ Archon</div>
+                ${!lead && html`<div className="cx-empty-line">You lead</div>`}
+                <${EntityPicker} ids=${lead ? [lead] : []} types=${['player']} placeholder=${lead ? '+ Someone else leads…' : '+ A player leads…'}
+                    onAdd=${async (/** @type {string} */ id) => setError(await setSteward(adventure.id, id, 'archon', true))}
+                    onRemove=${async (/** @type {string} */ id) => setError(await setSteward(adventure.id, id, 'archon', false))} />
+            </div>
             ${/** @type {('herald' | 'commissioner')[]} */ (['herald', 'commissioner']).map((role) => html`
                 <div key=${role} className="ol">
                     <div className="cx-linked-head" style=${{ color: STEWARD_ROLES[role].color }}>${STEWARD_ROLES[role].label}s</div>
@@ -151,6 +147,19 @@ function Roster({ adventure, onOpen }) {
                         onRemove=${async (/** @type {string} */ id) => setError(await setWarden(site.id, id, false))} />`
                     : html`<div className="cx-empty-line">Link a site in the Refinery to give it wardens</div>`}
             </div>
+            <div className="cpx-section">Party <b>${party.length}</b></div>
+            ${Object.entries(STAGES).map(([stage, label]) => {
+                const rows = party.filter((m) => PARTY_STATUSES[m.status ?? 'resonant'].stage === stage);
+                return rows.length > 0 && html`
+                    <div key=${stage} className="cpx-group"><small>${label}</small>
+                        ${rows.map((m) => {
+                            const s = PARTY_STATUSES[m.status ?? 'resonant'];
+                            return html`<button key=${m.id} className="cpx-row" style=${{ '--c': s.color }} onClick=${() => onOpen(m.id)}>${m.id === lead ? html`<span className="pr-crown" title="Archon">♛</span>` : html`<i></i>`}<b>${m.name}</b><em>${s.label}</em></button>`;
+                        })}
+                    </div>`;
+            })}
+            <${EntityPicker} ids=${party.map((m) => m.id)} chips=${false} types=${['player']} placeholder="+ Add a player as resonant…"
+                onAdd=${async (/** @type {string} */ id) => setError(await setPartyMember(adventure.id, id, {}))} />
             ${error && html`<div className="nc-error" role="alert">${error}</div>`}
         </div>
     `;
@@ -190,8 +199,8 @@ function ResonanceList({ adventure, onOpen }) {
 }
 
 /**
- * The Complex: how players connect to the selected adventure. Complex mode shows its
- * substrate (adventure, site, party), stewards and cohort; Resonance mode ranks every
+ * The Combinator: how players connect to the selected adventure. Molecule mode shows its
+ * substrate (adventure, site, party), ministry and party; Resonance mode ranks every
  * player by the entities they share with it. Follows the selection like the node card.
  */
 export function ComplexPanel() {
@@ -266,7 +275,7 @@ export function ComplexPanel() {
         <div className="panel-body complex"><div className="cpx">
             <div className="cpx-scene">
                 <div className="alm-host" ref=${hostRef}></div>
-                ${status !== 'ready' && html`<div className="map-status">${status === 'loading' ? 'Gathering the complex…' : 'The Complex failed to load (see console)'}</div>`}
+                ${status !== 'ready' && html`<div className="map-status">${status === 'loading' ? 'Warming the Combinator…' : 'The Combinator failed to load (see console)'}</div>`}
                 ${status === 'ready' && !adventure && html`
                     <div className="nc-empty alm-overlay-empty">${item ? 'Raw events have no party' : 'Nothing selected'}
                         <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to see who it connects'}</small></div>`}

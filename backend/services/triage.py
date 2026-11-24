@@ -35,7 +35,7 @@ from backend.db.models import (
     CENTRIFUGE_NODE, MANUAL_PHASES, PRE_ARENA_PHASES, PHASES, SUMP_NODE, WHEN_WHERE_TYPES, Adventure, Enshrining, Epitaph,
     Event, EventSource, harvester_node,
 )
-from backend.db.queries import list_adventures, list_events
+from backend.db.queries import list_adventures, list_events, list_entities
 from backend.services import ledger
 from backend.services.hub import hub
 from backend.services.transitions import record_many
@@ -58,6 +58,8 @@ async def broadcast_pools() -> None:
     async with SessionLocal() as session:
         await hub.broadcast("events", events=await list_events(session))
         await hub.broadcast("adventures", adventures=await list_adventures(session))
+        # a broken seal takes a spell's skills back (queries.spell_skills)
+        await hub.broadcast("entities", entities=await list_entities(session))
 
 
 async def _get_event(session: AsyncSession, event_id: uuid.UUID) -> Event:

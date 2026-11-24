@@ -39,7 +39,7 @@ PANELS_METADATA = {
     },
     "complex": {
         "id": "complex", "kind": "complex", "icon": "molecule",
-        "name": "Complex", "question": "who", "flow": ["players", "party"],
+        "name": "Combinator", "question": "who", "flow": ["adventure", "collaboration"],
     },
     "quests": {
         "id": "quests", "kind": "quests", "icon": "scroll",

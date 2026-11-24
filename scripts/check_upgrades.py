@@ -44,11 +44,10 @@ with TestClient(app) as c:
     skill, deity, other, site = entity("skill", "T skill"), entity("deity", "T deity"), entity("deity", "T other"), entity("site", "T site")
     player = entity("player", "T foe")
 
-    # spells use skills, and only skills
-    call("PUT", f"/entities/{spells[0]['id']}/skills/{skill}")
-    call("PUT", f"/entities/{spells[0]['id']}/skills/{deity}", want=422)
-    assert next(e for e in call("GET", "/entities") if e["id"] == spells[0]["id"])["skills"] == [skill]
-    call("PUT", f"/entities/{player}/affinities/{spells[0]['id']}")
+    # spells can't be linked to anything
+    call("PUT", f"/entities/{player}/affinities/{spells[0]['id']}", want=422)
+    x = adventure("performance", "T link")
+    call("PUT", f"/adventures/{x}/entities/{spells[0]['id']}", want=409)
 
     # when/where: battles and performances may have one, items never
     at = "2030-01-01T20:00:00+00:00"
@@ -102,6 +101,14 @@ with TestClient(app) as c:
     e = get(b)["enshrining"]
     assert [f["key"] for f in e["feedback"]] == ["s", "own:1"] and e["moves"][0]["spell"] == spells[0]["id"] and e["sealed_at"]
     call("PUT", f"/adventures/{b}/enshrining", {"verdict": [2, 2], "feedback": [{"key": "s", "result": "maybe"}]}, want=422)
+
+    # a sealed play teaches its spell its skills, for as long as it's sealed
+    def taught():
+        return next(e for e in call("GET", "/entities") if e["id"] == spells[0]["id"])["skills"]
+    assert taught() == [skill]
+    call("PUT", f"/adventures/{b}/phase", {"phase": "consuming"})
+    assert taught() == []
+    call("PUT", f"/adventures/{b}/phase", {"phase": "completed"})
 
     # pins and idols
     call("PUT", "/state/anvil", {"pins": [{"adventure": b, "action": "A1"}]})

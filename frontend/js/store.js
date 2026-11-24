@@ -854,11 +854,6 @@ const workspaceStore = (set, get) => ({
         return typeof res === 'string' ? res : null;
     },
 
-    setSpellSkill: async (spellId, skillId, on) => {
-        const res = await sendJson(`/api/entities/${spellId}/skills/${skillId}`, on ? 'PUT' : 'DELETE');
-        return typeof res === 'string' ? res : null;
-    },
-
     pins: [],
     setPins: (pins) => { set({ pins }); scheduleSave('anvil', () => ({ pins: get().pins })); },
     idols: {},

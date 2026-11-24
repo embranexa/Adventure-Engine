@@ -76,6 +76,13 @@ def _migrate_names(conn: Connection) -> None:
         conn.execute(text("UPDATE adventures SET type = 'performance' WHERE type = 'song'"))
 
 
+def _unlink_spells(conn: Connection) -> None:
+    """Spells could be linked for a while (2026-11-23); now they can't."""
+    spells = "(SELECT id FROM entities WHERE type = 'spell')"
+    conn.execute(text(f"DELETE FROM adventure_entities WHERE entity_id IN {spells}"))
+    conn.execute(text(f"DELETE FROM entity_links WHERE from_id IN {spells} OR to_id IN {spells}"))
+
+
 def _give_statuses(conn: Connection) -> None:
     """Players linked before parties existed get a status: emergent if a sealed analysis
     discovered them there, else resonant."""
@@ -101,6 +108,7 @@ async def init_db(sources: dict[str, str]) -> None:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_add_missing_columns)
         await conn.run_sync(_give_statuses)
+        await conn.run_sync(_unlink_spells)
 
     async with SessionLocal() as session:
         existing = set((await session.scalars(select(EventSource.name))).all())

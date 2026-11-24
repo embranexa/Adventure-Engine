@@ -91,12 +91,16 @@ export const FACETS = [
         value: (i) => (i.kind === 'adventure' ? (i.collaboration ? 'collaboration' : 'solo') : null),
         display: (v) => (v === 'collaboration' ? '☉ Collaboration' : 'Solo'),
     },
+    {
+        key: 'leader', label: 'Leader', modes: ['adventures'],
+        value: (i) => (i.kind === 'adventure' ? (i.stewards.some((s) => s.role === 'archon') ? 'others' : 'me') : null),
+        display: (v) => (v === 'me' ? '♛ Led by me' : '♛ Led by others'),
+    },
     entityFacet('deity'),
     entityFacet('site'),
     entityFacet('player'),
     entityFacet('organization'),
     entityFacet('skill'),
-    entityFacet('spell'),
 ];
 
 /** Phases the Hermetic Seal hides (on top of anything already past). */

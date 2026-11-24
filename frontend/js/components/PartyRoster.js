@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { PARTY_STATUSES, STEWARD_ROLES } from '../lifecycle.js';
-import { partyOf, wardensOf } from '../lib/complexGraph.js';
+import { mayChange } from '../lib/archon.js';
+import { archonOf, partyOf, wardensOf } from '../lib/complexGraph.js';
 import { dayKey, parseDay } from '../filters.js';
 
 const STATUSES = /** @type {PartyStatus[]} */ (Object.keys(PARTY_STATUSES));
@@ -19,7 +20,7 @@ export function StatusSelect({ adventure, member, onError }) {
     const option = (/** @type {PartyStatus} */ k) => html`<option key=${k} value=${k}>${PARTY_STATUSES[k].label}</option>`;
     return html`
         <select className="pr-status" value=${status} style=${{ '--c': s.color }} aria-label=${`${member.name}’s status`} title=${s.hint}
-            onChange=${async (/** @type {any} */ e) => onError(await setPartyMember(adventure.id, member.id, { status: e.target.value }))}>
+            onChange=${async (/** @type {any} */ e) => { if (mayChange(adventure, member, e.target.value)) onError(await setPartyMember(adventure.id, member.id, { status: e.target.value })); else e.target.value = status; }}>
             ${option(status)}
             ${next.length > 0 && html`<optgroup label="Next">${next.map(option)}</optgroup>`}
             <optgroup label="Other">${rest.map(option)}</optgroup>
@@ -40,7 +41,7 @@ function RoleBox({ adventure, member, onError }) {
 
 /**
  * An adventure's players with their statuses (and follow-ups due), compact: the Refinery,
- * Crucible and Arena. A name opens that player in the Complex. Nothing when there's no one.
+ * Crucible and Arena. A name opens that player in the Combinator. Nothing when there's no one.
  * @param {{ adventure: AdventureRecord, stewards?: boolean, removable?: boolean, roles?: boolean }} props
  *   roles: a box for what each player in it does here
  */
@@ -52,7 +53,7 @@ export function PartyRoster({ adventure, stewards = false, removable = false, ro
     const [error, setError] = useState(/** @type {string | null} */ (null));
     const party = partyOf(adventure), today = dayKey(new Date());
     /** @type {{ id: string, name: string, role: StewardRole, type: EntityType }[]} */
-    const held = stewards ? [...adventure.stewards, ...wardensOf(adventure, entities).map((w) => ({ id: w.id, name: w.name, type: w.type, role: /** @type {const} */ ('warden') }))] : [];
+    const held = stewards ? [...adventure.stewards.filter((s) => s.role !== 'archon'), ...wardensOf(adventure, entities).map((w) => ({ id: w.id, name: w.name, type: w.type, role: /** @type {const} */ ('warden') }))] : [];
     if (!party.length && !held.length) return null;
 
     return html`
@@ -68,12 +69,12 @@ export function PartyRoster({ adventure, stewards = false, removable = false, ro
                 const due = open && m.follow_up ? m.follow_up : null;
                 return html`
                     <div key=${m.id} className="pr-row" style=${{ '--c': PARTY_STATUSES[m.status ?? 'resonant'].color }}>
-                        <i></i>
-                        <button className="pr-name" disabled=${!pooled} title=${pooled ? 'Open in the Complex' : 'Not in the current pool'} onClick=${() => openInComplex(adventure.id, m.id)}>${m.name}</button>
+                        ${m.id === archonOf(adventure) ? html`<span className="pr-crown" title="Archon: leads the adventure">♛</span>` : html`<i></i>`}
+                        <button className="pr-name" disabled=${!pooled} title=${pooled ? 'Open in the Combinator' : 'Not in the current pool'} onClick=${() => openInComplex(adventure.id, m.id)}>${m.name}</button>
                         ${roles && m.status != null && PARTY_STATUSES[m.status].stage === 'active' ? html`<${RoleBox} adventure=${adventure} member=${m} onError=${setError} />` : m.role && html`<span className="pr-role">${m.role}</span>`}
                         ${due && html`<span className=${`pr-due ${due <= today ? 'late' : ''}`} title="Follow up">◷ ${parseDay(due).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>`}
                         <${StatusSelect} adventure=${adventure} member=${m} onError=${setError} />
-                        ${removable && html`<button className="ol-chip-x" aria-label=${`Unlink ${m.name}`} title="Unlink" onClick=${async () => setError(await unlinkEntity(adventure.id, m.id))}>✕</button>`}
+                        ${removable && html`<button className="ol-chip-x" aria-label=${`Unlink ${m.name}`} title="Unlink" onClick=${async () => { if (mayChange(adventure, m, null)) setError(await unlinkEntity(adventure.id, m.id)); }}>✕</button>`}
                     </div>
                 `;
             })}

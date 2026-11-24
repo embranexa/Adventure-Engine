@@ -250,8 +250,9 @@ From `resources/upgrades.md`. Check: `scripts/check_upgrades.py` (on a database 
   the Arena and Treasury. All primary ones settled suggest an outcome; they never set the verdict or bounty.
 - **Battle**: like a performance, plus adversaries (players, organizations, or anything named). No link needed
   to seal. An adversary isn't in the party; in the Complex they face the adventure on a red edge.
-- **Spell**: a Codex entity, a kind of play cast with skills (`uses` links). *Play* is the Treasury's word for
-  what was a move (the table and API still say `moves`); a play can name one spell, which brings its skills.
+- **Spell**: a Codex entity, a kind of play. It can't be linked to anything: its skills are those of the sealed plays that name it, so
+  they come from the Treasury alone. *Play* is the Treasury's word for
+  what was a move (the table and API still say `moves`); a play can name one spell, which fills in its known skills.
 - **Effects** are buffs or debuffs to skills, rated 1-3 (percentages, favor and "other" are gone).
 - **Preparations** (the Arena): free text with effects, or owned items of the adventure's gear set (sharing a
   deity). They count when checked. Informational: nothing else uses them, and not ambrosia.
@@ -259,4 +260,4 @@ From `resources/upgrades.md`. Check: `scripts/check_upgrades.py` (on a database 
 - A player has a free-text **role** per adventure. Archetypes have **no buffs**.
 - **Idols** (the Cohort): a statue and a card per archetype, editable description, skills (app state `idols`).
   Suggested skills become Codex skills only when clicked.
-- The Complex is a Core machine before the Refinery, with no pipes. The Sanctum's floor follows its machine count.
+- The **Combinator** (was the Complex panel and machine; id still `complex`; adventure -> collaboration) is a Core machine before the Refinery, with no pipes. The Sanctum's floor follows its machine count.

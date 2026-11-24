@@ -11,9 +11,11 @@ import { safeHttpUrl } from '../../events.js';
 import { FeedbackPane } from '../FeedbackPane.js';
 import { Objectives, suggestedOutcome } from '../Objectives.js';
 import { AftermathPane } from '../AftermathPane.js';
+import { EntityPicker } from '../EntityPicker.js';
 import { GradeIcon } from '../GradeIcon.js';
 
 const SAVE_MS = 700;
+const SKILL = /** @type {EntityType[]} */ (['skill']);
 const ROWS = /** @type {const} */ ([['Exciting', 2], ['Neutral', 1], ['Boring', 0]]);
 const COLS = ['Defeat', 'Draw', 'Success'];
 
@@ -127,6 +129,7 @@ function MoveRow({ move, n, editing, skills, spells, open, onOpen, onChange, onR
                     `)}
                 </div>
             `}
+            <div className="ana-skills ana-newskill"><${EntityPicker} ids=${move.skills} chips=${false} types=${SKILL} placeholder="+ A skill…" onAdd=${(/** @type {string} */ id) => onChange({ skills: [...move.skills, id] })} /></div>
         </div>
     `;
 }

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
-import { ARCHETYPES, ENTITY_TYPES, PARTY_STATUSES, PHASE_STAGES, STEWARD_ROLES } from '../../lifecycle.js';
+import { ARCHETYPES, ENTITY_TYPES, UNLINKABLE, PARTY_STATUSES, PHASE_STAGES, STEWARD_ROLES } from '../../lifecycle.js';
 import { PLACE_PLACEHOLDER, coordsText, readPlace } from '../../lib/places.js';
 import { PALETTE, entityColor } from '../../lib/lens.js';
 import { EntityPicker } from '../EntityPicker.js';
 import { PlayerFields } from '../PlayerFields.js';
 import { Field } from './AdventureEditor.js';
+import { mayChange } from '../../lib/archon.js';
 import { confirmHere } from '../../lib/windows.js';
 
 /**
@@ -61,11 +62,11 @@ function EntityDetail({ obj, onBack }) {
     useEffect(() => setPlaceNote(null), [obj.id]);
 
     const t = ENTITY_TYPES[obj.type];
-    const setSpellSkill = useWorkspaceStore((s) => s.setSpellSkill);
     const setWarden = useWorkspaceStore((s) => s.setWarden);
     const entities = useWorkspaceStore((s) => s.entities);
     const held = adventures.flatMap((a) => a.stewards.filter((s) => s.id === obj.id).map((s) => ({ a, role: s.role })));
     const kept = entities.filter((e) => e.wardens.includes(obj.id));
+    const spellSkills = entities.filter((e) => obj.skills.includes(e.id));
     const linked = adventures.filter((a) => a.entities.some((o) => o.id === obj.id));
     const located = obj.lat != null && obj.lon != null;
 
@@ -140,9 +141,9 @@ function EntityDetail({ obj, onBack }) {
             ${obj.type === 'spell' && html`
                 <div className="ol">
                     <div className="ol-head">Cast with</div>
-                    <${EntityPicker} ids=${obj.skills} types=${['skill']} placeholder="+ A skill it uses…"
-                        onAdd=${async (/** @type {string} */ id) => setError(await setSpellSkill(obj.id, id, true))}
-                        onRemove=${async (/** @type {string} */ id) => setError(await setSpellSkill(obj.id, id, false))} />
+                    ${spellSkills.length
+                        ? html`<div className="ol-chips">${spellSkills.map((k) => html`<span key=${k.id} className="ol-chip"><button className="ol-chip-name" onClick=${() => selectEntity(k.id)}><i>✧</i>${k.name}</button></span>`)}</div>`
+                        : html`<div className="cx-empty-line">No skills yet · they come from sealed plays in the Treasury</div>`}
                 </div>
             `}
             ${(held.length > 0 || kept.length > 0) && html`
@@ -162,7 +163,7 @@ function EntityDetail({ obj, onBack }) {
             <${Field} label="Link" kind="url" placeholder="https://…" ...${text('url')} />
             ${error && html`<div className="nc-error">${error}</div>`}
 
-            <div className="cx-linked">
+            ${!UNLINKABLE.includes(obj.type) && html`<div className="cx-linked">
                 <div className="cx-linked-head">Linked adventures <b>${linked.length}</b></div>
                 ${linked.length === 0 && html`<div className="cx-empty-line">None yet · link it from an adventure in the Refinery</div>`}
                 ${linked.map((a) => {
@@ -175,11 +176,11 @@ function EntityDetail({ obj, onBack }) {
                                 title=${pooled ? 'Select it' : 'Not in the current pool (Discovery mode)'}>
                                 <i></i>${a.title}${status && html`<small style=${{ color: PARTY_STATUSES[status].color }}>${PARTY_STATUSES[status].label}</small>`}<em>${stage?.matter ?? ''}</em>
                             </button>
-                            <button className="ol-chip-x" onClick=${async () => setError(await unlinkEntity(a.id, obj.id))} title="Unlink" aria-label=${`Unlink ${a.title}`}>✕</button>
+                            <button className="ol-chip-x" onClick=${async () => { if (mayChange(a, obj, null)) setError(await unlinkEntity(a.id, obj.id)); }} title="Unlink" aria-label=${`Unlink ${a.title}`}>✕</button>
                         </div>
                     `;
                 })}
-            </div>
+            </div>`}
 
             <div className="cx-actions">
                 <button className="btn ghost cx-delete" onClick=${remove}>✕ Delete ${t.label.toLowerCase()}</button>
@@ -259,7 +260,7 @@ export function CodexPanel() {
                 ${shown.length === 0 && html`
                     <div className="nc-empty cx-none">
                         ${entities.length ? 'Nothing matches' : 'The Codex is empty'}
-                        <small>${entities.length ? 'Try another search, or create it above' : 'Deities, sites, players, organizations, skills and spells you make here can be linked to adventures'}</small>
+                        <small>${entities.length ? 'Try another search, or create it above' : 'Deities, sites, players, organizations, skills and spells live here; all but spells can be linked to adventures'}</small>
                     </div>
                 `}
                 ${shown.map((o) => html`

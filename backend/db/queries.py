@@ -64,14 +64,14 @@ def _own(a: Adventure) -> dict[str, Any]:
     }
 
 
-def entity_to_dict(o: Entity, links: list[EntityLink] = ()) -> dict[str, Any]:
-    """`links`: every entity link from or to it."""
+def entity_to_dict(o: Entity, links: list[EntityLink] = (), skills: list[str] = ()) -> dict[str, Any]:
+    """`links`: every entity link from or to it. `skills`: a spell's (spell_skills)."""
     return {
         "id": str(o.id), "type": o.type, "name": o.name, "description": o.description, "url": o.url,
         "address": o.address, "city": o.city, "lat": o.lat, "lon": o.lon, "details": o.details or {},
         "color": o.color, "created_at": _iso(o.created_at),
         "affinities": [str(l.to_id) for l in links if l.role == "affinity" and l.from_id == o.id],  # players
-        "skills": [str(l.to_id) for l in links if l.role == "uses" and l.from_id == o.id],           # spells
+        "skills": list(skills),  # spells
         "wardens": [str(l.from_id) for l in links if l.role == "warden" and l.to_id == o.id],       # sites
     }
 
@@ -82,13 +82,28 @@ async def list_entities(session: AsyncSession) -> list[dict[str, Any]]:
     for l in (await session.scalars(select(EntityLink).order_by(EntityLink.created_at))).all():
         for end in (l.from_id, l.to_id):
             links.setdefault(end, []).append(l)
-    return [entity_to_dict(o, links.get(o.id, [])) for o in rows.all()]
+    skills = await spell_skills(session)
+    return [entity_to_dict(o, links.get(o.id, []), skills.get(str(o.id), [])) for o in rows.all()]
+
+
+async def spell_skills(session: AsyncSession) -> dict[str, list[str]]:
+    """Spell id -> the skills of the sealed plays that name it."""
+    known = {str(i) for i in (await session.scalars(select(Entity.id).where(Entity.type == "skill"))).all()}
+    out: dict[str, list[str]] = {}
+    for spell, skills in (await session.execute(
+        select(Move.spell, Move.skills).join(Enshrining, Enshrining.adventure_id == Move.adventure_id)
+        .where(Move.spell.is_not(None), Enshrining.sealed_at.is_not(None)).order_by(Move.id)
+    )).all():
+        have = out.setdefault(spell, [])
+        have.extend(s for s in skills or [] if s in known and s not in have)
+    return out
 
 
 async def get_entity(session: AsyncSession, o: Entity) -> dict[str, Any]:
     links = await session.scalars(select(EntityLink).where((EntityLink.from_id == o.id) | (EntityLink.to_id == o.id))
                                   .order_by(EntityLink.created_at))
-    return entity_to_dict(o, list(links.all()))
+    skills = await spell_skills(session) if o.type == "spell" else {}
+    return entity_to_dict(o, list(links.all()), skills.get(str(o.id), []))
 
 
 def linked_to_dict(o: Entity, link: AdventureEntity) -> dict[str, Any]:

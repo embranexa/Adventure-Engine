@@ -114,6 +114,29 @@ async def main():
     await refused(party.set_steward(U(a), U(p), "warden", True), party.InvalidParty)
     await refused(party.set_steward(U(a), U(site), "herald", True), party.InvalidParty)
 
+    # the archon: one, a player, bonded by it; giving it up isn't leaving
+    async def archon():
+        return [s["id"] for s in (await adv(a))["stewards"] if s["role"] == "archon"]
+    await refused(party.set_steward(U(a), U(org), "archon", True), party.InvalidParty)
+    await party.set_steward(U(a), U(p), "archon", True)
+    assert await archon() == [p] and (await member(a, p))["status"] == "bonded"
+    await party.set_member(U(a), U(p), {"status": "annealed"})
+    assert await archon() == [p]
+    p2 = (await entities.create_entity({"type": "player", "name": "Test second"}))["id"]
+    await party.set_member(U(a), U(p2), {"status": "resisted"})
+    await party.set_steward(U(a), U(p2), "archon", True)
+    assert await archon() == [p2] and (await member(a, p2))["status"] == "bonded" and (await member(a, p))["status"] == "annealed"
+    await party.set_member(U(a), U(p2), {"status": "attuning"})
+    assert await archon() == []
+    await party.set_steward(U(a), U(p2), "archon", True)
+    await party.set_steward(U(a), U(p2), "archon", False)
+    assert (await member(a, p2))["status"] == "bonded"
+    await party.set_steward(U(a), U(p2), "archon", True)
+    await entities.unlink(U(a), U(p2))
+    assert await archon() == [] and len((await adv(a))["stewards"]) == 2  # herald and commissioner stay
+    await entities.delete_entity(U(p2))
+    await entities.unlink(U(a), U(p))
+
     # a player discovered on seal is emergent
     await enshrinings.save(U(a), {"verdict": [2, 2], "link": None, "notes": "", "gains": [], "losses": [], "moves": [],
                                   "discoveries": [{"type": "player", "name": "Test found", "entity_id": None}]}, seal=True)

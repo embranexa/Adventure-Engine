@@ -19,6 +19,9 @@ export const REVIEW_STAGES = {
     ignored:   { module: 'Sump',       matter: 'dross',         color: '#5d6070', deep: '#25262d', light: '#8a8d9a', hint: 'Rejected; can be revived' },
 };
 
+/** Entity types that are never linked to anything. @type {EntityType[]} */
+export const UNLINKABLE = ['spell'];
+
 /** Adventure phases, in lifecycle order. @type {Record<Phase, Stage>} */
 export const PHASE_STAGES = {
     queued:         { module: 'Hopper',     matter: 'ore',        color: '#3d7bf0', deep: '#1b3a7a', light: '#a8c6ff', hint: 'Waiting to be assayed' },
@@ -75,7 +78,7 @@ export const ENTITY_TYPES = {
     player: { label: 'Player', plural: 'Players', glyph: '☉', hint: 'A person who can join an adventure’s party' },
     organization: { label: 'Organization', plural: 'Organizations', glyph: '⎔', hint: 'An organization or a network' },
     skill: { label: 'Skill', plural: 'Skills', glyph: '✧', hint: 'A skill an adventure uses or builds' },
-    spell: { label: 'Spell', plural: 'Spells', glyph: '✴', hint: 'A kind of play, cast with skills' },
+    spell: { label: 'Spell', plural: 'Spells', glyph: '✴', hint: 'A kind of play; its skills come from the Treasury' },
 };
 
 /**
@@ -116,9 +119,11 @@ export const PARTY_STATUSES = {
     repelled:    { label: 'Repelled',    stage: 'aftermath',   color: '#ef4444', next: ['annealed', 'neutralized'], hint: 'Completed together; the relationship is weaker (warmth −1)' },
 };
 
-/** Who holds an adventure without being in its party. Wardens belong to its site.
+/** Who holds an adventure. Wardens belong to its site. The archon leads it, and is the only one always in
+ *  its party; without one, you lead.
  *  @type {Record<StewardRole, { label: string, color: string, hint: string }>} */
 export const STEWARD_ROLES = {
+    archon:       { label: 'Archon',       color: '#fff1c9', hint: 'Leads the adventure, bonded to its party' },
     herald:       { label: 'Herald',       color: '#facc15', hint: 'Brought or referred the adventure' },
     commissioner: { label: 'Commissioner', color: '#fb923c', hint: 'Issued the adventure' },
     warden:       { label: 'Warden',       color: '#38bdf8', hint: 'Keeps the site (on every adventure there)' },

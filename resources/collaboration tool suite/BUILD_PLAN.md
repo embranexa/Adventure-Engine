@@ -9,7 +9,7 @@ Sources: the other files in this folder. This file holds the decisions made from
 |---|---|---|
 | 1 | contact -> player; archetype, warmth, tags, affinities | done, uncommitted |
 | 2 | Parties (statuses, notes, follow-up, history), stewards, wardens, collaboration flag and facet | done, uncommitted |
-| 3 | Complex panel: 3D complex, resonance mode, editing | done, uncommitted |
+| 3 | Combinator panel (was Complex; its first tab is Molecule): 3D complex, resonance mode, editing | done, uncommitted |
 | 4 | Rosters in the Refinery, Crucible and a new Arena panel | done, uncommitted |
 | 5 | Treasury: an aftermath and impact note per player; never required to seal | done, uncommitted |
 | 6 | Cohort: cabinet of player sigils by archetype; a Sanctum machine | done, uncommitted |
@@ -24,6 +24,11 @@ Sources: the other files in this folder. This file holds the decisions made from
 - Collaboration = someone bonded, emergent or in the aftermath. Stewards don't count.
 - Heralds and commissioners belong to the adventure, wardens to the site. Players and
   organizations can steward; one player can steward and be in the party.
+- **Archon**: the player leading an adventure. One at most; naming one bonds them (bonded or beyond stays) and
+  replaces the last. Giving it up isn't leaving; leaving, or going back to recruitment, gives it up (asked first).
+  None means you lead ("You" in the Molecule, not stored). One raised node joined to both adventure and party: the
+  only exception to the cohort rule. Facet and lens: Leader. May also be herald or commissioner.
+- In the Combinator: **Ministry** (archon, heralds, commissioners, wardens) and **Party**. "Cohort" is only the panel.
 - No site: the complex leaves the site node out.
 - 12 archetypes in three groups (ops, tech, staff). Vesta's is **Cleric** (Warden is the steward).
   Idols are labels, not Codex deities.

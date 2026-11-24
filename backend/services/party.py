@@ -1,7 +1,7 @@
 """Parties: the players of an adventure and their statuses, and its stewards.
 
     set_member    add a player, change its status, or write its role, proposal note, follow-up day and impact
-    set_steward   add or remove a herald or commissioner
+    set_steward   add or remove a herald, commissioner or archon
     history       every status change in an adventure's party
 
 Rules:
@@ -10,20 +10,23 @@ Rules:
     - any status can follow any other; the aftermath ones need a completed adventure
     - annealed adds 1 to the player's warmth and repelled takes 1; a change of mind undoes that
     - stewards aren't party members: one player can be both
+    - except the archon, who leads: naming one bonds them (unless already bonded or beyond) and
+      replaces the last. Leaving the party, or going back to recruitment, gives it up; giving
+      it up doesn't leave the party
 """
 
 import uuid
 from datetime import date
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import (
-    AFTERMATH_STATUSES, PARTY_STATUSES, STEWARD_ROLES, STEWARD_TYPES, AdventureEntity, Entity, PartyLog, Steward,
+    AFTERMATH_STATUSES, PARTY_STATUSES, RECRUITMENT_STATUSES, STEWARD_ROLES, STEWARD_TYPES, AdventureEntity, Entity, PartyLog, Steward,
 )
-from backend.services.entities import _broadcast, _get_entity, add_link
+from backend.services.entities import _broadcast, _get_entity, add_link, drop_archon
 from backend.services.triage import _get_adventure
 
 NOTE_LIMIT = 5_000
@@ -64,6 +67,8 @@ async def set_member(adventure_id: uuid.UUID, player_id: uuid.UUID, changes: dic
         elif changing:
             session.add(PartyLog(adventure_id=adventure_id, player_id=player_id, from_status=row.status, to_status=status))
             row.status, row.status_at = status, utcnow()
+        if changing and status in RECRUITMENT_STATUSES:
+            await drop_archon(session, adventure_id, player_id)
         if changing:
             _nudge(player, row, status)
         for field in ("note", "impact"):
@@ -92,6 +97,19 @@ def _day(value: Any) -> str | None:
         raise InvalidParty("the follow-up is a day, like 2026-12-01") from e
 
 
+async def _crown(session: AsyncSession, adventure_id: uuid.UUID, player: Entity) -> None:
+    """Make way for a new archon, and bond them."""
+    if player.type != "player":
+        raise InvalidParty("only a player can be the archon")
+    await session.execute(delete(Steward).where(Steward.adventure_id == adventure_id, Steward.role == "archon"))
+    row = await session.get(AdventureEntity, (adventure_id, player.id))
+    if row is None:
+        add_link(session, adventure_id, player, "bonded")
+    elif row.status is None or row.status in RECRUITMENT_STATUSES:
+        session.add(PartyLog(adventure_id=adventure_id, player_id=player.id, from_status=row.status, to_status="bonded"))
+        row.status, row.status_at = "bonded", utcnow()
+
+
 async def set_steward(adventure_id: uuid.UUID, entity_id: uuid.UUID, role: str, on: bool) -> None:
     if role not in STEWARD_ROLES:
         raise InvalidParty(f"role must be one of {', '.join(STEWARD_ROLES)} (wardens belong to the site)")
@@ -102,6 +120,8 @@ async def set_steward(adventure_id: uuid.UUID, entity_id: uuid.UUID, role: str, 
         if on and row is None:
             if entity.type not in STEWARD_TYPES:
                 raise InvalidParty(f"a {entity.type} can't be a {role}")
+            if role == "archon":
+                await _crown(session, adventure_id, entity)
             session.add(Steward(adventure_id=adventure_id, entity_id=entity_id, role=role))
         elif not on and row is not None:
             await session.delete(row)

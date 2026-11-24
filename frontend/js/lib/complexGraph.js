@@ -6,13 +6,14 @@
 //   rankPlayers(adventure, entities)     every player by resonance
 //
 // Routing rules: heralds and commissioners reach the adventure, wardens only the site, the
-// cohort only the party; only the adventure joins site and party.
+// cohort only the party; only the adventure joins site and party. The archon is the one
+// exception: it holds the adventure and is bonded to the party. With none, that's you.
 
 import { ARCHETYPES, ENTITY_TYPES, PARTY_STATUSES, PHASE_STAGES, STEWARD_ROLES } from '../lifecycle.js';
 import { entityColor } from './lens.js';
 
 /**
- * @typedef {{ id: string, entityId: string | null, kind: 'core' | 'steward' | 'player' | 'entity', label: string, sub: string, color: string,
+ * @typedef {{ id: string, entityId: string | null, kind: 'core' | 'steward' | 'archon' | 'player' | 'entity', label: string, sub: string, color: string,
  *   pos: [number, number, number], size: number, dim?: boolean, glow?: boolean }} GraphNode
  * @typedef {{ a: string, b: string, color: string, width: number, style: 'solid' | 'dashed' | 'triple' | 'jagged',
  *   arrow?: boolean, flow?: boolean, dim?: boolean }} GraphEdge
@@ -36,9 +37,12 @@ const MAX_RESONANT = 30; // players drawn in the resonance view (the list shows 
 /** A little warmth breaks ties, and never outweighs a shared entity. */
 const WARMTH_WEIGHT = 0.1;
 
-/** An adventure's players. @param {AdventureRecord} adventure */
+/** The id of the player leading it, or null: you are. @param {AdventureRecord} adventure */
+export const archonOf = (adventure) => adventure.stewards.find((s) => s.role === 'archon')?.id ?? null;
+
+/** An adventure's players, its archon first. @param {AdventureRecord} adventure */
 export const partyOf = (adventure) => adventure.entities.filter((e) => e.type === 'player')
-    .sort((x, y) => STATUS_ORDER.indexOf(x.status ?? 'resonant') - STATUS_ORDER.indexOf(y.status ?? 'resonant') || x.name.localeCompare(y.name));
+    .sort((x, y) => Number(y.id === archonOf(adventure)) - Number(x.id === archonOf(adventure)) || STATUS_ORDER.indexOf(x.status ?? 'resonant') - STATUS_ORDER.indexOf(y.status ?? 'resonant') || x.name.localeCompare(y.name));
 
 /** An adventure's wardens: its site's. @param {AdventureRecord} adventure @param {Entity[]} entities */
 export function wardensOf(adventure, entities) {
@@ -85,11 +89,12 @@ export function buildComplex(adventure, entities) {
         const wardens = wardensOf(adventure, entities);
         arc(wardens.length, [-72, 0], 125, 235, 52).forEach((pos, i) => steward(wardens[i], 'warden', 'site', pos));
     }
-    const spread = adventure.stewards.length > 1 ? 70 : 0;
-    arc(adventure.stewards.length, [0, 0], 252 - spread / 2, 252 + spread / 2, 78).forEach((pos, i) => steward(adventure.stewards[i], adventure.stewards[i].role, 'adventure', pos));
-    const wide = Math.min(115, 24 + party.length * 14);
-    arc(party.length, [72, 0], party.length > 1 ? -wide : 0, party.length > 1 ? wide : 0, 72).forEach((pos, i) => {
-        const m = party[i], status = m.status ?? 'resonant', s = PARTY_STATUSES[status];
+    const holders = adventure.stewards.filter((s) => s.role !== 'archon'), lead = archonOf(adventure), cohort = party.filter((m) => m.id !== lead);
+    const spread = holders.length > 1 ? 70 : 0;
+    arc(holders.length, [0, 0], 252 - spread / 2, 252 + spread / 2, 78).forEach((pos, i) => steward(holders[i], holders[i].role, 'adventure', pos));
+    const wide = Math.min(115, 24 + cohort.length * 14);
+    arc(cohort.length, [72, 0], cohort.length > 1 ? -wide : 0, cohort.length > 1 ? wide : 0, 72).forEach((pos, i) => {
+        const m = cohort[i], status = m.status ?? 'resonant', s = PARTY_STATUSES[status];
         const arch = entities.find((e) => e.id === m.id)?.details.archetype;
         g.nodes.push({
             id: `p:${m.id}`, entityId: m.id, kind: 'player', label: m.name, sub: `${arch ? `${ARCHETYPES[arch].glyph} ` : ''}${s.label}`, color: s.color, pos,
@@ -97,6 +102,11 @@ export function buildComplex(adventure, entities) {
         });
         g.edges.push({ a: `p:${m.id}`, b: 'party', color: s.color, ...BONDS[status] });
     });
+    // the archon, raised between the adventure and the party
+    const m = party.find((x) => x.id === lead), ARCHON = STEWARD_ROLES.archon.color, id = m ? `p:${m.id}` : 'you', status = m?.status ?? 'bonded';
+    g.nodes.push({ id, entityId: m?.id ?? null, kind: 'archon', label: m?.name ?? 'You', sub: `♛ Archon${m ? ` · ${PARTY_STATUSES[status].label}` : ''}`, color: ARCHON, pos: [36, 46, 0], size: 6, glow: true });
+    g.edges.push({ a: id, b: 'adventure', color: ARCHON, width: 0.8, style: 'solid', arrow: true });
+    g.edges.push({ a: id, b: 'party', color: m ? PARTY_STATUSES[status].color : ARCHON, ...BONDS[status] });
     // adversaries face the adventure
     const foes = adventure.adversaries, half = foes.length > 1 ? Math.min(60, foes.length * 14) : 0;
     arc(foes.length, [0, 0], 100 - half, 100 + half, 78).forEach((pos, i) => {

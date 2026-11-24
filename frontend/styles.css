@@ -1755,3 +1755,13 @@ input.obj-text:hover { border-color: var(--steel-2); } input.obj-text:focus { ou
 .idol-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 0; font: 400 12.5px/1.4 var(--font-body); }
 .idol-facts dt { color: var(--text-dim); } .idol-facts dd { margin: 0; color: var(--text); }
 .idol-suggest { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; } .idol-suggest small { color: var(--text-dim); font: 500 10px var(--font-mono); }
+/* the Cohort keeps its cabinet and sheet side by side for longer than the Inventory does */
+@container (min-width: 521px) and (max-width: 780px) {
+    .cohort .inv-grid { flex-direction: row; }
+    .cohort .inv-cab { flex: 1 1 54%; }
+    .cohort .inv-side { flex: 1 1 46%; padding: 14px 12px 18px 4px; }
+}
+.ana-newskill > .ol-add { flex: 0 1 220px; }
+.pr-crown { flex-shrink: 0; width: 12px; margin-left: -2px; color: #fff1c9; font-size: 12px; text-align: center; text-shadow: 0 0 7px rgba(255, 241, 201, 0.7); }
+.cpx-section { padding-bottom: 4px; border-bottom: 1px solid var(--steel-2); color: var(--text-bright); font: 600 13px var(--font-display); letter-spacing: 0.2em; text-transform: uppercase; }
+.cpx-section b { color: var(--text-muted); } .cpx-section:not(:first-child) { margin-top: 8px; }

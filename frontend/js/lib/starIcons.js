@@ -143,10 +143,6 @@ const DRAW = {
         for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 - Math.PI / 2, r = k % 2 ? 12 : 30; pts.push(/** @type {[number, number]} */ ([C + Math.cos(a) * r, C + Math.sin(a) * r])); }
         poly(g, pts, true);
     },
-    spell(g) {
-        for (let k = 0; k < 4; k++) { const a = (k / 4) * Math.PI; poly(g, [[C - Math.cos(a) * 30, C - Math.sin(a) * 30], [C + Math.cos(a) * 30, C + Math.sin(a) * 30]]); }
-        g.beginPath(); g.arc(C, C, 16, 0, Math.PI * 2); g.stroke();
-    },
     // the date range: a calendar page
     date(g) {
         poly(g, [[36, 44], [92, 44], [92, 90], [36, 90]], true);

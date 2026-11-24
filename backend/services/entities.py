@@ -2,7 +2,7 @@
 
     create / update / delete   an entity (deleting also removes its links)
     link / unlink              attach an entity to an adventure, or detach it
-    set_entity_link            between entities: a player's affinity, a site's warden, a spell's skill
+    set_entity_link            between entities: a player's affinity, or a site's warden
 
 Rules:
     - only sites have a location (address, city, lat/lon); players keep email, phone,
@@ -26,13 +26,13 @@ from sqlalchemy import delete, select
 
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import (
-    AFFINITY_TYPES, ARCHETYPES, CODEX_NODE, GEO_ENTITY_TYPES, ENTITY_TYPES, PHASE_NODES, STEWARD_TYPES, WHEN_WHERE_TYPES,
+    AFFINITY_TYPES, ARCHETYPES, CODEX_NODE, GEO_ENTITY_TYPES, ENTITY_TYPES, PHASE_NODES, STEWARD_TYPES, UNLINKABLE_TYPES, WHEN_WHERE_TYPES,
     AdventureEntity, Entity, EntityLink, PartyLog, Steward,
 )
 from backend.db.queries import list_adventures, get_entity, list_entities
 from backend.services.hub import hub
 from backend.services.transitions import record
-from backend.services.triage import NotFound, _get_adventure
+from backend.services.triage import InvalidTransition, NotFound, _get_adventure
 
 LIMITS = {"name": 200, "description": 20_000, "address": 500, "city": 200}
 PLAYER_DETAILS = {"email": 200, "phone": 60, "handle": 100}
@@ -126,12 +126,19 @@ def _apply(entity: Entity, changes: dict[str, Any]) -> None:
         entity.details = details
 
 
+async def drop_archon(session, adventure_id: uuid.UUID, player_id: uuid.UUID) -> None:
+    """They no longer lead it, if they did."""
+    await session.execute(delete(Steward).where(
+        Steward.adventure_id == adventure_id, Steward.entity_id == player_id, Steward.role == "archon"))
+
+
 async def _delete_links(session, *where) -> None:
     """Delete the links matching `where`, recording each as an unlink (refinery -> codex)."""
     links = (await session.execute(
         select(AdventureEntity.adventure_id, AdventureEntity.entity_id, AdventureEntity.status).where(*where))).all()
     for adventure_id, entity_id, status in links:
         if status:  # a player leaves the party
+            await drop_archon(session, adventure_id, entity_id)
             session.add(PartyLog(adventure_id=adventure_id, player_id=entity_id, from_status=status, to_status=None))
         record(session, "link", entity_id, PHASE_NODES["classifying"], CODEX_NODE, ref_id=adventure_id)
     if links:
@@ -206,8 +213,6 @@ async def set_entity_link(from_id: uuid.UUID, to_id: uuid.UUID, role: str, on: b
                 raise InvalidEntity(f"a {a.type} can't have an affinity with a {b.type}")
             if role == "warden" and (a.type not in STEWARD_TYPES or b.type != "site"):
                 raise InvalidEntity("a warden is a player or organization, and keeps a site")
-            if role == "uses" and (a.type != "spell" or b.type != "skill"):
-                raise InvalidEntity("a spell uses skills")
             session.add(EntityLink(from_id=from_id, to_id=to_id, role=role))
         elif not on and row is not None:
             await session.delete(row)
@@ -219,6 +224,8 @@ async def link(adventure_id: uuid.UUID, entity_id: uuid.UUID) -> None:
     async with SessionLocal() as session:
         adventure = await _get_adventure(session, adventure_id)
         entity = await _get_entity(session, entity_id)
+        if entity.type in UNLINKABLE_TYPES:
+            raise InvalidTransition(f"a {entity.type} can't be linked: name it in a play (the Treasury)")
         if entity.type == "site" and adventure.type in WHEN_WHERE_TYPES:
             # it happens at one site: replace any other
             others = select(Entity.id).where(Entity.type == "site", Entity.id != entity.id)
