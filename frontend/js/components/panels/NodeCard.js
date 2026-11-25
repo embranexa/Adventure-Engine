@@ -10,6 +10,8 @@ import { AdventureEditor } from './AdventureEditor.js';
 import { Forge } from '../Forge.js';
 import { Adversaries } from '../Adversaries.js';
 import { Objectives } from '../Objectives.js';
+import { AssayRow } from '../AssayRow.js';
+import { LinkBox } from '../LinkBox.js';
 import { EntityLinks } from '../EntityLinks.js';
 
 // details keys shown in their own rows; any others are listed generically below
@@ -296,6 +298,7 @@ function FlagToggles({ adventure }) {
 export function NewAdventureButtons() {
     const createAdventure = useWorkspaceStore((s) => s.createAdventure);
     return html`
+        <${LinkBox} />
         <div className="nc-new">
             ${Object.entries(ADVENTURE_TYPES).map(([key, t]) => html`
                 <button key=${key} className="btn" title=${t.hint}
@@ -356,6 +359,7 @@ export function NodeCard() {
                             `}
                         </div>
                     `}
+                    <${AssayRow} item=${event} />
                     ${event.kind === 'adventure' && editing
                         ? html`<${AdventureEditor} adventure=${event} focusTitle=${fresh} onDone=${stopEditing} />`
                         : html`<${ItemActions} item=${event} />`}

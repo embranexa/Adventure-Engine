@@ -10,9 +10,9 @@ from backend.db.base import get_session
 from backend.db.queries import list_adventures
 from backend.routers.errors import triage_errors
 from backend.schemas.adventures import (
-    AdventureCreate, AdventureUpdate, BountyPayload, DatePayload, DayPayload, EnshriningPayload, EpitaphPayload, ForgePayload, ItemPayload, PhasePayload, RoadmapPayload,
+    AdventureCreate, AdventureUpdate, BountyPayload, DatePayload, DayPayload, EnshriningPayload, EpitaphPayload, ForgePayload, ItemPayload, LinkPayload, PhasePayload, RoadmapPayload,
 )
-from backend.services import adventures, enshrinings, epitaphs, forge, items, ledger, roadmap, series, triage
+from backend.services import adventures, enshrinings, epitaphs, forge, items, ledger, links, roadmap, series, triage
 
 router = APIRouter(prefix="/adventures", tags=["adventures"])
 
@@ -29,6 +29,22 @@ async def create_adventure(payload: AdventureCreate):
         return await adventures.create_adventure(payload.sent() | {"type": payload.type})
     except adventures.InvalidAdventure as e:
         raise HTTPException(422, str(e)) from e
+
+
+@router.post("/link")
+async def make_from_link(payload: LinkPayload):
+    """A new adventure filled in from a page, or {"existing"} when its link is already here. 422: not a link."""
+    try:
+        return await links.make(payload.url, payload.force)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+
+
+@router.post("/{adventure_id}/assay")
+async def fill_from_link(adventure_id: uuid.UUID):
+    """Fill its blanks from its link's page."""
+    with triage_errors():
+        return await links.fill(adventure_id)
 
 
 @router.patch("/{adventure_id}")

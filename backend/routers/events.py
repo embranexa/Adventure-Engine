@@ -13,7 +13,7 @@ from backend.db.base import get_session
 from backend.db.models import Adventure, Event
 from backend.db.queries import list_events
 from backend.routers.errors import triage_errors
-from backend.services import triage
+from backend.services import assayer, triage
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -66,6 +66,36 @@ async def move_events(body: EventMove):
     with triage_errors():
         ids = await triage.move_events(body.ids, body.from_review, body.to_review)
     return {"moved": len(ids), "ids": ids}
+
+
+class Assay(EventIds):
+    again: bool = False  # even ones tried lately
+
+
+@router.post("/assay")
+async def assay_events(body: Assay):
+    """Centrifuge -> Assayer: the given specimens, read one at a time and returned."""
+    ids = await assayer.start(body.ids, body.again)
+    return {"moved": len(ids), "ids": ids}
+
+
+@router.post("/assay/stop")
+async def stop_assay():
+    """Assayer -> Centrifuge: everything still waiting."""
+    ids = await assayer.stop()
+    return {"moved": len(ids), "ids": ids}
+
+
+class CoverPayload(BaseModel):
+    url: str | None = Field(None, max_length=2000)
+
+
+@router.put("/{event_id}/cover")
+async def set_cover(event_id: uuid.UUID, body: CoverPayload):
+    """A specimen's cover, by hand (null takes it away)."""
+    with triage_errors():
+        await assayer.set_cover(event_id, body.url)
+    return {"cover": body.url}
 
 
 @router.post("/{event_id}/pass")

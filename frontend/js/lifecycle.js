@@ -24,6 +24,7 @@ export const GRADE_STAGES = {
 export const REVIEW_STAGES = {
     harvested: { module: 'Harvester',  matter: 'specimen & ore', color: '#3a4a5e', deep: '#171e27', light: '#9fb0c4', hint: 'Harvested; feed it to the Centrifuge to review' },
     new:       { module: 'Centrifuge', matter: 'specimen & ore', color: '#4b5a86', deep: '#1f2640', light: '#b6c1e2', hint: 'In the Centrifuge: not reviewed yet' },
+    assaying:  { module: 'Assayer',    matter: 'specimen',       color: '#c8a46a', deep: '#4a3a1e', light: '#e6cf9f', hint: 'In the Assayer: its page is being read' },
     passed:    { module: 'Hopper',     matter: 'concentrate',    color: '#3d7bf0', deep: '#1b3a7a', light: '#a8c6ff', hint: 'Became an adventure' },
     ignored:   { module: 'Sump',       matter: 'tailings',       color: '#5d6070', deep: '#25262d', light: '#8a8d9a', hint: 'Rejected; can be revived' },
 };
@@ -177,7 +178,7 @@ export function hasWhenWhere(item) {
 
 /** Matter name -> color, for titles that name a matter (e.g. "concentrate ⟶ essence"). */
 export const MATTER_COLORS = Object.fromEntries(
-    [...Object.values(GRADE_STAGES), ...Object.values(REVIEW_STAGES), ...Object.values(PHASE_STAGES)].map((s) => [s.matter, s.light]),
+    [...Object.values(REVIEW_STAGES), ...Object.values(GRADE_STAGES), ...Object.values(PHASE_STAGES)].map((s) => [s.matter, s.light]),
 );
 
 /**
@@ -197,7 +198,7 @@ export const SEEKING_PHASES = ['queued', 'classifying', 'decomposing', 'construc
 export const MAIN_ROUTE = ['queued', 'classifying', 'decomposing', 'constructing', 'consuming', 'completed'];
 
 /** A raw event's matter: its grade until it's reviewed. @param {EventRecord} e @returns {Grade | ReviewState} */
-export const rawMatter = (e) => (e.review === 'harvested' || e.review === 'new' ? (e.missing?.length ? 'specimen' : 'ore') : e.review);
+export const rawMatter = (e) => (e.review === 'harvested' || e.review === 'new' || e.review === 'assaying' ? (e.missing?.length ? 'specimen' : 'ore') : e.review);
 
 /**
  * Stage of a pool record: its phase if it's an adventure, else its review state.

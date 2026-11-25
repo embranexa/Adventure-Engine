@@ -25,7 +25,7 @@ def source_to_dict(s: EventSource) -> dict[str, Any]:
 
 
 def event_to_dict(e: Event, source_name: str) -> dict[str, Any]:
-    return {
+    out = {
         "id": str(e.id),
         "source": source_name,
         "api_id": e.api_id,
@@ -43,10 +43,19 @@ def event_to_dict(e: Event, source_name: str) -> dict[str, Any]:
         "cover_url": e.cover_url,
         "details": e.details,
         "review": e.review,
-        "missing": grade.missing(e, source_name),  # [] = ore, else a specimen
-        "all_day": False,       # crawled events are one-off and timed
+        "all_day": bool((e.details or {}).get("all_day")),  # a deposited one may be; others are timed
         "recurrence": None,
     }
+    # what the Assayer found fills the gaps; an exact place replaces an approximate one
+    found = (e.assay or {}).get("fields") or {}
+    for name, key in (("end_time", "end"), ("venue", "venue"), ("address", "address"), ("city", "city"), ("cover_url", "cover_url"), ("description", "description")):
+        if not out.get(key) and found.get(name):
+            out[key] = found[name]
+    if found.get("lat") is not None and (out["lat"] is None or out["location_approximate"]):
+        out.update(lat=found["lat"], lon=found["lon"], location_approximate=False)
+    out["assay"] = {k: e.assay.get(k) for k in ("at", "outcome", "why", "sources")} if e.assay else None
+    out["missing"] = grade.missing(out, source_name)  # [] = ore, else a specimen
+    return out
 
 
 # Fields an adventure can set itself, over its event's (see Adventure). "When/where" ones
@@ -166,6 +175,7 @@ def adventure_to_dict(
         merged.update({k: None for k in WHEN_WHERE_FIELDS})
         merged["location_approximate"] = False
     merged.pop("missing", None)  # a raw event's
+    merged["assay"] = a.assay
     return {
         **merged,
         "id": str(a.id),

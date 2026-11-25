@@ -256,16 +256,17 @@ export class TwinScene {
         label.appendChild(count);
         label._count = count;
         const commands = node.kind === 'harvester' && !node.locked ? ['harvest', 'feed', 'siphon']
-            : node.id === CENTRIFUGE ? ['purge'] : [];
+            : node.id === CENTRIFUGE ? ['assay', 'purge'] : [];
         if (commands.length) {
             const row = el('div', 'twin-cmds');
             for (const cmd of commands) {
-                const b = el('button', `twin-cmd cmd-${cmd}`, { harvest: 'Harvest', feed: 'Feed ⟶', siphon: '⟵ Siphon', purge: 'Purge' }[cmd]);
+                const b = el('button', `twin-cmd cmd-${cmd}`, { harvest: 'Harvest', feed: 'Feed ⟶', siphon: '⟵ Siphon', assay: 'Assay', purge: 'Purge' }[cmd]);
                 b.type = 'button';
                 b.title = {
-                    harvest: 'Crawl the source: events not harvested before fill this harvester',
+                    harvest: node.label === 'deposit' ? 'Drop links in' : 'Crawl the source: events not harvested before fill this harvester',
                     feed: "Pour this harvester's events into the Centrifuge, to review them",
                     siphon: "Draw this source's events back out of the Centrifuge",
+                    assay: 'Specimens that pass the filter go to the Assayer',
                     purge: 'Send everything left in the Centrifuge to the Sump',
                 }[cmd];
                 b.addEventListener('click', () => {
@@ -351,11 +352,12 @@ export class TwinScene {
             // harvested recently: off (no hover, no click) until it goes stale
             const fresh = syncing ? undefined : this.data.fresh?.[node.label];
             label._harvest.disabled = syncing || fresh != null;
-            label._harvest.textContent = syncing ? 'Harvesting…' : 'Harvest';
+            label._harvest.textContent = node.label === 'deposit' ? 'Deposit' : syncing ? 'Harvesting…' : 'Harvest';
             label._harvest.classList.toggle('fresh', fresh != null);
             label._feed.disabled = !level.total;
             label._siphon.disabled = !this.data.centrifugeBySource?.[node.label]; // its events in the centrifuge
         }
+        if (label._assay) label._assay.disabled = !this.data.assayable;
         if (label._purge) label._purge.disabled = !level.total;
         label.classList.toggle('syncing', syncing);
     }

@@ -211,12 +211,12 @@ async def pass_event(event_id: uuid.UUID) -> str:
     """Raw event -> concentrate. Returns the new adventure's id."""
     async with SessionLocal() as session:
         event = await _get_event(session, event_id)
-        if event.review != "new":
+        if event.review not in ("new", "assaying"):
             raise InvalidTransition(f"can only pass a new event (this one is {event.review})")
         existing = await session.scalar(select(Adventure).where(Adventure.event_id == event.id))
         if existing:  # shouldn't happen for a new event, but never create a second link
             raise InvalidTransition("this event already has an adventure")
-        adventure = Adventure(event_id=event.id, type="event", phase="queued")
+        adventure = Adventure(event_id=event.id, type="event", phase="queued", all_day=True if (event.details or {}).get("all_day") else None)
         session.add(adventure)
         event.review, event.reviewed_at = "passed", utcnow()
         await session.commit()
@@ -229,7 +229,7 @@ async def ignore_event(event_id: uuid.UUID) -> None:
     """Raw event -> tailings (Sump)."""
     async with SessionLocal() as session:
         event = await _get_event(session, event_id)
-        if event.review != "new":
+        if event.review not in ("new", "assaying"):
             raise InvalidTransition(f"can only ignore a new event (this one is {event.review})")
         event.review, event.reviewed_at = "ignored", utcnow()
         await session.commit()

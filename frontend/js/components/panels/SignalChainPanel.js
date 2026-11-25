@@ -4,6 +4,7 @@ import { panelInUse, useWorkspaceStore } from '../../store.js';
 import { ENTITY_TYPES, PHASE_NODES, PHASE_STAGES, REVIEW_STAGES } from '../../lifecycle.js';
 import { passes, pendingChanges } from '../../filters.js';
 import { freshMinutes, freshTitle } from '../../lib/harvest.js';
+import { assayable } from '../../lib/assay.js';
 import { LENSES, byMatter, lensColor, lensRuns, lensValues, sourceColor } from '../../lib/lens.js';
 import { eventNode, pipeFlows, twinModel } from '../../lib/twinModel.js';
 import { ASSAYER, CENTRIFUGE, CODEX, LODE, OUTSIDE, SUMP, nodeStage, twinNodes, twinPipes } from '../../lib/twinTopology.js';
@@ -29,6 +30,7 @@ const PANEL_MACHINES = {
     arena: [PHASE_NODES.consuming],
     agora: ['agora'],
     pantheon: ['pantheon'],
+    assayer: [ASSAYER],
 };
 const RECENT = 15;
 const VIEW_KEY = 'signal-chain-view';
@@ -80,9 +82,11 @@ function runAction(action) {
 function runCommand(command, nodeId) {
     const s = useWorkspaceStore.getState();
     const source = nodeId.replace(/^harvester:/, '');
-    if (command === 'harvest') s.syncSource(source);
+    if (command === 'harvest' && source === 'deposit') s.showPanel('deposit');   // it's filled by hand
+    else if (command === 'harvest') s.syncSource(source);
     else if (command === 'feed') s.feedSource(source);
     else if (command === 'siphon') s.siphonSource(source);
+    else if (command === 'assay') s.assayEvents(assayable(s.rawEvents, s.draftFilters, Date.now()));
     else if (command === 'purge') {
         const n = s.rawEvents.reduce((k, e) => k + (e.review === 'new' ? 1 : 0), 0);
         if (n) s.purgeCentrifuge(); // no confirm: each event can be revived from the Sump
@@ -250,6 +254,8 @@ export function SignalChainPanel() {
         }
         return out;
     }, [flows]);
+    const canAssay = useMemo(() => assayable(rawEvents, draftFilters, now).length, [rawEvents, draftFilters, now]);
+    const reading = useMemo(() => rawEvents.some((e) => e.review === 'assaying'), [rawEvents]);
     const centrifugeBySource = useMemo(() => {
         /** @type {Record<string, number>} */
         const out = {};
@@ -369,11 +375,11 @@ export function SignalChainPanel() {
         const accents = Object.fromEntries(nodes.filter((n) => n.kind === 'harvester').map((n) => [n.id, sourceColor(n.label)]));
         scene.update({
             nodes, pipes, levels: model.levels, codex: model.codex, flows: routed.byPipe, colors, accents, sources, io,
-            centrifugeBySource, stageFilter, light, packetStyle, fresh,
+            assayable: canAssay, centrifugeBySource, stageFilter, light, packetStyle, fresh,
         });
         scene.play(transitions, { replay: !replayed.current });
         replayed.current = true;
-    }, [status, nodes, pipes, model, routed, sources, io, centrifugeBySource, transitions, stageFilter, light, packetStyle, fresh]);
+    }, [status, nodes, pipes, model, routed, sources, io, canAssay, centrifugeBySource, transitions, stageFilter, light, packetStyle, fresh]);
 
     useEffect(() => {
         if (status === 'ready') sceneRef.current?.setSelection(selection.nodeId, selection.color);
@@ -384,10 +390,11 @@ export function SignalChainPanel() {
         if (status !== 'ready') return;
         const ids = [...(inUsePanel ? PANEL_MACHINES[inUsePanel] ?? [] : [])];
         if (inUsePanel === 'node' && creating) ids.push(LODE);
+        if (reading) ids.push(ASSAYER);   // it weighs while it reads
         if (poolMode === 'discovery') ids.push(CENTRIFUGE);   // the Centrifuge spins all through Discovery, whatever panel is in use
         if (inUsePanel === 'classifier' && poolMode === 'discovery') ids.push(SUMP);   // events are reviewed only in Discovery
         sceneRef.current?.setInUse(ids);
-    }, [status, inUsePanel, creating, poolMode]);
+    }, [status, inUsePanel, creating, poolMode, reading]);
 
     return html`
         <div className="panel-body signal-chain">

@@ -128,6 +128,31 @@ def start() -> None:
     task.add_done_callback(_tasks.discard)
 
 
+async def locate(venue: str | None, address: str | None, city: str | None) -> tuple[float, float] | None:
+    """One place's exact spot (its address, else its named venue), looked up now if need be."""
+    cands = candidates(venue, address, city)
+    cache = await _load_cache({k for _, k in cands})
+    if any(lv != "city" and k not in cache for lv, k in cands):
+        async with _lock:  # one lookup a second, whoever asks
+            async with httpx.AsyncClient(timeout=20, headers={"User-Agent": USER_AGENT}) as client:
+                city_key = next((k for lv, k in cands if lv == "city"), None)
+                for level, key in ([("city", city_key)] if city_key else []) + [c for c in cands if c[0] != "city"]:
+                    if key in cache:
+                        if cache[key] and level != "city":
+                            break
+                        continue
+                    hit, label = await _lookup(client, key, cache.get(city_key) if city_key and level != "city" else None)
+                    cache[key] = hit
+                    await _store(key, hit, label)
+                    await asyncio.sleep(REQUEST_GAP_S)
+                    if hit and level != "city":
+                        break
+        if _again:
+            start()
+    found = best([c for c in cands if c[0] != "city"], cache)
+    return (found[1], found[2]) if found else None
+
+
 async def _lookup(client: httpx.AsyncClient, key: str, city_centre: Hit) -> tuple[Hit, str | None]:
     level = key.split(":", 1)[0]
     res = await client.get(NOMINATIM, params={"q": _query_text(key), "format": "jsonv2", "limit": 5, "countrycodes": "us"})

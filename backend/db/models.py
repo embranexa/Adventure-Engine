@@ -14,6 +14,7 @@
     ambrosia       the Agora's ledger: every amount earned or taken back
     item_sheets    an adventure's 3D model; an item's purpose and effects (the Inventory)
     epitaphs       why a killed adventure died (the Necropolis)
+    deposit_links  links dropped into the Deposit
     app_state      small JSON settings that must survive restarts (filters)
     geocache       place lookups (address / venue / city -> coordinates), so each is asked once
     transitions    log of every move between nodes of the signal chain (the twin's packets)
@@ -35,8 +36,9 @@ from backend.db.base import Base, UTCDateTime, utcnow
 # Raw event review states:
 #   harvested (in its Harvester) | new (in the Centrifuge: Discovery shows these); in both, a
 #   specimen or ore by what it lacks (services/grade.py)
+#   assaying (a specimen in the Assayer)
 #   passed (became an adventure)       | ignored (tailings, in the Sump)
-REVIEW_STATES = ("harvested", "new", "passed", "ignored")
+REVIEW_STATES = ("harvested", "new", "assaying", "passed", "ignored")
 
 # Adventure phases, in lifecycle order (display names in frontend/js/lifecycle.js)
 PHASES = (
@@ -63,6 +65,7 @@ PHASE_NODES = {
 }
 OUTSIDE_NODE = "outside"        # where harvested events come from
 CENTRIFUGE_NODE = "centrifuge"  # events "new"
+ASSAYER_NODE = "assayer"        # events "assaying"
 SUMP_NODE = "sump"              # events "ignored" that have no adventure
 LODE_NODE = "lode"              # hand-made adventures enter here
 CODEX_NODE = "codex"            # entities; links travel codex <-> athanor
@@ -115,6 +118,9 @@ class Event(Base):
     location_approximate: Mapped[bool] = mapped_column(Boolean, default=False)
     cover_url: Mapped[str | None] = mapped_column(Text)
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # source-specific extras
+    # what the Assayer found on its page: {at, outcome, why, url, fields, sources}. Its own column, as a
+    # harvest overwrites the others; it only fills their gaps (queries.event_to_dict)
+    assay: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     first_seen: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     # server_default only fills rows that existed before the column did; harvests insert "harvested"
@@ -162,6 +168,8 @@ class Adventure(Base):
     rewards: Mapped[str | None] = mapped_column(Text)
     phase: Mapped[str] = mapped_column(String(20), default="queued")
     phase_before_kill: Mapped[str | None] = mapped_column(String(20))  # restored on revive
+    # made or filled from a link (services/links.py): {at, outcome, why, url, sources}
+    assay: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # set by hand (HP, ATK, ...)
     # what it's worth: {effort, resistance, ratio, locked_at, part (a series: date | spent)}; see services/bounty.py, ledger.py
     bounty: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
@@ -414,6 +422,20 @@ class Transition(Base):
     from_node: Mapped[str] = mapped_column(String(120))
     to_node: Mapped[str] = mapped_column(String(120))
     synthetic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+
+
+class DepositLink(Base):
+    """A link dropped into the Deposit (see services/deposit.py)."""
+
+    __tablename__ = "deposit_links"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    url: Mapped[str] = mapped_column(Text)
+    key: Mapped[str] = mapped_column(Text, unique=True)  # what makes two links the same (assay.key)
+    status: Mapped[str] = mapped_column(String(10), default="waiting")  # waiting | held (why) | done (an event)
+    why: Mapped[str | None] = mapped_column(Text)
+    title: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class AppState(Base):

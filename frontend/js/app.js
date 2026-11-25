@@ -65,11 +65,14 @@ function App() {
                         const type = e.target.value;
                         e.target.value = '';
                         if (!type) return;
-                        showPanel('node'); // the new adventure opens there, in edit mode
+                        showPanel('node');
+                        if (type === 'link') { useWorkspaceStore.getState().selectItem(null, 'create'); return; } // its link box shows when nothing is selected
+                        // the new adventure opens there, in edit mode
                         createAdventure(type);
                     }}
                 >
                     <option value="">✦ New adventure</option>
+                    <option value="link">⚖ From a link</option>
                     ${Object.entries(ADVENTURE_TYPES).map(([key, t]) => html`
                         <option key=${key} value=${key}>${t.glyph} ${t.label}</option>
                     `)}

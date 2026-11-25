@@ -4,19 +4,20 @@ Ore has everything needed to judge it: a title, a start, its own link, an exact 
 cover. A specimen lacks some of it. The end time and description are optional.
 """
 
+from typing import Any
+
 from backend.crawlers import CRAWLERS
-from backend.db.models import Event
 
 
-def missing(e: Event, source_name: str) -> list[str]:
-    """What keeps an event from being ore, in words ([]: it's ore)."""
+def missing(e: dict[str, Any], source_name: str) -> list[str]:
+    """What keeps an event (as sent to browsers) from being ore, in words ([]: it's ore)."""
     source = CRAWLERS.get(source_name)
     checks = {
-        "title": e.title,
-        "start": e.start_time,
+        "title": e["title"],
+        "start": e["start"],
         # a row without a link of its own points at the source's page
-        "link": e.url and not (source and e.url.rstrip("/") == source.URL.rstrip("/")),
-        "exact location": e.lat is not None and e.lon is not None and not e.location_approximate,
-        "cover": e.cover_url,
+        "link": e["url"] and not (source and e["url"].rstrip("/") == source.URL.rstrip("/")),
+        "exact location": e["lat"] is not None and e["lon"] is not None and not e["location_approximate"],
+        "cover": e["cover_url"],
     }
     return [name for name, ok in checks.items() if not ok]

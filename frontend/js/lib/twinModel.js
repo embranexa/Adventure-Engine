@@ -6,7 +6,7 @@
 import { passes } from '../filters.js';
 import { ENTITY_TYPES, PHASE_NODES } from '../lifecycle.js';
 import { lensColor, lensLabel, lensValues } from './lens.js';
-import { CENTRIFUGE, SUMP, harvesterId, pipeIndex, route } from './twinTopology.js';
+import { ASSAYER, CENTRIFUGE, SUMP, harvesterId, pipeIndex, route } from './twinTopology.js';
 
 /** @typedef {{ value: string, label: string, color: string, count: number }} TwinBand */
 /**
@@ -31,6 +31,7 @@ export function eventNode(e, linked) {
     if (linked.has(e.id)) return null;
     if (e.review === 'harvested') return harvesterId(e.source);
     if (e.review === 'new') return CENTRIFUGE;
+    if (e.review === 'assaying') return ASSAYER;
     if (e.review === 'ignored') return SUMP;
     return null; // "passed" without an adventure: shouldn't exist (the check reports it)
 }
@@ -88,7 +89,7 @@ export function twinModel({ rawEvents, adventures, entities, filters, lens, now 
 /**
  * The counting rules (BUILD_PLAN.md, section 1):
  *   count(adventures) = sum of the core vessels
- *   count(events)     = harvesters + centrifuge + sump + adventures with an event
+ *   count(events)     = harvesters + centrifuge + assayer + sump + adventures with an event
  * @param {Record<string, TwinLevel>} levels @param {EventRecord[]} rawEvents
  * @param {AdventureRecord[]} adventures @param {number} unplaced
  */
@@ -99,7 +100,7 @@ export function checkRules(levels, rawEvents, adventures, unplaced) {
     if (core !== adventures.length) problems.push(`core vessels hold ${core}, but there are ${adventures.length} adventures`);
     const harvesters = Object.keys(levels).filter((id) => id.startsWith('harvester:')).reduce((n, id) => n + count(id), 0);
     const withEvent = adventures.filter((a) => a.event_id != null).length;
-    const net = harvesters + count(CENTRIFUGE) + count(SUMP) + withEvent;
+    const net = harvesters + count(CENTRIFUGE) + count(ASSAYER) + count(SUMP) + withEvent;
     if (net !== rawEvents.length) problems.push(`net holds ${net} (incl. ${withEvent} with adventures), but there are ${rawEvents.length} events`);
     if (unplaced) problems.push(`${unplaced} passed event(s) have no adventure`);
     return { ok: problems.length === 0, problems };

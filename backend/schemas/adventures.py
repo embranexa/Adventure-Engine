@@ -179,3 +179,8 @@ class DatePayload(DayPayload):
 
     start: AwareDatetime
     end: AwareDatetime | None = None
+
+
+class LinkPayload(BaseModel):
+    url: str = Field(min_length=1, max_length=2000)
+    force: bool = False  # even if it's already here
