@@ -32,11 +32,11 @@
     --danger: #ff6b6b;
 
     /* matter (cold -> warm along the lifecycle) */
-    --m-flux: #3a4a5e;
-    --m-prima: #4b5a86;
-    --m-ore: #3d7bf0;
+    --m-specimen: #3a4a5e;
+    --m-ore: #4b5a86;
+    --m-concentrate: #3d7bf0;
     --m-essence: #1fc2c9;
-    --m-distillate: #e9c43b;
+    --m-armature: #e9c43b;
     --m-alloy: #f28a2e;
     --m-animus: #ef3e4a;
     --m-artifact: #a855f7;
@@ -210,7 +210,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .mode-btn.active b { text-shadow: 0 0 8px rgba(255, 255, 255, 0.4); }
 .mode-btn small { font: 500 10px var(--font-mono); letter-spacing: 0; text-transform: none; color: var(--text-dim); }
 .inbox { font: 600 12px var(--font-mono); letter-spacing: 0; color: var(--text-dim); }
-.inbox.has-prima { color: #a9b6dc; text-shadow: 0 0 8px rgba(110, 130, 200, 0.7); }
+.inbox.has-raw { color: #a9b6dc; text-shadow: 0 0 8px rgba(110, 130, 200, 0.7); }
 /* Discovery: harvesters and the centrifuge (until the Signal Chain twin) */
 .harvesters { display: flex; gap: 6px; align-items: center; }
 .hv {
@@ -218,8 +218,8 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
     box-shadow: inset 0 0 0 1px var(--steel-2); background: rgba(10, 11, 13, 0.7);
 }
 .hv-name { font: 600 11px var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
-.hv-count { font: 600 12px var(--font-mono); color: var(--m-flux); color: color-mix(in srgb, var(--m-flux) 40%, #fff); min-width: 1.5ch; }
-.hv.centrifuge .hv-count { color: color-mix(in srgb, var(--m-prima) 45%, #fff); }
+.hv-count { font: 600 12px var(--font-mono); color: var(--m-specimen); color: color-mix(in srgb, var(--m-specimen) 40%, #fff); min-width: 1.5ch; }
+.hv.centrifuge .hv-count { color: color-mix(in srgb, var(--m-ore) 45%, #fff); }
 .hv.failed .hv-name { color: #e57373; }
 .hv.syncing .hv-count { animation: hv-fill 1.2s ease-in-out infinite; }
 @keyframes hv-fill { 50% { opacity: 0.4; } }
@@ -491,10 +491,10 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .nc-edit { flex-shrink: 0; }
 .nc-desc { margin: 0 0 14px; color: #cfd3da; font: 400 13px/1.55 var(--font-body); white-space: pre-wrap; word-break: break-word; }
 .nc-new { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; letter-spacing: normal; }
-.nc-new .btn { padding: 5px 12px; font-size: 11px; border-radius: 5px; border-color: color-mix(in srgb, var(--m-ore) 55%, var(--steel-3)); color: #cfe0ff; }
-.nc-new .btn:hover { border-color: var(--m-ore); box-shadow: 0 0 12px color-mix(in srgb, var(--m-ore) 30%, transparent); }
-.new-adventure { border-color: color-mix(in srgb, var(--m-ore) 55%, var(--steel-3)); color: #cfe0ff; }
-.new-adventure:hover { border-color: var(--m-ore); }
+.nc-new .btn { padding: 5px 12px; font-size: 11px; border-radius: 5px; border-color: color-mix(in srgb, var(--m-concentrate) 55%, var(--steel-3)); color: #cfe0ff; }
+.nc-new .btn:hover { border-color: var(--m-concentrate); box-shadow: 0 0 12px color-mix(in srgb, var(--m-concentrate) 30%, transparent); }
+.new-adventure { border-color: color-mix(in srgb, var(--m-concentrate) 55%, var(--steel-3)); color: #cfe0ff; }
+.new-adventure:hover { border-color: var(--m-concentrate); }
 
 /* adventure editor (node card edit mode) */
 .ae { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
@@ -886,7 +886,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .btn:disabled { opacity: 0.4; cursor: default; border-color: var(--steel-2); color: var(--text-dim); }
 .btn.on { border-color: var(--text-muted); color: var(--text-bright); background: rgba(255, 255, 255, 0.07); }
 
-/* ═════════ Entity links (Refinery) ═════════ */
+/* ═════════ Entity links (Athanor) ═════════ */
 .ol { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .ol-head { color: var(--text-dim); font: 600 12px var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; }
 .ol-chips { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -982,7 +982,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .cx-adv-name em { margin-left: auto; padding-left: 6px; font: 500 9px var(--font-mono); font-style: normal; color: var(--c); text-transform: uppercase; }
 .cx-adv-name:not(:disabled):hover { color: #fff; }
 
-/* ═════════ Alembic: an adventure's action roadmap (scene in js/lib/alembicScene.js) ═════════ */
+/* ═════════ Anvil: an adventure's action roadmap (scene in js/lib/alembicScene.js) ═════════ */
 .alembic { padding: 0; --todo: var(--m-alloy); --done: var(--m-animus); }
 .alm-host, .alm-root { position: absolute; inset: 0; overflow: hidden; }
 .alm-root canvas { display: block; width: 100%; height: 100%; }
@@ -1027,8 +1027,8 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 }
 .alm-meter i {
     position: absolute; inset: 0 auto 0 0; border-radius: 2px; transition: width .4s ease;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--meter, var(--m-distillate)) 60%, #000), var(--meter, var(--m-distillate)));
-    box-shadow: 0 0 6px var(--meter, var(--m-distillate));
+    background: linear-gradient(90deg, color-mix(in srgb, var(--meter, var(--m-armature)) 60%, #000), var(--meter, var(--m-armature)));
+    box-shadow: 0 0 6px var(--meter, var(--m-armature));
 }
 
 .alm-empty {
@@ -1245,7 +1245,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .sc-view + .sc-view { border-left: 1px solid var(--steel-2); }
 .sc-view.active { background: rgba(255, 255, 255, 0.07); color: var(--text-bright); }
 .sc-home { padding: 2px 10px; font-size: 13px; }
-/* a view's ⌂ button (Atlas, Nexus, Alembic): frame everything */
+/* a view's ⌂ button (Atlas, Nexus, Anvil): frame everything */
 .view-home { position: absolute; top: 10px; right: 10px; z-index: 5; padding: 2px 10px; font-size: 13px; border-radius: 999px; background: rgba(8, 9, 11, 0.75); }
 .map-panel .view-home { top: 104px; right: 10px; }  /* below MapLibre's zoom controls */
 .cls-stage .view-home { top: auto; bottom: 10px; right: 10px; z-index: 21; }  /* clear of the lens row */
@@ -1272,7 +1272,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .twin-label.locked .twin-label-count { color: var(--text-dim); }
 .twin-label-count:empty { display: none; }
 .twin-label.hover { color: var(--text-bright); box-shadow: inset 0 0 0 1px var(--steel-5); }
-.twin-label.syncing { box-shadow: inset 0 0 0 1px var(--m-flux), 0 0 10px color-mix(in srgb, var(--m-flux) 60%, transparent); }
+.twin-label.syncing { box-shadow: inset 0 0 0 1px var(--m-specimen), 0 0 10px color-mix(in srgb, var(--m-specimen) 60%, transparent); }
 .twin-cmds { display: flex; gap: 3px; }
 .twin-cmd {
     border: 1px solid var(--steel-3); border-radius: 999px; background: rgba(12, 13, 16, 0.85); color: #cfd3da; cursor: pointer;
@@ -1382,7 +1382,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .ld-dot i { display: block; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
 .ld-empty { padding: 30px; text-align: center; color: var(--text-dim); font: 500 11px var(--font-mono); }
 
-/* adventure flags (Refinery card) */
+/* adventure flags (Athanor card) */
 .nc-flags { display: flex; flex-wrap: wrap; gap: 5px; margin: -6px 0 14px; }
 .nc-flag {
     --f: #888; padding: 2px 9px; border: 0; border-radius: 999px; cursor: pointer; background: transparent;
@@ -1602,7 +1602,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .ag-owed:hover:not(:disabled) { background: rgba(255, 255, 255, 0.07); } .ag-owed:disabled { cursor: default; }
 .ag-owed span { min-width: 0; overflow-wrap: anywhere; } .ag-owed small { display: block; font: 500 10.5px var(--font-mono); } .ag-owed b { font: 600 13px var(--font-mono); color: #f2cd6a; }
 .ql-pay { margin: 0; flex-shrink: 0; color: #f2cd6a; font: 600 11px var(--font-mono); }
-.bounty { position: static; }  /* its popover hangs from the Alembic's bar */
+.bounty { position: static; }  /* its popover hangs from the Anvil's bar */
 .bounty-pop { position: absolute; left: 0; max-width: 100%; top: calc(100% + 8px); z-index: 30; width: 260px; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 8px; background: rgba(8, 9, 11, 0.97); box-shadow: inset 0 0 0 1px var(--steel-3), 0 12px 28px rgba(0, 0, 0, 0.75); }
 .bounty-pop label { display: flex; flex-direction: column; gap: 3px; } .bounty-pop label span { display: flex; justify-content: space-between; color: var(--text-muted); font: 400 12px var(--font-body); } .bounty-pop label b { color: var(--text-bright); font: 600 12px var(--font-mono); }
 .bounty-pop input { width: 100%; accent-color: #e9b949; }
@@ -1673,7 +1673,7 @@ select.btn option { background: #0c0d10; color: var(--text); text-transform: non
 .cpx-history { display: flex; flex-direction: column; gap: 3px; padding-top: 8px; border-top: 1px solid var(--steel-1); color: var(--text-dim); font: 500 11px var(--font-body); }
 .cpx-history time { display: inline-block; width: 50px; font: 500 10px var(--font-mono); }
 
-/* party rosters (Refinery, Crucible, Arena), aftermath (Treasury, Cohort) */
+/* party rosters (Athanor, Crucible, Arena), aftermath (Treasury, Cohort) */
 .arena { --alloy: var(--m-animus); }
 .pr { display: flex; flex-direction: column; gap: 3px; }
 .pr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-width: 0; }
@@ -1700,16 +1700,16 @@ button.aft-head { cursor: pointer; } button.aft-head:disabled { cursor: default;
 .aft-choices { display: flex; flex-wrap: wrap; gap: 5px; }
 .aft-choices .on { box-shadow: inset 0 0 0 1px var(--c); color: color-mix(in srgb, var(--c) 70%, #fff); }
 
-/* the anvil (Crucible); objectives, preparations, effects; feedback */
-.anvil { flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; padding: 9px 10px; border-radius: 6px; background: linear-gradient(180deg, color-mix(in srgb, var(--alloy) 14%, rgba(5, 6, 8, 0.6)), rgba(5, 6, 8, 0.6)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alloy) 55%, transparent), 0 0 18px color-mix(in srgb, var(--alloy) 14%, transparent); }
-.anvil-head { color: color-mix(in srgb, var(--alloy) 55%, #fff); font: 600 12px var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; }
-.anvil-of { align-self: flex-start; max-width: 100%; padding: 0; border: 0; background: none; cursor: pointer; color: var(--text-dim); font: 500 11px var(--font-body); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.anvil-of:hover:not(:disabled) { color: var(--text-bright); } .anvil-of:disabled { cursor: default; }
-.anvil-btn { flex-shrink: 0; padding: 1px 5px; border: 0; border-radius: 4px; background: none; color: var(--text-dim); cursor: pointer; font-size: 13px; opacity: 0.55; }
-.anvil-btn:hover, .anvil-btn.on { opacity: 1; color: var(--alloy); }
-.anvil-move { flex-shrink: 0; display: flex; flex-direction: column; }
-.anvil-move button { padding: 0 4px; border: 0; background: none; color: var(--text-dim); cursor: pointer; font-size: 8px; line-height: 1.4; }
-.anvil-move button:hover:not(:disabled) { color: #fff; } .anvil-move button:disabled { opacity: 0.2; cursor: default; }
+/* targets (Crucible); objectives, preparations, effects; feedback */
+.tgt { flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; padding: 9px 10px; border-radius: 6px; background: linear-gradient(180deg, color-mix(in srgb, var(--alloy) 14%, rgba(5, 6, 8, 0.6)), rgba(5, 6, 8, 0.6)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alloy) 55%, transparent), 0 0 18px color-mix(in srgb, var(--alloy) 14%, transparent); }
+.tgt-head { color: color-mix(in srgb, var(--alloy) 55%, #fff); font: 600 12px var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; }
+.tgt-of { align-self: flex-start; max-width: 100%; padding: 0; border: 0; background: none; cursor: pointer; color: var(--text-dim); font: 500 11px var(--font-body); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tgt-of:hover:not(:disabled) { color: var(--text-bright); } .tgt-of:disabled { cursor: default; }
+.tgt-btn { flex-shrink: 0; padding: 1px 5px; border: 0; border-radius: 4px; background: none; color: var(--text-dim); cursor: pointer; font-size: 13px; opacity: 0.55; }
+.tgt-btn:hover, .tgt-btn.on { opacity: 1; color: var(--alloy); }
+.tgt-move { flex-shrink: 0; display: flex; flex-direction: column; }
+.tgt-move button { padding: 0 4px; border: 0; background: none; color: var(--text-dim); cursor: pointer; font-size: 8px; line-height: 1.4; }
+.tgt-move button:hover:not(:disabled) { color: #fff; } .tgt-move button:disabled { opacity: 0.2; cursor: default; }
 .obj { display: flex; flex-direction: column; gap: 4px; }
 .obj-row, .prep-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .obj-mark { flex-shrink: 0; width: 20px; height: 20px; padding: 0; border: 1px solid var(--steel-3); border-radius: 50%; background: none; color: var(--text-muted); cursor: pointer; font-size: 11px; line-height: 1; }
@@ -1744,13 +1744,24 @@ input.obj-text:hover { border-color: var(--steel-2); } input.obj-text:focus { ou
 .pr-rolebox { flex: 0 1 84px; min-width: 50px; padding: 2px 6px; border: 1px solid var(--steel-2); border-radius: 4px; background: rgba(0, 0, 0, 0.35); color: var(--text); font: 400 11px var(--font-body); }
 .pr-rolebox:focus { outline: none; border-color: var(--steel-5); }
 
-/* the Cohort's idols */
+/* the Cohort's paragons */
 .cohort { display: flex; flex-direction: column; }
+.paragon-card { flex-shrink: 0; align-self: center; width: min(100%, 300px); aspect-ratio: 480 / 760; border-radius: 16px; box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6); }
+.paragon-flip { flex-shrink: 0; align-self: center; width: min(100%, 300px); padding: 0; border: 0; background: none; cursor: pointer; animation: paragon-flip 0.35s ease-out; }
+.paragon-flip .paragon-card { display: block; width: 100%; }
+@keyframes paragon-flip { from { transform: perspective(900px) rotateY(80deg); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .paragon-flip { animation: none; } }
 .cohort-modes { position: absolute; z-index: 12; top: 10px; left: 12px; display: flex; gap: 5px; padding: 4px; border-radius: 6px; background: rgba(5, 6, 8, 0.72); }
-.idol-card { flex-shrink: 0; align-self: center; width: min(100%, 300px); aspect-ratio: 480 / 760; border-radius: 16px; box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6); }
-.idol-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 0; font: 400 12.5px/1.4 var(--font-body); }
-.idol-facts dt { color: var(--text-dim); } .idol-facts dd { margin: 0; color: var(--text); }
-.idol-suggest { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; } .idol-suggest small { color: var(--text-dim); font: 500 10px var(--font-mono); }
+.cohort-modes .on { border-color: var(--c); color: var(--c); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 35%, transparent); }
+/* virtue: light from above; vice: a glow from below, and the dark closing in */
+.cohort.virtue { background: radial-gradient(90% 60% at 50% -10%, rgba(255, 224, 150, 0.16), transparent 70%); }
+.cohort.vice { background: radial-gradient(110% 60% at 50% 112%, rgba(208, 31, 42, 0.3), transparent 70%), linear-gradient(rgba(6, 0, 1, 0.55), rgba(20, 2, 4, 0.35)); }
+.cohort.vice .inv-side > .nec-pane { border-color: color-mix(in srgb, #d01f2a 38%, var(--steel-2)); }
+.cab-label .paragon-count { display: block; margin-top: 1px; color: var(--c); font-size: 14px; line-height: 1; letter-spacing: 2px; }
+.pl-rev { display: inline-block; font-style: normal; transform: rotate(180deg); }
+.paragon-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 0; font: 400 12.5px/1.4 var(--font-body); }
+.paragon-facts dt { color: var(--text-dim); } .paragon-facts dd { margin: 0; color: var(--text); }
+.paragon-suggest { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; } .paragon-suggest small { color: var(--text-dim); font: 500 10px var(--font-mono); }
 /* the Cohort keeps its cabinet and sheet side by side for longer than the Inventory does */
 @container (min-width: 521px) and (max-width: 780px) {
     .cohort .inv-grid { flex-direction: row; }
@@ -1774,7 +1785,7 @@ input.obj-text:hover { border-color: var(--steel-2); } input.obj-text:focus { ou
 .alm-label.noverb b::after { content: ' · verb?'; color: var(--pending); }
 .ql-noverb { color: var(--pending); font: 500 10px var(--font-mono); }
 
-/* the Refinery card's cover / model switch, and the Forge under it */
+/* the Athanor card's cover / model switch, and the Forge under it */
 .tcard-face { position: relative; }
 .tcard-face .tcard-art { position: relative; }
 .tcard-face .model-view { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
@@ -1845,8 +1856,40 @@ input.obj-text:hover { border-color: var(--steel-2); } input.obj-text:focus { ou
 .ql-cover::after { border-radius: inherit; }
 .ql-group :disabled { pointer-events: none; }
 .pl-arch small { color: var(--text-dim); font: italic 500 11px var(--font-body); letter-spacing: 0; text-transform: none; }
-.idol-verb { color: var(--c); font: italic 500 15px var(--font-body); letter-spacing: 0; }
-.idol-attr { margin-right: 10px; white-space: nowrap; }
+.paragon-verb { color: var(--c); font: italic 500 15px var(--font-body); letter-spacing: 0; }
+.paragon-attr { margin-right: 10px; white-space: nowrap; }
 .cx-attrs { display: flex; flex-wrap: wrap; gap: 5px; } .cx-attrs .cls-layer:disabled { opacity: 0.4; cursor: default; }
 .ae-label em.cx-hint { color: var(--text-dim); }
 .fx-totals small { color: var(--text-dim); font: 400 10px var(--font-body); }
+
+/* the Pantheon, and fulfillment factors */
+.factor { display: inline-flex; align-items: center; gap: 2px; padding: 0 4px; }
+.factor button, .factor i { width: 7px; height: 7px; padding: 0; border: 1px solid var(--steel-4); border-radius: 50%; background: transparent; box-sizing: border-box; }
+.factor button { width: 9px; height: 9px; cursor: pointer; }
+.factor .on { border-color: #c86bf0; background: #c86bf0; box-shadow: 0 0 5px rgba(200, 107, 240, 0.6); }
+.factor i { flex-shrink: 0; box-shadow: none; }
+.pan-row .factor { margin-left: auto; }
+.pan-favor { display: flex; align-items: center; gap: 12px; }
+.pan-favor > b { color: var(--c); font: 600 40px/1 var(--font-display); text-shadow: 0 0 18px color-mix(in srgb, var(--c) 60%, transparent); }
+.pan-favor span { display: flex; flex-direction: column; color: var(--c); font: 600 15px var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; }
+.pan-favor small, .pan-sum small { color: var(--text-dim); font: 400 11px var(--font-body); letter-spacing: 0; text-transform: none; }
+.pan-sum { display: flex; align-items: flex-end; gap: 14px; } .pan-sum > i { color: var(--text-dim); font: 500 18px/1.4 var(--font-mono); }
+.pan-sum > div { display: flex; flex-direction: column; gap: 3px; } .pan-sum b { color: var(--text); font: 600 18px/1.4 var(--font-mono); } .pan-sum b.pan-c { color: var(--c); }
+.pan-step { display: inline-flex; align-items: center; gap: 8px; } .pan-step b { min-width: 2ch; text-align: center; }
+.pan-step button { width: 26px; height: 26px; padding: 0; border: 1px solid var(--steel-4); border-radius: 50%; background: rgba(0, 0, 0, 0.35); color: var(--text); font: 500 15px/1 var(--font-mono); cursor: pointer; }
+.pan-step button:hover:not(:disabled) { border-color: var(--c); color: #fff; box-shadow: 0 0 8px color-mix(in srgb, var(--c) 50%, transparent); } .pan-step button:disabled { opacity: 0.3; cursor: default; }
+
+/* a weekly adventure's dates (Arena) */
+.sd { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid var(--steel-2); }
+.sd-head { display: flex; align-items: center; gap: 8px; color: var(--text); font: 600 12px var(--font-display); letter-spacing: 0.06em; } .sd-head small { color: var(--text-dim); font: 400 11px var(--font-body); letter-spacing: 0; } .sd-head button { margin-left: auto; }
+.sd-dates { display: flex; flex-wrap: wrap; gap: 5px; }
+.sd-date { padding: 4px 9px; border: 1px solid color-mix(in srgb, var(--m-animus) 50%, var(--steel-3)); border-radius: 14px; background: rgba(0, 0, 0, 0.3); color: var(--text); font: 500 11.5px var(--font-body); cursor: pointer; }
+.sd-date:hover:not(:disabled) { border-color: #a855f7; color: #fff; box-shadow: 0 0 10px rgba(168, 85, 247, 0.4); } .sd-date:disabled { cursor: default; opacity: 0.6; } .sd-date.done { border-color: #a855f7; color: #dcb8ff; opacity: 1; }
+
+/* skills on quests, and what an artifact taught */
+.alm-bar-skills { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.alm-bar-skills .ol-add { flex: 1 1 180px; } .alm-bar-skills .ol-menu { top: auto; bottom: 100%; max-height: 170px; }
+.ql-skills { color: #cdb8ff; }
+.gr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; } .gr-row small { flex: 0 0 74px; color: var(--text-dim); font: 500 11px var(--font-body); }
+.gr-skill { padding: 2px 8px; border: 0; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--steel-3); background: rgba(255, 255, 255, 0.03); color: #cdb8ff; font: 500 12px var(--font-body); } .gr-skill b { color: var(--text-muted); }
+button.gr-skill { cursor: pointer; } button.gr-skill:hover { color: #fff; box-shadow: inset 0 0 0 1px #cdb8ff; } span.gr-skill { color: var(--text); }

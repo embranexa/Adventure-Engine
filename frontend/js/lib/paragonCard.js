@@ -1,10 +1,10 @@
 // An archetype's card (the Cohort), drawn on a canvas: an ornate frame, a magic circle, rays,
-// and the idol's emblem in gilt line. See idols.js (what it says) and cabinet/idols.js (the statue).
+// and the paragon's emblem in gilt line. See paragons.js (what it says) and cabinet/paragons.js (the statue).
 
 import { ARCHETYPES, ORDERS } from '../lifecycle.js';
 import { sigilCanvas } from './cabinet/sigil.js';
 import { magicCircleCanvases } from './magicCircle.js';
-import { IDOLS } from './idols.js';
+import { PARAGONS, facing, paragonColor } from './paragons.js';
 
 export const CARD_W = 480, CARD_H = 760;
 const TAU = Math.PI * 2;
@@ -36,7 +36,7 @@ const EMBLEMS = {
         curve(g, 'M0 54 C-46 20 -40 -26 -14 -22 C-4 -20 0 -10 0 -4 C0 -10 4 -20 14 -22 C40 -26 46 20 0 54 Z', true);
         circle(g, 0, -62, 7, true);
     },
-    juggernaut(g) {
+    paladin(g) {
         for (const s of [1, -1]) { g.save(); g.rotate(s * 0.6); path(g, [[0, 118], [0, -92]]); path(g, [[-9, -84], [0, -122], [9, -84], [0, -74]], true, true); g.restore(); }
         circle(g, 0, 8, 66, true); circle(g, 0, 8, 56); circle(g, 0, 8, 22);
         for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU; path(g, [[Math.cos(a) * 22, 8 + Math.sin(a) * 22], [Math.cos(a + 0.26) * 40, 8 + Math.sin(a + 0.26) * 40], [Math.cos(a) * 56, 8 + Math.sin(a) * 56]]); }
@@ -49,7 +49,7 @@ const EMBLEMS = {
         path(g, [[0, 112], [0, -74]]); path(g, [[-10, -62], [0, -96], [10, -62], [0, -70]], true, true);
         both(g, () => { path(g, [[0, 100], [12, 112]]); path(g, [[0, 92], [12, 104]]); });
     },
-    terraformer(g) {
+    mariner(g) {
         for (let i = 0; i < 3; i++) { const y = 60 + i * 18; curve(g, `M-112 ${y} C-92 ${y - 24} -72 ${y - 24} -56 ${y} C-40 ${y + 20} -20 ${y + 20} 0 ${y} C20 ${y - 24} 40 ${y - 24} 56 ${y} C72 ${y + 20} 92 ${y + 20} 112 ${y}`); }
         path(g, [[-104, 44], [-62, -26], [-36, 12], [0, -50], [36, 12], [62, -26], [104, 44]], false);
         path(g, [[-5, 100], [-5, -66], [5, -66], [5, 100]], true, true);
@@ -113,9 +113,10 @@ function tinted(c, color) {
     return out;
 }
 
-/** @param {HTMLCanvasElement} canvas @param {Archetype} id */
-export function drawIdolCard(canvas, id) {
-    const W = CARD_W, H = CARD_H, a = ARCHETYPES[id], d = IDOLS[id], gold = '#e6c98a';
+/** @param {HTMLCanvasElement} canvas @param {Archetype} id @param {Aspect} [aspect]  exploitative: reversed like a tarot card, blood on iron */
+export function drawParagonCard(canvas, id, aspect) {
+    const W = CARD_W, H = CARD_H, a = ARCHETYPES[id], dark = aspect === 'exploitative', name = facing(id, aspect);
+    const d = dark ? { ...PARAGONS[id], color: paragonColor(id, aspect) } : PARAGONS[id], gold = dark ? '#9aa0ab' : '#e6c98a';
     canvas.width = W; canvas.height = H;
     const g = /** @type {G} */ (canvas.getContext('2d'));
     const cx = W / 2, cy = 330;
@@ -134,9 +135,9 @@ export function drawIdolCard(canvas, id) {
     g.globalAlpha = 1;
     g.restore();
     // the emblem: gilt line over dark fills, with a glow
-    g.save(); g.translate(cx, cy); g.scale(1.12, 1.12);
+    g.save(); g.translate(cx, cy); g.scale(1.12, 1.12); if (dark) g.rotate(Math.PI);
     g.lineJoin = g.lineCap = 'round'; g.lineWidth = 2.6; g.fillStyle = 'rgba(9,10,14,0.94)';
-    const ink = g.createLinearGradient(0, -120, 0, 120); ink.addColorStop(0, '#fff3d6'); ink.addColorStop(0.5, gold); ink.addColorStop(1, '#a8834a');
+    const ink = g.createLinearGradient(0, -120, 0, 120); const inks = dark ? ['#6b1f24', '#c9ccd2', '#f0f1f4'] : ['#fff3d6', gold, '#a8834a']; inks.forEach((c, i) => ink.addColorStop(i / 2, c));
     g.strokeStyle = ink; g.shadowColor = d.color; g.shadowBlur = 14;
     EMBLEMS[id](g);
     g.restore();
@@ -153,9 +154,9 @@ export function drawIdolCard(canvas, id) {
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = gold;
     g.font = '600 25px "Saira Condensed", sans-serif'; g.fillText(d.numeral, cx, 56);
     g.beginPath(); g.moveTo(44, 566); g.lineTo(W - 44, 566); g.moveTo(44, 570); g.lineTo(W - 44, 570); g.stroke();
-    g.fillStyle = '#f6efe0'; g.font = '600 52px "Saira Condensed", sans-serif'; g.letterSpacing = '8px'; g.fillText(a.label.toUpperCase(), cx + 4, 612);
-    g.fillStyle = '#e9dcc0'; g.font = 'italic 500 27px "Saira Condensed", sans-serif'; g.letterSpacing = '3px'; g.fillText(a.verb, cx + 2, 654);
-    g.fillStyle = d.color; g.font = '500 20px "Saira Condensed", sans-serif'; g.letterSpacing = '3px'; g.fillText(`${a.idol.toUpperCase()}  ·  ${ORDERS[a.order].label.toUpperCase()}`, cx + 2, 688);
+    g.fillStyle = '#f6efe0'; g.font = '600 52px "Saira Condensed", sans-serif'; g.letterSpacing = '8px'; g.fillText(name.label.toUpperCase(), cx + 4, 612);
+    g.fillStyle = '#e9dcc0'; g.font = 'italic 500 27px "Saira Condensed", sans-serif'; g.letterSpacing = '3px'; g.fillText(name.verb, cx + 2, 654);
+    g.fillStyle = d.color; g.font = '500 20px "Saira Condensed", sans-serif'; g.letterSpacing = '3px'; g.fillText(`${a.paragon.toUpperCase()}  ·  ${ORDERS[a.order].label.toUpperCase()}`, cx + 2, 688);
     g.fillStyle = '#a9a496'; g.letterSpacing = '1px'; g.font = '500 17px "Saira Condensed", sans-serif'; g.fillText(`${a.organ}  ·  ${a.medium}`, cx, 716);
     g.letterSpacing = '0px';
 }

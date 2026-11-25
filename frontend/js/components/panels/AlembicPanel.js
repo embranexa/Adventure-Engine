@@ -2,22 +2,25 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import {
-    addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, roadmapColors, setNotes, toggleDone, toggleLink,
+    addAction, analyze, orEmpty, promotionTarget, removeAction, renameAction, roadmapColors, setNotes, setSkills, toggleDone, toggleLink,
 } from '../../lib/roadmap.js';
 import { FIRST_VERB, joinTitle, splitTitle } from '../../lib/quests.js';
 import { BountyControl } from '../BountyControl.js';
+import { EntityPicker } from '../EntityPicker.js';
 import { VerbSelect } from '../VerbSelect.js';
 import { PromoteButton } from '../PromoteButton.js';
 import { focusedWindow } from '../../lib/windows.js';
 
+const SKILL = /** @type {EntityType[]} */ (['skill']);
+
 /**
  * Controls for the selected quest: its verb and subject, complete/undo, link, add the next quest,
- * delete, and its notes (free text, saved when you leave the box; shown in the Crucible).
+ * delete, the skills it practices, and its notes (free text, saved when you leave the box; shown in the Crucible).
  * @param {{ info: import('../../lib/roadmap.js').ActionInfo, linking: boolean, pinned: boolean, onPin: () => void, waiting: string[],
- *           onRename: (t: string) => void, onNotes: (t: string) => void, onToggle: () => void, onLink: () => void,
+ *           onRename: (t: string) => void, onNotes: (t: string) => void, onSkills: (ids: string[]) => void, onToggle: () => void, onLink: () => void,
  *           onAddNext: () => void, onDelete: () => void, autoFocus: boolean }} props
  */
-function ActionBar({ info, linking, pinned, onPin, waiting, onRename, onNotes, onToggle, onLink, onAddNext, onDelete, autoFocus }) {
+function ActionBar({ info, linking, pinned, onPin, waiting, onRename, onNotes, onSkills, onToggle, onLink, onAddNext, onDelete, autoFocus }) {
     const { verb, subject } = splitTitle(info.title);
     const [draft, setDraft] = useState(subject);
     const [notes, setNotesDraft] = useState(info.notes);
@@ -79,12 +82,14 @@ function ActionBar({ info, linking, pinned, onPin, waiting, onRename, onNotes, o
                     if (e.key === 'Escape') { setNotesDraft(info.notes); /** @type {HTMLElement} */ (e.target).blur(); }
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) /** @type {HTMLElement} */ (e.target).blur();
                 }}></textarea>
+            <div className="alm-bar-skills"><${EntityPicker} key=${info.id} ids=${info.skills} types=${SKILL} placeholder="+ A skill it practices…"
+                onAdd=${(/** @type {string} */ id) => onSkills([...info.skills, id])} onRemove=${(/** @type {string} */ id) => onSkills(info.skills.filter((s) => s !== id))} /></div>
         </div>
     `;
 }
 
 /**
- * The Alembic: the selected adventure's action roadmap. Follows the selection like the
+ * The Anvil: the selected adventure's action roadmap. Follows the selection like the
  * node card. Edit in 3D (select, link, add, complete) or as text in the Scripter panel.
  */
 export function AlembicPanel() {
@@ -231,13 +236,13 @@ export function AlembicPanel() {
             `}
 
             ${status !== 'ready' && html`
-                <div className="map-status">${status === 'loading' ? 'Heating the Alembic…' : 'Alembic failed to load (see console)'}</div>
+                <div className="map-status">${status === 'loading' ? 'Raising the Anvil…' : 'Anvil failed to load (see console)'}</div>
             `}
 
             ${status === 'ready' && !adventure && html`
                 <div className="nc-empty alm-overlay-empty">
                     ${item ? 'Raw events have no roadmap' : 'Nothing selected'}
-                    <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to break it into quests'}</small>
+                    <small>${item ? 'Pass it first: it becomes concentrate' : 'Select an adventure to break it into quests'}</small>
                 </div>
             `}
 
@@ -280,6 +285,7 @@ export function AlembicPanel() {
                             autoFocus=${focusTitle}
                             onRename=${(/** @type {string} */ t) => save(renameAction(roadmap, selectedInfo.id, t))}
                             onNotes=${(/** @type {string} */ t) => save(setNotes(roadmap, selectedInfo.id, t))}
+                            onSkills=${(/** @type {string[]} */ ids) => save(setSkills(roadmap, selectedInfo.id, ids))}
                             onToggle=${() => handlers.current.activate(selectedInfo.id)}
                             onLink=${() => setLinkFrom(linkFrom === selectedInfo.id ? null : selectedInfo.id)}
                             onAddNext=${() => add(selectedInfo.id)}

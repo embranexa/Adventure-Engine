@@ -1,5 +1,5 @@
-// Action roadmaps (the Alembic): one dependency graph of actions per adventure.
-// Pure functions shared by the Alembic panel, the quest log and the store. The server
+// Action roadmaps (the Anvil): one dependency graph of actions per adventure.
+// Pure functions shared by the Anvil panel, the quest log and the store. The server
 // keeps the same rules (backend/services/roadmap.py).
 //
 // Script format (one statement per line, Mermaid-like):
@@ -81,7 +81,7 @@ function cascade(roadmap) {
 
 /**
  * @typedef {'done' | 'ready' | 'locked'} ActionState
- * @typedef {{ id: string, title: string, notes: string, parents: string[], children: string[],
+ * @typedef {{ id: string, title: string, notes: string, skills: string[], parents: string[], children: string[],
  *             state: ActionState, layer: number, row: number }} ActionInfo
  * @typedef {{ actions: ActionInfo[], byId: Map<string, ActionInfo>, layers: string[][],
  *             total: number, doneCount: number, bottlenecks: ActionInfo[], complete: boolean }} RoadmapAnalysis
@@ -98,7 +98,7 @@ export function analyze(input) {
     /** @type {Map<string, ActionInfo>} */
     const byId = new Map();
     for (const a of roadmap.actions) {
-        byId.set(a.id, { id: a.id, title: a.title, notes: a.notes ?? '', parents: [], children: [], state: 'locked', layer: 0, row: 0 });
+        byId.set(a.id, { id: a.id, title: a.title, notes: a.notes ?? '', skills: a.skills ?? [], parents: [], children: [], state: 'locked', layer: 0, row: 0 });
     }
     for (const [a, b] of roadmap.edges) {
         const src = byId.get(a), tgt = byId.get(b);
@@ -208,6 +208,18 @@ export function setNotes(roadmap, id, notes) {
     };
 }
 
+/** Set the skills an action practices. @param {Roadmap} roadmap @param {string} id @param {string[]} skills @returns {Roadmap} */
+export function setSkills(roadmap, id, skills) {
+    return {
+        ...roadmap,
+        actions: roadmap.actions.map((a) => {
+            if (a.id !== id) return a;
+            const { skills: _old, ...rest } = a;
+            return skills.length ? { ...rest, skills: skills.slice(0, 10) } : rest;
+        }),
+    };
+}
+
 /** Remove an action and its links. @param {Roadmap} roadmap @param {string} id @returns {Roadmap} */
 export function removeAction(roadmap, id) {
     return cascade({
@@ -294,9 +306,9 @@ export function parseScript(text, previous = null) {
     }
     // keep the previous order (so stills don't jump around); new actions go last
     const order = new Map((previous?.actions ?? []).map((a, i) => [a.id, i]));
-    const notes = new Map((previous?.actions ?? []).filter((a) => a.notes).map((a) => [a.id, a.notes])); // notes aren't in the script: kept by id
+    const before = new Map((previous?.actions ?? []).map((a) => [a.id, a])); // notes and skills aren't in the script: kept by id
     const actions = [...titles]
-        .map(([id, title]) => (notes.has(id) ? { id, title: title || id, notes: notes.get(id) } : { id, title: title || id }))
+        .map(([id, title]) => ({ ...before.get(id), id, title: title || id }))
         .sort((a, b) => (order.get(a.id) ?? Infinity) - (order.get(b.id) ?? Infinity));
     if (actions.length > 200) return { roadmap: null, error: 'At most 200 quests' };
     const cycle = findCycle(actions.map((a) => a.id), edges);
@@ -314,7 +326,7 @@ export function isValidId(id) {
 
 /**
  * The colours of a roadmap's actions, from its adventure's matter (the user's rule):
- * distillate (still distilling actions): everything yellow; alloy (building): incomplete
+ * armature (still distilling actions): everything yellow; alloy (building): incomplete
  * actions orange, complete ones red; animus, artifact, relic (and the rest): every action
  * in that matter's colour. The server moves the phase as actions are completed
  * (backend/services/roadmap.py), so the colours follow.

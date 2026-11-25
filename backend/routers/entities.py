@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.base import get_session
 from backend.db.queries import list_entities
 from backend.routers.errors import triage_errors
-from backend.schemas.entities import EntityCreate, EntityUpdate
+from backend.schemas.entities import EntityCreate, EntityUpdate, FactorPayload
 from backend.services import entities
 
 router = APIRouter(tags=["entities"])
@@ -83,6 +83,17 @@ async def link_entity(adventure_id: uuid.UUID, entity_id: uuid.UUID):
     with triage_errors():
         await entities.link(adventure_id, entity_id)
     return {"linked": True}
+
+
+@router.patch("/adventures/{adventure_id}/entities/{entity_id}")
+async def set_factor(adventure_id: uuid.UUID, entity_id: uuid.UUID, payload: FactorPayload):
+    """Set a linked deity's fulfillment factor. 422 unless it's one, linked, and 1-5 or null."""
+    with triage_errors():
+        try:
+            await entities.set_factor(adventure_id, entity_id, payload.factor)
+        except entities.InvalidEntity as e:
+            raise HTTPException(422, str(e)) from e
+    return {"factor": payload.factor}
 
 
 @router.delete("/adventures/{adventure_id}/entities/{entity_id}")

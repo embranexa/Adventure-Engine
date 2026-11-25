@@ -12,12 +12,12 @@ import { deferredResize, viewOf } from '../lib/resizing.js';
  * @property {number} [points] @property {number} [rings] @property {boolean} [lit]
  * @property {AdventureType} [kind] @property {string | null} [cover]   a vessel's
  * @property {number} [level] @property {number} [marks]   an amphora's
- * @property {Archetype} [idol]   an idol's
- * @property {string} [glyph]   a sigil's
+ * @property {Archetype} [paragon] @property {boolean} [dark]   a paragon's; dark: its exploitative aspect
+ * @property {string} [own] @property {number} [supply] @property {DeityForm} [form]   a deity's own colour, what it's offered, and its form
  * @property {any} [parts]   a recipe's
  */
 /** @typedef {{ id: string, label: string, sub: any, model: CabinetModel }} CabinetItem */
-/** @typedef {{ shape: 'arch' | 'lancet' | 'octagon', sealColor: string, seed: string, points?: number, dim?: boolean }} CabinetStyle */
+/** @typedef {{ shape: 'arch' | 'lancet' | 'octagon', sealColor: string, seed: string, points?: number, dim?: boolean, moral?: 'virtue' | 'vice', wash?: string }} CabinetStyle */
 
 /**
  * A 3D cabinet: a scrolling grid of alcoves, each a button, with the cabinet drawn behind

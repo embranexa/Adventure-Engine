@@ -15,7 +15,9 @@ export const actionShare = (b) => Math.floor((bountyTotal(b) * b.ratio) / 100 + 
 /** What's still to be earned from a locked bounty (0 without one). @param {AdventureRecord} a */
 export function remaining(a) {
     const b = a.bounty;
-    if (!b?.locked_at || a.phase === 'killed' || b.paid_seal) return 0;
+    if (!b?.locked_at || a.phase === 'killed' || b.paid_seal || b.part === 'spent') return 0;
+    if (b.part === 'date') return b.total - b.action_share;
+    if (a.recurrence) return Math.max(0, b.action_share - b.paid_actions);   // each date pays the rest again
     return Math.max(0, b.total - b.paid_actions);
 }
 

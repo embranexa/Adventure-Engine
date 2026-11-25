@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.base import get_session
 from backend.db.models import AppState
 from backend.services import targets
-from backend.schemas.state import Anvil, FilterState, Idols, LayoutPresets, Verbs
+from backend.schemas.state import FilterState, LayoutPresets, Paragons, Targets, Verbs
 
 router = APIRouter(prefix="/state", tags=["state"])
 
@@ -17,9 +17,9 @@ router = APIRouter(prefix="/state", tags=["state"])
 SCHEMAS: dict[str, type[BaseModel]] = {
     "filters": FilterState,        # applied: what the calendar and map show
     "filters_draft": FilterState,  # the Nexus's pending edits, until "pass through"
-    "anvil": Anvil,                # the Crucible's targets (services/targets.py)
+    "targets": Targets,            # the Crucible's targets (services/targets.py)
     "verbs": Verbs,                # your own quest and buff verbs
-    "idols": Idols,                # the Cohort's archetypes
+    "paragons": Paragons,          # the Cohort's archetypes
     "layout_presets": LayoutPresets,  # the user's saved dock arrangements (Layouts menu)
 }
 
@@ -60,6 +60,6 @@ async def put_state(key: str, body: dict[str, Any], session: AsyncSession = Depe
     else:
         row.value = value
     await session.commit()
-    if key == "anvil":
+    if key == "targets":
         await targets.sync(before, value)
     return value

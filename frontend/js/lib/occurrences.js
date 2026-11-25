@@ -30,6 +30,9 @@ function plusDays(d, n) {
     return x;
 }
 
+/** Local date -> "2026-11-20". @param {Date} d */
+export const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 /** "2026-11-20" -> local midnight. @param {string} s */
 function parseDay(s) {
     const [y, m, d] = s.split('-').map(Number);
@@ -63,8 +66,9 @@ function weekly(item) {
 }
 
 /**
- * Every occurrence overlapping [from, to) (local Dates), oldest first.
- * @param {{ start?: string | null, end?: string | null, all_day?: boolean | null, recurrence?: any }} item
+ * Every occurrence overlapping [from, to) (local Dates), oldest first. A series' dates that
+ * are artifacts (done_dates) are left out: the artifacts stand there themselves.
+ * @param {{ start?: string | null, end?: string | null, all_day?: boolean | null, recurrence?: any, done_dates?: string[] }} item
  * @param {Date} from @param {Date} to
  * @returns {Occurrence[]}
  */
@@ -83,6 +87,7 @@ export function occurrences(item, from, to) {
     for (let guard = 0; day < to && guard < 800; guard++, day = plusDays(day, 1)) {
         if (until && day >= until) break;
         if (!days.has(weekday(day)) && !(guard === 0 && day.getTime() === dayStart(first.start).getTime())) continue;
+        if (item.done_dates?.includes(dayKey(day))) continue;
         const start = new Date(day);
         start.setHours(first.start.getHours(), first.start.getMinutes(), 0, 0);
         const end = new Date(start.getTime() + len);
@@ -111,6 +116,18 @@ export function span(item) {
 /** Does any occurrence overlap [from, to)? @param {any} item @param {Date} from @param {Date} to */
 export function occursIn(item, from, to) {
     return occurrences(item, from, to).length > 0;
+}
+
+/**
+ * A weekly item's latest dates that have started, newest first; `done`: it's an artifact.
+ * @param {AdventureRecord} item @param {Date} now @param {number} [max]
+ */
+export function pastDates(item, now, max = 6) {
+    const first = firstOccurrence(item);
+    if (!first || !weekly(item)) return [];
+    const from = new Date(Math.max(first.start.getTime(), now.getTime() - (max + 1) * 7 * DAY_MS));
+    return occurrences({ ...item, done_dates: [] }, from, now).filter((o) => weekly(item)?.days.includes(weekday(o.start)))
+        .reverse().slice(0, max).map((o) => ({ ...o, key: dayKey(o.start), done: item.done_dates.includes(dayKey(o.start)) }));
 }
 
 /** "Mon, Thu" style label for a weekly rule. @param {{ days: number[] }} rule */

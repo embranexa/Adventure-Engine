@@ -1,8 +1,8 @@
-"""Action roadmaps (the Alembic): one dependency graph of actions per adventure.
+"""Action roadmaps (the Anvil): one dependency graph of actions per adventure.
 
 The interface calls actions quests. A roadmap is stored on its adventure as JSON:
 
-    {"actions": [{"id": "A1", "title": "Buy tickets", "notes": "..."}, ...],   # notes optional
+    {"actions": [{"id": "A1", "title": "Buy tickets", "notes": "...", "skills": [...]}, ...],   # notes and skills (ids) optional
      "edges":   [["A1", "A2"], ...],     # A1 must be done before A2
      "done":    ["A1", ...]}
 
@@ -13,9 +13,9 @@ graph valid: known ids, no self-links, no cycles, and nothing done behind an
 unfinished prerequisite.
 
 The roadmap also moves its adventure (the user's rule, resources/UPGRADES_PLAN.md U3), for
-adventures in the Alembic or later (never queued, classifying or killed): no action done
--> distillate (decomposing), or alloy if one is a target; some done -> alloy (constructing); all done -> stays where it
-is (promotion to animus is the Promote button), except a distillate becomes alloy. So
+adventures in the Anvil or later (never queued, classifying or killed): no action done
+-> armature (decomposing), or alloy if one is a target; some done -> alloy (constructing); all done -> stays where it
+is (promotion to animus is the Promote button), except a armature becomes alloy. So
 un-completing an action on an animus, artifact or relic sends it back to alloy. Moving an
 adventure by hand to animus or later marks every action done (triage.set_phase).
 """
@@ -37,6 +37,7 @@ ROADMAP_PHASES = ("decomposing", "constructing", "consuming", "completed", "deco
 
 MAX_TITLE = 200
 MAX_NOTES = 2000
+MAX_SKILLS = 10
 ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 
 
@@ -79,7 +80,7 @@ def normalize(raw: dict[str, Any]) -> dict[str, Any]:
     actions = raw.get("actions") or []
     if len(actions) > MAX_ACTIONS:
         raise InvalidRoadmap(f"at most {MAX_ACTIONS} quests")
-    clean_actions: list[dict[str, str]] = []
+    clean_actions: list[dict[str, Any]] = []
     seen: set[str] = set()
     for action in actions:
         action_id = str(action.get("id", ""))
@@ -89,10 +90,15 @@ def normalize(raw: dict[str, Any]) -> dict[str, Any]:
         if action_id in seen:
             raise InvalidRoadmap(f"quest {action_id} appears twice")
         seen.add(action_id)
-        clean = {"id": action_id, "title": (title or action_id)[:MAX_TITLE]}
+        clean: dict[str, Any] = {"id": action_id, "title": (title or action_id)[:MAX_TITLE]}
         notes = str(action.get("notes") or "").strip()
         if notes:
             clean["notes"] = notes[:MAX_NOTES]
+        skills = list(dict.fromkeys(str(s) for s in action.get("skills") or []))
+        if any(not ID_PATTERN.match(s) for s in skills):
+            raise InvalidRoadmap(f"quest {action_id} has a bad skill id")
+        if skills:
+            clean["skills"] = skills[:MAX_SKILLS]
         clean_actions.append(clean)
 
     ids = [a["id"] for a in clean_actions]

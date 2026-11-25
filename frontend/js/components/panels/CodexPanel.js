@@ -3,6 +3,7 @@ import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { ARCHETYPES, ATTRIBUTES, ENTITY_TYPES, UNLINKABLE, PARTY_STATUSES, PHASE_STAGES, STEWARD_ROLES } from '../../lifecycle.js';
 import { PLACE_PLACEHOLDER, coordsText, readPlace } from '../../lib/places.js';
+import { skillRecord } from '../../lib/growth.js';
 import { PALETTE, entityColor } from '../../lib/lens.js';
 import { EntityPicker } from '../EntityPicker.js';
 import { PlayerFields } from '../PlayerFields.js';
@@ -64,6 +65,7 @@ function EntityDetail({ obj, onBack }) {
     const t = ENTITY_TYPES[obj.type];
     const setWarden = useWorkspaceStore((s) => s.setWarden);
     const entities = useWorkspaceStore((s) => s.entities);
+    const grown = obj.type === 'skill' ? skillRecord(obj.id, adventures, entities) : [];
     const held = adventures.flatMap((a) => a.stewards.filter((s) => s.id === obj.id).map((s) => ({ a, role: s.role })));
     const kept = entities.filter((e) => e.wardens.includes(obj.id));
     const spellSkills = entities.filter((e) => obj.skills.includes(e.id));
@@ -150,6 +152,15 @@ function EntityDetail({ obj, onBack }) {
                     </div>
                 </div>
             `}
+            ${obj.type === 'skill' && grown.length > 0 && html`
+                <div className="cx-linked">
+                    <div className="cx-linked-head">Growth <b>${grown.length}</b></div>
+                    ${grown.map(({ a, practiced, proven }) => html`
+                        <div key=${a.id} className="cx-adv" style=${{ '--c': PHASE_STAGES[a.phase].color }}>
+                            <button className="cx-adv-name" disabled=${!itemsById[a.id]} onClick=${() => selectItem(a.id, 'codex')}><i></i>${a.title}<em>${[practiced && 'practiced', proven && 'proven'].filter(Boolean).join(', ')}</em></button>
+                        </div>`)}
+                </div>
+            `}
             ${obj.type === 'spell' && html`
                 <div className="ol">
                     <div className="ol-head">Cast with</div>
@@ -177,7 +188,7 @@ function EntityDetail({ obj, onBack }) {
 
             ${!UNLINKABLE.includes(obj.type) && html`<div className="cx-linked">
                 <div className="cx-linked-head">Linked adventures <b>${linked.length}</b></div>
-                ${linked.length === 0 && html`<div className="cx-empty-line">None yet · link it from an adventure in the Refinery</div>`}
+                ${linked.length === 0 && html`<div className="cx-empty-line">None yet · link it from an adventure in the Athanor</div>`}
                 ${linked.map((a) => {
                     const stage = PHASE_STAGES[a.phase];
                     const pooled = Boolean(itemsById[a.id]);
@@ -204,7 +215,7 @@ function EntityDetail({ obj, onBack }) {
 /**
  * The Codex: entities (deities, sites, players, organizations, skills, spells) that adventures link to. Browse
  * by type, search, create; open one to edit it and see its adventures. Linking happens
- * in the Refinery; entities show as stars in the Nexus (in their colour), sites as pins on the Atlas.
+ * in the Athanor; entities show as stars in the Nexus (in their colour), sites as pins on the Atlas.
  */
 export function CodexPanel() {
     const entities = useWorkspaceStore((s) => s.entities);

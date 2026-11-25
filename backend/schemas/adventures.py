@@ -157,6 +157,7 @@ class RoadmapAction(BaseModel):
     id: str
     title: str
     notes: str | None = Field(None, max_length=2000)
+    skills: list[str] = Field(default_factory=list, max_length=10)  # ids of skill entities it practices
 
 
 class RoadmapPayload(BaseModel):
@@ -165,3 +166,16 @@ class RoadmapPayload(BaseModel):
     actions: list[RoadmapAction] = Field(default_factory=list, max_length=200)
     edges: list[list[str]] = Field(default_factory=list, max_length=2000)
     done: list[str] = Field(default_factory=list, max_length=200)
+
+
+class DayPayload(BaseModel):
+    """A date where you are."""
+
+    date: date
+
+
+class DatePayload(DayPayload):
+    """One date of a weekly adventure."""
+
+    start: AwareDatetime
+    end: AwareDatetime | None = None

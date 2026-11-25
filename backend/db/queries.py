@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.services import bounty
+from backend.services import bounty, grade
 from backend.db.models import COLLABORATING, WHEN_WHERE_TYPES, Adventure, AdventureEntity, Ambrosia, Enshrining, Entity, EntityLink, Epitaph, Event, EventSource, ItemSheet, Move, Steward
 
 
@@ -43,6 +43,7 @@ def event_to_dict(e: Event, source_name: str) -> dict[str, Any]:
         "cover_url": e.cover_url,
         "details": e.details,
         "review": e.review,
+        "missing": grade.missing(e, source_name),  # [] = ore, else a specimen
         "all_day": False,       # crawled events are one-off and timed
         "recurrence": None,
     }
@@ -111,6 +112,8 @@ def linked_to_dict(o: Entity, link: AdventureEntity) -> dict[str, Any]:
     base = {"id": str(o.id), "type": o.type, "name": o.name}
     if o.type == "player":
         base |= {"status": link.status or "resonant", "status_at": _iso(link.status_at), "role": link.role, "note": link.note, "impact": link.impact, "follow_up": link.follow_up}
+    elif o.type == "deity":
+        base["factor"] = link.factor
     return base
 
 
@@ -134,13 +137,13 @@ def adventure_to_dict(
     a: Adventure, e: Event | None, source_name: str | None, linked: list[tuple[Entity, AdventureEntity]] = (),
     epitaph: Epitaph | None = None, enshrining: Enshrining | None = None, moves: list[Move] = (),
     sheet: ItemSheet | None = None, paid: dict[bool, int] | None = None,
-    stewards: list[dict[str, Any]] = (),
+    stewards: list[dict[str, Any]] = (), done_dates: list[str] = (),
 ) -> dict[str, Any]:
     """An adventure, flattened: its own fields over its linked event's (read through).
 
     `id` is the adventure's id; the raw event's id is `event_id`. The shape matches
-    event_to_dict, so the calendar, Atlas and Refinery can show either. `own` holds just
-    the adventure's own values, which is what the Refinery edits. `linked` are its linked
+    event_to_dict, so the calendar, Atlas and Athanor can show either. `own` holds just
+    the adventure's own values, which is what the Athanor edits. `linked` are its linked
     entities with their links; a hand-made event takes its where from its linked site.
     """
     base = event_to_dict(e, source_name or "") if e else {
@@ -162,6 +165,7 @@ def adventure_to_dict(
     if a.type not in WHEN_WHERE_TYPES:
         merged.update({k: None for k in WHEN_WHERE_FIELDS})
         merged["location_approximate"] = False
+    merged.pop("missing", None)  # a raw event's
     return {
         **merged,
         "id": str(a.id),
@@ -172,6 +176,9 @@ def adventure_to_dict(
         "collaboration": any(o.type == "player" and link.status in COLLABORATING for o, link in linked),
         "site_id": str(site.id) if site else None,
         "type": a.type,
+        "series_id": str(a.series_id) if a.series_id else None,
+        "series_date": a.series_date,
+        "done_dates": list(done_dates),  # a series': the dates that are artifacts
         "phase": a.phase,
         "phase_before_kill": a.phase_before_kill,
         "phase_changed_at": _iso(a.phase_changed_at),
@@ -222,6 +229,10 @@ async def list_adventures(session: AsyncSession) -> list[dict[str, Any]]:
         select(Steward, Entity).join(Entity, Steward.entity_id == Entity.id).order_by(Steward.created_at)
     )).all():
         stewards.setdefault(s.adventure_id, []).append({"id": str(obj.id), "type": obj.type, "name": obj.name, "role": s.role})
+    dates: dict[Any, list[str]] = {}
+    for series_id, day in (await session.execute(select(Adventure.series_id, Adventure.series_date)
+            .where(Adventure.series_id.is_not(None), Adventure.phase != "killed").order_by(Adventure.series_date))).all():
+        dates.setdefault(series_id, []).append(day)
     epitaphs = {r.adventure_id: r for r in (await session.scalars(select(Epitaph))).all()}
     paid: dict[Any, dict[bool, int]] = {}
     for adventure_id, ref, amount in (await session.execute(
@@ -234,7 +245,7 @@ async def list_adventures(session: AsyncSession) -> list[dict[str, Any]]:
     for m in (await session.scalars(select(Move).order_by(Move.adventure_id, Move.position))).all():
         moves.setdefault(m.adventure_id, []).append(m)
     return [adventure_to_dict(a, e, name, links.get(a.id, []), epitaphs.get(a.id), enshrinings.get(a.id), moves.get(a.id, []),
-                              sheets.get(a.id), paid.get(a.id), stewards.get(a.id, []))
+                              sheets.get(a.id), paid.get(a.id), stewards.get(a.id, []), dates.get(a.id, []))
             for a, e, name in rows.all()]
 
 

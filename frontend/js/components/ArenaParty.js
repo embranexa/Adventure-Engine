@@ -39,7 +39,7 @@ export function ArenaParty({ adventure }) {
                         <${RoleBox} adventure=${adventure} member=${member} onError=${setError} />
                         <${StatusSelect} adventure=${adventure} member=${member} onError=${setError} />
                     </div>
-                    <div className="ap-top"><${ArchetypeBadge} id=${player.details.archetype} /><${Warmth} value=${player.details.warmth} /></div>
+                    <div className="ap-top"><${ArchetypeBadge} id=${player.details.archetype} aspect=${player.details.aspect} /><${Warmth} value=${player.details.warmth} /></div>
                     <div className="ap-res" title="Resonance: what they share with this adventure">
                         <b>⚡ ${shared.length}</b>${shared.map((e) => html`<span key=${e.id}>${ENTITY_TYPES[e.type].glyph} ${e.name}</span>`)}
                     </div>

@@ -4,6 +4,7 @@ import { modelSpec, proposalOf, sheetOf, showsModel } from '../../lib/items.js';
 import { ModelView } from '../ModelView.js';
 import { centrifugeOrder, useWorkspaceStore } from '../../store.js';
 import { formatEventWhen, formatPrice, safeHttpUrl } from '../../events.js';
+import { dayKey } from '../../lib/occurrences.js';
 import { ADVENTURE_FLAGS, ADVENTURE_TYPES, MAIN_ROUTE, PHASE_STAGES, hasWhenWhere, stageOf } from '../../lifecycle.js';
 import { AdventureEditor } from './AdventureEditor.js';
 import { Forge } from '../Forge.js';
@@ -186,7 +187,7 @@ function EventRows({ event }) {
 }
 
 /**
- * Comb through the Centrifuge: the previous and next prima materia in time order (the
+ * Comb through the Centrifuge: the previous and next raw events in time order (the
  * earliest first; undated ones last). ◀ on the first wraps to the last, ▶ on the last to the first.
  * @param {{ item: PoolItem }} props
  */
@@ -199,10 +200,10 @@ function CentrifugeComb({ item }) {
     if (i < 0 || order.length < 2) return null;
     const go = (/** @type {number} */ step) => { selectItem(order[(i + step + order.length) % order.length], 'triage'); };
     return html`
-        <div className="nc-comb" role="group" aria-label="Prima materia in the Centrifuge">
-            <button className="btn" onClick=${() => go(-1)} title="The earlier prima materia" aria-label="Earlier">◀</button>
+        <div className="nc-comb" role="group" aria-label="Raw event in the Centrifuge">
+            <button className="btn" onClick=${() => go(-1)} title="The earlier raw event" aria-label="Earlier">◀</button>
             <span>${i + 1} <small>of ${order.length} in the Centrifuge</small></span>
-            <button className="btn" onClick=${() => go(1)} title="The later prima materia" aria-label="Later">▶</button>
+            <button className="btn" onClick=${() => go(1)} title="The later raw event" aria-label="Later">▶</button>
         </div>
     `;
 }
@@ -217,6 +218,7 @@ function ItemActions({ item }) {
     const reviveEvent = useWorkspaceStore((s) => s.reviveEvent);
     const killAdventure = useWorkspaceStore((s) => s.killAdventure);
     const reviveAdventure = useWorkspaceStore((s) => s.reviveAdventure);
+    const continueSeries = useWorkspaceStore((s) => s.continueSeries);
     const setPhase = useWorkspaceStore((s) => s.setPhase);
     const error = useWorkspaceStore((s) => s.actionError);
 
@@ -226,11 +228,11 @@ function ItemActions({ item }) {
             ? html`<button className="btn nc-act" onClick=${() => reviveEvent(item.id)}
                 title="Back into play: its killed adventure returns where it was, else the event goes back to the Centrifuge">↺ Revive</button>`
             : html`
-                <button className="btn nc-act pass" onClick=${() => passEvent(item.id)} title="Becomes an adventure: ore">✦ Pass → Ore</button>
-                <button className="btn nc-act" onClick=${() => ignoreEvent(item.id)} title="Rejected, to dross; can be revived later">✕ Ignore → Dross</button>
+                <button className="btn nc-act pass" onClick=${() => passEvent(item.id)} title="Becomes an adventure: concentrate">✦ Pass → Concentrate</button>
+                <button className="btn nc-act" onClick=${() => ignoreEvent(item.id)} title="Rejected, to tailings; can be revived later">✕ Ignore → Tailings</button>
             `;
     } else if (item.phase === 'killed') {
-        const from = item.phase_before_kill ? PHASE_STAGES[item.phase_before_kill].matter : 'ore';
+        const from = item.phase_before_kill ? PHASE_STAGES[item.phase_before_kill].matter : 'concentrate';
         controls = html`<button className="btn nc-act" onClick=${() => reviveAdventure(item.id)}>↺ Revive → ${from}</button>`;
     } else {
         controls = html`
@@ -241,11 +243,13 @@ function ItemActions({ item }) {
                         className=${`nc-step ${phase === item.phase ? 'current' : ''}`}
                         style=${{ '--s': PHASE_STAGES[phase].color }}
                         title=${`${PHASE_STAGES[phase].matter}: ${PHASE_STAGES[phase].hint}`}
+                        disabled=${phase === 'completed' && phase !== item.phase && Boolean(item.recurrence)}
                         onClick=${() => setPhase(item.id, phase)}
                     >${PHASE_STAGES[phase].matter}</button>
                 `)}
             </div>
             ${item.phase === 'completed' && html`
+                ${item.recurrence && item.start && html`<button className="btn nc-act" title="This becomes the artifact of its first date; the weekly adventure carries on in the Arena" onClick=${() => continueSeries(item.id, dayKey(new Date(/** @type {string} */ (item.start))))}>↻ Continue the series</button>`}
                 <button className="btn nc-act" onClick=${() => setPhase(item.id, 'decommissioned')}>⌛ Decommission → Relic</button>
             `}
             <button className="btn nc-act kill" onClick=${() => killAdventure(item.id)} title="Becomes a vestige; can be revived">☠ Kill → Vestige</button>

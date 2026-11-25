@@ -8,7 +8,7 @@ const ICON_PATHS = {
     compass: html`<circle cx="8" cy="8" r="6.3"></circle><path d="M8 3.6l1.6 4.4L8 12.4 6.4 8z"></path>`,
     clock: html`<circle cx="8" cy="8" r="6.3"></circle><path d="M8 4.3V8l2.6 1.6"></path>`,
     ledger: html`<path d="M3 2.5h10v11H3z"></path><path d="M5.4 5.5h5.2M5.4 8h5.2M5.4 10.5h3.4"></path>`,
-    alembic: html`<circle cx="5.8" cy="10" r="4.2"></circle><path d="M8.4 6.7L14.6 3.6v3.2"></path><path d="M2 10.6h7.6"></path>`,
+    anvil: html`<path d="M1.5 4.5h3.500M5 3h9v2.500c-2.500 0-4 1.200-4 3V10h2v3H5v-3h2V8.500C7 6.500 4.500 6.500 1.500 4.500"></path>`,
     quill: html`<path d="M13.8 2.2C9.6 2.6 5.8 5.8 4.6 11.4l-.9 2.4"></path><path d="M13.8 2.2c-.4 4.4-3.6 7.4-8.4 8.6"></path><path d="M7.4 8.6l2.4.2"></path>`,
     codex: html`<path d="M3 2.5h7.5a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2z"></path><path d="M3 11.5a2 2 0 0 1 2-2h7.5"></path><path d="M7.8 4.6l1 1.9-1 1.9-1-1.9z"></path>`,
     gear: html`<circle cx="8" cy="8" r="2.3"></circle><path d="M8 1.6v2M8 12.4v2M1.6 8h2M12.4 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4"></path><circle cx="8" cy="8" r="4.4"></circle>`,
@@ -18,6 +18,7 @@ const ICON_PATHS = {
     cohort: html`<circle cx="8" cy="4.500" r="2"></circle><path d="M4.800 13.500c0-3 1.200-5 3.200-5s3.200 2 3.200 5z"></path><circle cx="3" cy="6.500" r="1.300"></circle><circle cx="13" cy="6.500" r="1.300"></circle><path d="M1.500 12.500c0-1.800.5-3 1.500-3M14.500 12.500c0-1.800-.5-3-1.500-3"></path>`,
     molecule: html`<circle cx="8" cy="8" r="2.200"></circle><circle cx="2.800" cy="4" r="1.500"></circle><circle cx="13.200" cy="4" r="1.500"></circle><circle cx="8" cy="14" r="1.500"></circle><path d="M4 4.900l2.200 1.800M12 4.900L9.800 6.700M8 10.200v2.300"></path>`,
     crown: html`<path d="M2 5.500l3 2.500 3-5 3 5 3-2.500-1.500 7.500h-9z"></path>`,
+    temple: html`<path d="M1.500 6L8 2l6.500 4zM2 14h12M3.500 6.500V13.500M6.500 6.500V13.500M9.500 6.500V13.500M12.500 6.500V13.500"></path>`,
     tomb: html`<path d="M4 13.5V6.4C4 4 5.8 2 8 2s4 2 4 4.400v7.100z"></path><path d="M2.300 13.500h11.400M8 5.200v4.600M6.300 7h3.400"></path>`,
     scroll: html`<path d="M4.5 2.5h8a1.6 1.6 0 0 1 0 3.2H11v7.6a1.6 1.6 0 0 1-1.6 1.6H3.2a1.6 1.6 0 0 1 0-3.2h1.3z"></path><path d="M6.6 7.2h2.8M6.6 9.8h2.8"></path>`,
 };
@@ -71,18 +72,19 @@ export function Corners() {
 
 /** What each panel is for: shown when hovering its rune icon. */
 const PANEL_HELP = {
-    node: 'The selected adventure or event as a trading card. Triage it, move it along the chain, edit it, link it to Codex entities. Here ore becomes essence: why do I want this?',
+    node: 'The selected adventure or event as a trading card. Triage it, move it along the chain, edit it, link it to Codex entities. Here concentrate becomes essence: why do I want this?',
     classifier: 'The whole pool as a constellation. Stars are facets (source, city, type, matter…); galaxies group the items that share them. Click a star: include → exclude → off. The sphere holds what passes; Pass through sends it to the Calendar and Atlas.',
     map: 'Where things happen: events as towers on the map, sites from the Codex, and the proximity ring that filters by distance.',
     calendar: 'When things happen, by week or month. Weekly events show on every day they repeat; all-day ones as banners. Drag across the day headers to filter by date.',
-    alembic: 'How to do it: the adventure’s roadmap, a graph of quests, each a verb and a subject. Completing the first quest turns distillate into alloy.',
+    alembic: 'How to do it: the adventure’s roadmap, a graph of quests, each a verb and a subject. Completing the first quest turns armature into alloy.',
     scripter: 'The roadmap as text: one statement per line, e.g. A1[Acquire tickets] --> A2[Prototype rig].',
     codex: 'The entities adventures link to: deities (demand signals), sites (places), players (people), organizations, skills (crafts, fed by attributes), and spells (kinds of play).',
     complex: 'Who: how players connect to the selected adventure. Its site and party stand beside it; the ministry holds it, and players gather around the party, each bond coloured by status. Resonance ranks every player by the Codex entities they share with it.',
     arena: 'Every adventure under way and who is in it. Tick objectives, turn on buffs and see what they amplify. Change a player’s status, and complete it into an artifact.',
-    cohort: 'Every player in a cabinet, by archetype. A sigil’s points are its archetype and its rings its warmth; it lights once you have collaborated. Idols shows the archetypes: a statue and a card each, with their attributes and skills. Open a player to edit the profile and see what you have done together.',
+    cohort: 'The twelve archetypes, in virtue (excellence, for others) or vice (excess, at others’ expense): a paragon each, lit once a player has it, with a pip per player. Open a player to edit the profile and see what you have done together.',
     quests: 'What can I do right now: the next quests of every alloy adventure, ready to tick off. Target a quest to keep it at the top; its adventure becomes alloy.',
-    agora: 'What your effort earns: the ambrosia you hold, the ledger of every amount, and what locked bounties still owe. Set a bounty in the Alembic.',
+    agora: 'What your effort earns: the ambrosia you hold, the ledger of every amount, and what locked bounties still owe. Set a bounty in the Anvil.',
+    pantheon: 'Tune in with the deities. Favor is supply minus demand: supply is what sealed artifacts in the Treasury fulfil, demand you set as you feel it. Archiving an artifact takes its supply away.',
     inventory: 'Every item, by the deity it serves: what it is for, what it boosts, and its model. Describe an item to the Forge and Claude models it; its parts turn solid as its quests are done.',
     treasury: 'Finished adventures as artifacts. Open one to analyse it like a chess game, then seal it: what you discovered goes to the Codex.',
     necropolis: 'Adventures that died, and why. Carve an epitaph to light a vestige’s candles; causes add up to patterns. Abandon deletes one for good.',
@@ -93,7 +95,7 @@ const PANEL_HELP = {
  * Two-line panel title: [icon] NAME / QUESTION · INPUT ⟶ OUTPUT.
  * Hovering the icon shows what the panel is for (PANEL_HELP).
  * Input/output words that name a matter take its color.
- * @param {{ meta: PanelMeta, input?: string }} props  `input` overrides the meta (e.g. "prima materia" in Discovery)
+ * @param {{ meta: PanelMeta, input?: string }} props  `input` overrides the meta (e.g. "raw event" in Discovery)
  */
 export function PanelTitle({ meta, input }) {
     const [inWord, outWord] = [input ?? meta.flow[0], meta.flow[1]];

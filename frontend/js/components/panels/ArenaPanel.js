@@ -6,6 +6,7 @@ import { onControl } from '../../lib/cards.js';
 import { formatEventWhen } from '../../events.js';
 import { Objectives } from '../Objectives.js';
 import { Buffs } from '../Buffs.js';
+import { SeriesDates } from '../SeriesDates.js';
 import { ArenaParty } from '../ArenaParty.js';
 import { QuestCover, dueLabel } from './QuestsPanel.js';
 
@@ -29,7 +30,7 @@ export function ArenaPanel() {
             <div className="ql-head"><b>${live.length}</b> ${PHASE_STAGES.consuming.matter}</div>
             <div className="ql-list">
                 ${live.map((a) => {
-                    const pooled = Boolean(itemsById[a.id]), due = dueLabel(a.start);
+                    const pooled = Boolean(itemsById[a.id]), due = a.recurrence ? null : dueLabel(a.start);
                     return html`
                         <section key=${a.id} className=${['ql-group', pooled && 'pooled', a.id === selectedId && 'selected', a.id === hoveredId && 'hovered'].filter(Boolean).join(' ')}
                             title=${pooled ? '' : 'Not in the current pool (Discovery mode or filtered out)'}
@@ -45,9 +46,9 @@ export function ArenaPanel() {
                                 <${Objectives} adventure=${a} />
                                 <${ArenaParty} adventure=${a} />
                                 <${Buffs} adventure=${a} />
-                                <div className="pr-foot">
+                                ${a.recurrence ? html`<${SeriesDates} adventure=${a} />` : html`<div className="pr-foot">
                                     <button className="btn" onClick=${() => setPhase(a.id, 'completed')} title="Done: it becomes an artifact in the Treasury">✦ Complete</button>
-                                </div>
+                                </div>`}
                             </div>
                         </section>
                     `;

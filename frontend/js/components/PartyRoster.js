@@ -40,7 +40,7 @@ export function RoleBox({ adventure, member, onError }) {
 }
 
 /**
- * An adventure's players with their statuses (and follow-ups due), compact: the Refinery
+ * An adventure's players with their statuses (and follow-ups due), compact: the Athanor
  * and Crucible. A name opens that player in the Combinator. Nothing when there's no one.
  * @param {{ adventure: AdventureRecord, stewards?: boolean, removable?: boolean }} props
  */

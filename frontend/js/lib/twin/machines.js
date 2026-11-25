@@ -35,7 +35,7 @@ const RIM_COLORS = { include: '#e6ebf2', exclude: '#ff4a3d' };
 const PACE_S = 0.5;          // a mechanism winds up or down in this long
 
 /** Plinth radius per body: the base is sized to the machine. */
-export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, forge: 11, hopper: 9, refinery: 7, alembic: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, cohort: 9, complex: 9, agora: 9, inventory: 9, pantheon: 10, mastery: 8, nexus: 8, atlas: 7, calendar: 8, ledger: 8, enricher: 8, sieve: 8 };
+export const FOOT = { harvester: 8, centrifuge: 10, sump: 13, lode: 11, hopper: 9, athanor: 7, anvil: 9, crucible: 10, arena: 12, treasury: 9, archive: 10, necropolis: 10, codex: 8, cohort: 9, complex: 9, agora: 9, inventory: 9, pantheon: 10, mastery: 8, nexus: 8, atlas: 7, calendar: 8, ledger: 8, assayer: 8 };
 
 /** Which body a node gets. */
 export function bodyOf(node) {
@@ -429,7 +429,7 @@ const BODIES = {
             const cu = curl(1.5); cu.position.set(x, Y + 8, z); cu.rotation.y = -t; g.add(cu);
             const l = ball(0.8, ownGlow(light, 1.6), x, Y + 8.6, z); g.add(l); lamps.push(l);
         }
-        // a dredge wheel on an iron gantry, turning through the dross while the Sump is worked
+        // a dredge wheel on an iron gantry, turning through the tailings while the Sump is worked
         for (const sx of [-3, 3]) g.add(tube([V(sx, Y + 4.6, -11), V(sx, Y + 9.5, -0.3), V(sx, Y + 4.6, 10.6)], 0.35, M.iron, 12));
         const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 7, 12), M.brass); axle.rotation.z = Math.PI / 2; axle.position.set(0, Y + 9.2, 0); g.add(axle);
         const wheel = G(); wheel.position.set(0, Y + 9.2, 0);
@@ -439,44 +439,35 @@ const BODIES = {
         a.push((dt, t) => { const k = pace(); wheel.rotation.x += dt * 1.6 * k; lamps.forEach((l, i) => { l.material.emissiveIntensity = 1.6 + (1.2 + 0.8 * Math.abs(Math.sin(t * 7 + i * 1.7)) - 1.6) * k; }); });
         return { group: g, height: Y + 16 };
     },
-    forge(c) {
-        const { G, M, color, light, cyl, torus, lathe, box, tube, mine, DOT, working, pace, a } = c;
-        const g = G();
-        g.add(cyl(8, 8.6, 6, M.stone, Y, 10), torus(8.2, 0.35, M.brass, Y + 6));
-        const mouthMat = mine(std({ color: 0x050505, emissive: new THREE.Color(color), emissiveIntensity: 2.2 }));
-        const mouth = box(4.6, 3, 1, mouthMat, Math.cos(FRONT) * 7.4, Y + 1.2, Math.sin(FRONT) * 7.4); mouth.rotation.y = -FRONT + Math.PI / 2; g.add(mouth);
-        g.add(lathe([[4.6, Y + 6], [3.6, Y + 9], [1.8, Y + 13], [1.5, Y + 18]], M.iron, 10), torus(1.7, 0.3, M.gilt, Y + 17.6));
-        // anvil with a trip hammer on a pivot post
-        const anvil = G(); anvil.position.set(-6, Y, 6); anvil.rotation.y = FRONT;
-        anvil.add(box(2.4, 2.4, 2.4, M.iron), box(1.6, 1, 1.6, M.iron, 0, 2.4, 0), box(5.6, 1.6, 2.4, M.iron, 0.5, 3.4, 0), box(5.8, 0.25, 2.6, M.gilt, 0.5, 5, 0));
-        anvil.add(box(0.9, 9, 0.9, M.iron, -4.6, 0, -2), box(0.9, 9, 0.9, M.iron, -4.6, 0, 2), box(1, 0.6, 5, M.brass, -4.6, 9, 0));
-        const arm = G(); arm.position.set(-4.6, 9, 0);
-        arm.add(box(6.6, 0.6, 0.6, M.wood, 3.3, -0.3, 0), box(1.6, 2, 1.6, M.iron, 5.6, -2.2, 0), box(1.8, 0.3, 1.8, M.gilt, 5.6, -0.4, 0), box(1.4, 0.6, 1.4, M.brass, -0.9, -0.3, 0));
-        anvil.add(arm); g.add(anvil);
-        // bellows feeding the hearth
-        const bel = G(); bel.position.set(7, Y, -5); bel.rotation.y = -FRONT;
-        bel.add(box(4, 0.4, 2.6, M.wood, 0, 0.6, 0));
-        const leather = box(3.6, 1.6, 2.2, mine(std({ color: 0x4a2f1c, roughness: 0.9 })), 0, 1, 0); bel.add(leather);
-        const lid = box(4, 0.4, 2.6, M.wood, 0, 2.6, 0); bel.add(lid, tube([V(-2, 1.6, 0), V(-4, 1.8, 0), V(-5.5, 2.4, 0)], 0.35, M.brass, 8));
-        g.add(bel);
-        const N = 70, pos = new Float32Array(N * 3), life = new Float32Array(N); for (let i = 0; i < N; i++) life[i] = Math.random();
-        const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-        const sparks = new THREE.Points(geo, mine(new THREE.PointsMaterial({ map: DOT, color: light, size: 1.6, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })));
-        sparks.visible = false; g.add(sparks);
-        let hp = 0;
+    // an outcrop of native metal, veins running through it, under a mine's headframe
+    lode(c) {
+        const { G, M, color, light, cyl, torus, box, tube, mine, ownGlow, gem, gear, pace, a } = c;
+        const g = G(), rock = mine(std({ color: 0x1c1a19, metalness: 0.25, roughness: 0.85, flatShading: true }));
+        const boulder = (r, x, y, z, sy, turn) => { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), rock); b.position.set(x, Y + y, z); b.scale.y = sy; b.rotation.y = turn; g.add(b); };
+        boulder(6.4, -1.5, 1.5, 1, 0.72, 0.3); boulder(4.4, 4.2, 1, 3.4, 0.7, 1.1); boulder(4, -5.4, 0.8, -3.4, 0.8, 2); boulder(3, 2.6, 1, -5, 0.9, 0.7);
+        // veins over the near face, bright where the metal shows
+        const vein = ownGlow(color, 1.3);
+        for (const [t0, t1, h0, h1] of [[-0.9, -0.2, 0.4, 5.2], [-0.3, 0.5, 0.5, 5.6], [0.4, 1.1, 0.3, 4.2], [-0.1, 0.2, 2, 6]]) {
+            const at = (k) => { const t = CAM + t0 + (t1 - t0) * k, rr = 6.6 * Math.cos((h0 + (h1 - h0) * k) / 7.2) + 0.5; return V(-1.5 + Math.cos(t) * rr, Y + h0 + (h1 - h0) * k, 1 + Math.sin(t) * rr); };
+            g.add(tube([at(0), at(0.3), at(0.62), at(1)], 0.32, vein, 16));
+        }
+        for (const [x, y, z, r] of [[1.6, 5.4, 4.4, 1], [-3.4, 6.2, 2.2, 1.3], [4.8, 3.6, 5, 0.8]]) { const n = gem(light, r); n.position.set(x, Y + y, z); g.add(n); }
+        // the headframe: four legs, a winding wheel, and a bucket on its cable
+        const T = Y + 19;
+        for (const [x, z] of [[-8, -6], [-8, 7], [7, -7], [8, 6]]) g.add(tube([V(x, Y, z), V(x * 0.22, T, z * 0.22)], 0.45, M.brass, 2));
+        g.add(torus(2.6, 0.35, M.brass, T), box(5, 0.5, 5, M.iron, 0, T, 0));
+        const wheel = G(); wheel.position.y = T + 3.4; wheel.rotation.y = FRONT; g.add(wheel);
+        const spin = gear(3, 20, M.gilt); wheel.add(spin, box(0.5, 3.4, 0.5, M.iron, 0, -3.4, -0.9), box(0.5, 3.4, 0.5, M.iron, 0, -3.4, 0.9));
+        const cable = cyl(0.12, 0.12, 1, M.iron, 0, 6), bucket = G(); g.add(cable, bucket);
+        bucket.add(cyl(1.5, 1.1, 2.2, M.brass, 0, 16), torus(1.5, 0.18, M.gilt, 2.2)); const load = gem(light, 0.8); load.position.y = 2.4; bucket.add(load);
+        cable.geometry.translate(0, -cable.geometry.parameters.height / 2, 0); cable.position.set(0, T, 0);
+        let p = 0;
         a.push((dt, t) => {
-            const on = working();
-            sparks.visible = on;
-            if (on) {
-                for (let i = 0; i < N; i++) { life[i] += dt * (0.25 + (i % 7) * 0.04) * 2; if (life[i] > 1) life[i] -= 1; const k = life[i]; pos.set([Math.sin(i + k * 3) * (1 + k * 2), Y + 18 + k * 14, Math.cos(i * 1.7 + k * 2) * (1 + k * 2)], i * 3); }
-                geo.attributes.position.needsUpdate = true;
-                hp = (hp + dt * 1.6 * pace()) % 1; const swing = hp < 0.18 ? 0.45 - (hp / 0.18) * 0.68 : -0.23 + ((hp - 0.18) / 0.82) * 0.68; arm.rotation.z = 0.45 + (swing - 0.45) * pace();
-            } else arm.rotation.z = 0.45;
-            const pump = on ? 0.5 + 0.5 * Math.sin(t * 5) : 1;
-            leather.scale.y = 0.35 + 0.65 * pump; leather.position.y = 1.0 + leather.scale.y * 0.8; lid.position.y = 1.0 + leather.scale.y * 1.6;
-            mouthMat.emissiveIntensity = on ? (2.6 + Math.sin(t * 5.5) * 0.6) * (1.4 + (1 - pump) * 0.6) : 2.2;
+            const k = pace(); p += dt * 0.9 * k; spin.rotation.z = p * 3;
+            const y = Y + 11 + Math.sin(p) * 3; bucket.position.y = y; cable.scale.y = T - y - 2;
+            vein.emissiveIntensity = 1.3 + (0.6 + 0.6 * Math.sin(t * 3)) * k;
         });
-        return { group: g, height: Y + 22 };
+        return { group: g, height: T + 7 };
     },
     hopper(c) {
         const { G, M, accent, heart, band, lathe, tube, torus, rivets, glow } = c;
@@ -489,7 +480,7 @@ const BODIES = {
         for (let i = 0; i < 4; i++) { const t = CAM + Math.PI / 4 + (i * Math.PI) / 2; g.add(tube([V(Math.cos(t) * 8.8, PLINTH_H, Math.sin(t) * 8.8), V(Math.cos(t) * 9.8, y + h * 0.8, Math.sin(t) * 9.8), V(Math.cos(t) * 11.2, top + 8.6, Math.sin(t) * 11.2)], 0.45, M.iron, 12)); }
         return { group: g, height: top + 11 };
     },
-    refinery(c) {
+    athanor(c) {
         const { G, M, light, cyl, heart, band, box, curls, lathe, runeBand, gem, finial, ball, busy, pace, a } = c;
         const g = G(), { r, h, y } = CORE, top = CORE_TOP;
         g.add(cyl(r + 0.6, r + 1.2, y - PLINTH_H, M.iron, PLINTH_H, 32), heart(r, h, y), band(r + 0.3, y + 0.6, 0.8), band(r + 0.3, top - 0.4, 0.8));
@@ -524,43 +515,39 @@ const BODIES = {
         });
         return { group: g, height: T + 9 };
     },
-    alembic(c) {
-        const { G, M, accent, light, heart, tube, band, torus, lathe, box, ball, glow, mine, DOT, busy, pace, a } = c;
-        const g = G(), { r, h, y } = CORE, top = CORE_TOP, d = top - (PLINTH_H + 12);
-        g.add(heart(r, h, y));
-        // copper feed pipes up the back of the heart only
-        for (const off of [-0.7, 0, 0.7]) { const t = away(off); g.add(tube([V(Math.cos(t) * (r + 0.3), y, Math.sin(t) * (r + 0.3)), V(Math.cos(t) * (r + 0.3), top, Math.sin(t) * (r + 0.3)), V(Math.cos(t) * (r - 0.8), top + 1.4, Math.sin(t) * (r - 0.8))], 0.3, M.copper, 12)); }
-        g.add(band(r + 0.3, y + 0.6, 1), band(r + 0.3, top - 0.4, 1), torus(r + 0.4, 0.14, glow(accent, 1.4), top + 0.3));
-        // the still-head: a copper helm on the heart
-        g.add(lathe([[r + 0.4, top + 0.4], [r - 0.2, top + 2], [3.6, top + 3.6], [2.2, top + 5.6], [3, top + 7], [2.6, top + 8.4], [0, top + 9.4]], M.copper, 48), torus(3.05, 0.3, M.gilt, top + 7), torus(3.1, 0.14, glow(accent, 1.8), top + 7.5));
-        // the swan neck falls into an open copper condenser coil, which drips into a copper cup
-        const Y0 = PLINTH_H + d, cx = 8.5, cz = -8.5;
-        g.add(tube([V(0, top + 8.4, 0), V(2, Y0 + 22.6, -2), V(5.5, Y0 + 22, -5.5), V(cx, Y0 + 18.6, cz), V(cx, Y0 + 16.6, cz)], 0.6, M.copper, 40));
-        const coilMat = mine(std({ color: 0xc06a3e, metalness: 1, roughness: 0.3, emissive: new THREE.Color(accent), emissiveIntensity: 0.2 }));
-        const coil = []; for (let i = 0; i <= 140; i++) { const t = i / 140, an = t * 5 * TAU; coil.push(V(cx + Math.cos(an) * 2.4, Y0 + 16.6 - t * 11, cz + Math.sin(an) * 2.4)); }
-        g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(coil), 320, 0.4, 8), coilMat));
-        for (let i = 0; i < 3; i++) { const t = (i / 3) * TAU; g.add(box(0.4, Y0 + 17, 0.4, M.iron, cx + Math.cos(t) * 3.2, 0, cz + Math.sin(t) * 3.2)); }
-        g.add(torus(3.2, 0.25, M.brass, Y0 + 17));
-        g.add(lathe([[0, 0], [2, 0], [2.4, 1.6], [2.7, 2.2]], M.copper, 24).translateX(cx).translateZ(cz));
-        const drip = ball(0.32, glow(light, 2.4), cx, Y0 + 5, cz); drip.visible = false; g.add(drip);
-        g.add(bubbles(c, r - 0.4, y + 0.6, h - 1, 22));
-        // a pressure gauge on the helm, its needle swinging while it boils
-        const gg = G(); gg.position.set(Math.cos(FRONT) * 4.6, top + 3.4, Math.sin(FRONT) * 4.6); gg.rotation.y = FRONT; gg.rotation.x = -0.35;
-        gg.add(new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.6, 24), M.brass).rotateX(Math.PI / 2), new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.18, 6, 24), M.gilt));
-        const face = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), mine(std({ color: 0xe8e0c8, roughness: 0.6 }))); face.position.z = 0.32; gg.add(face);
-        const needle = box(0.12, 1.2, 0.05, M.iron); needle.position.z = 0.36; gg.add(needle);
-        g.add(gg);
-        const steam = new THREE.Sprite(mine(new THREE.SpriteMaterial({ map: DOT, color: light, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }))); steam.scale.set(7, 7, 1); g.add(steam);
-        let ph = 0;
-        a.push((dt, t) => {
-            const k = busy(), on = k > 0; ph += dt * 0.7 * k; const p = ph % 1;
-            drip.position.y = Y0 + 5.4 - p * (Y0 + 3.4); drip.visible = on && p < 0.92;
-            const e = pace();
-            coilMat.emissiveIntensity = 0.2 + (0.6 + 0.4 * Math.sin(t * 6)) * e;
-            needle.rotation.z = 1.1 + (-1.7 + Math.sin(t * 2.3) * 0.5 + Math.sin(t * 17) * 0.06) * e;
-            steam.material.opacity = (0.3 + 0.15 * Math.sin(t * 3)) * e; steam.position.y = top + 10 + ((t * 5) % 7);
+    // an anvil on the heart's lid, a trip hammer behind it, and a jointed armature growing on its horn
+    anvil(c) {
+        const { G, M, accent, light, heart, band, torus, lathe, cyl, box, ball, tube, rivets, glow, mine, DOT, working, pace, a } = c;
+        const g = G(), { r, h, y } = CORE, top = CORE_TOP;
+        g.add(cyl(r + 0.6, r + 1.2, y - PLINTH_H, M.iron, PLINTH_H, 32), heart(r, h, y), band(r + 0.3, y + 0.6, 0.8), band(r + 0.3, top - 0.4, 0.8), torus(r + 0.4, 0.14, glow(accent, 1.4), top + 0.3), rivets(r + 0.3, y + 0.4, 22));
+        g.add(lathe([[r + 0.5, top], [r + 0.5, top + 0.8], [4.4, top + 1.6]], M.iron, 40));
+        // everything above turns so +x looks at the camera: the anvil lies across its view
+        const steel = mine(std({ color: 0x8b929c, metalness: 0.9, roughness: 0.34 }));
+        const s = G(); s.rotation.y = -CAM; s.position.y = top + 1.4; g.add(s);
+        s.add(box(5, 1.2, 6.4, steel, 0, 0, 0), box(2.8, 2.2, 3.4, steel, 0, 1.2, 0), box(4.2, 2.2, 8.4, steel, 0, 3.4, -0.6), box(4.4, 0.35, 8.6, M.gilt, 0, 5.6, -0.6));
+        const horn = new THREE.Mesh(new THREE.ConeGeometry(1.6, 5, 20), steel); horn.rotation.x = Math.PI / 2; horn.position.set(0, 4.6, 6); s.add(horn);
+        // the armature: rods and joints, standing on the face
+        const J = [[0, 6, 2.6], [0, 9.6, 4.6], [-0.6, 13, 2.4], [0.5, 12.4, 7.2], [0, 16, 4.8], [0.4, 8.6, 8.2]].map((p) => V(...p));
+        for (const [i, k] of [[0, 1], [1, 2], [1, 3], [2, 4], [3, 4], [1, 5]]) s.add(tube([J[i], J[k]], 0.26, M.copper, 1));
+        const joint = mine(std({ color: 0x050505, emissive: new THREE.Color(accent), emissiveIntensity: 1.2 })), joints = J.map((p) => { const b = ball(0.42, joint, p.x, p.y, p.z); s.add(b); return b; });
+        // the trip hammer, on two posts round the back
+        for (const z of [-3.2, 0.4]) s.add(box(0.9, top + 10 - PLINTH_H, 0.9, M.iron, -8.4, PLINTH_H - top - 1.4, z));
+        s.add(box(1.2, 0.8, 5, M.brass, -8.4, 8.8, -1.4));
+        const arm = G(); arm.position.set(-8.4, 8.4, -1.4); s.add(arm);
+        arm.add(box(10, 0.7, 0.7, M.wood, 4.4, -0.35, 0), box(2.2, 2.8, 2.2, M.iron, 8.4, -2.4, 0), box(2.4, 0.4, 2.4, M.gilt, 8.4, 0.2, 0), box(1.6, 0.8, 1.6, M.brass, -0.6, -0.4, 0));
+        const spark = new THREE.Sprite(mine(new THREE.SpriteMaterial({ map: DOT, color: light, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }))); spark.position.set(0, 6.4, -1.4); s.add(spark);
+        let hp = 0.5;
+        a.push((dt) => {
+            const k = pace(), on = working();
+            hp = (hp + dt * 1.2 * k) % 1;
+            const up = hp < 0.12 ? 1 - hp / 0.12 : (hp - 0.12) / 0.88;         // falls fast, lifts slowly
+            arm.rotation.z = 0.06 + 0.34 * (on || k > 0 ? up * k + 0.5 * (1 - k) : 0.5);
+            const hit = hp > 0.1 && hp < 0.3 ? 1 - (hp - 0.1) / 0.2 : 0;
+            spark.material.opacity = 0.8 * hit * k; spark.scale.setScalar(3 + 6 * (1 - hit));
+            joint.emissiveIntensity = 1.2 + 2 * hit * k;
+            joints.forEach((b, i) => b.scale.setScalar(1 + 0.25 * hit * k * (i % 2)));
         });
-        return { group: g, height: top + 13 };
+        return { group: g, height: top + 19 };
     },
     crucible(c) {
         const { G, M, color, accent, heart, cyl, tube, ball, torus, rivets, box, glow, gear, mine, pace, a } = c;
@@ -682,42 +669,28 @@ const BODIES = {
         });
         return { group: g, height: Y + 27 };
     },
-    // a sieve: three mesh trays stacked on a tripod, finest at the bottom (locked until built)
-    sieve(c) {
-        const { G, M, node, cyl, torus, box, finial } = c;
-        const g = G();
-        for (let i = 0; i < 3; i++) { const t = (i / 3) * TAU + Math.PI / 2; g.add(cyl(0.4, 0.5, 16, M.brass, Y, 8).translateX(Math.cos(t) * 6.6).translateZ(Math.sin(t) * 6.6)); }
-        const mesh = (r, cells) => {   // a tray: a rim and a grid of wires
-            const tray = G();
-            tray.add(torus(r, 0.35, M.gilt, 0), cyl(r, r * 0.92, 1.2, M.copper, -1.2, 40, true));
-            for (let k = -cells; k <= cells; k++) {
-                const off = (k / cells) * r * 0.92, half = Math.sqrt(Math.max(0, (r * 0.92) ** 2 - off ** 2));
-                if (half < 0.5) continue;
-                tray.add(box(half * 2, 0.08, 0.08, M.brass, 0, -0.9, off), box(0.08, 0.08, half * 2, M.brass, off, -0.9, 0));
-            }
-            return tray;
-        };
-        [[7, 3, Y + 15], [6.2, 5, Y + 10.5], [5.4, 8, Y + 6]].forEach(([r, cells, y]) => { const t = mesh(r, cells); t.position.y = y; g.add(t); });
-        g.add(torus(7.1, 0.3, M.gilt, Y + 0.4));
-        const f = finial(0.6); f.position.y = Y + 15.4; g.add(f);
-        if (node.locked) { for (let k = 0; k < 3; k++) { const ch = torus(7.3, 0.3, M.iron, Y + 4 + k * 4); ch.rotation.z = (k - 1) * 0.12; g.add(ch); } g.add(box(2.4, 2.2, 1.2, M.brass, 0, Y + 7, 7.2)); }
-        return { group: g, height: Y + 20 };
-    },
-    // a still: three feed funnels over a cauldron under a glass dome (locked until built)
-    enricher(c) {
-        const { G, M, node, lathe, cyl, torus, tube, box, finial } = c;
-        const g = G();
-        g.add(lathe([[6.6, Y], [6.8, Y + 1], [6.2, Y + 6], [4.6, Y + 8], [4.6, Y + 8.6]], M.copper, 40), torus(6.5, 0.3, M.gilt, Y + 3));
-        g.add(new THREE.Mesh(new THREE.SphereGeometry(4.4, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), M.glass).translateY(Y + 8.6), torus(4.5, 0.25, M.gilt, Y + 8.6));
-        for (let i = 0; i < 3; i++) {
-            const t = (i / 3) * TAU + Math.PI / 6, x = Math.cos(t) * 8.6, z = Math.sin(t) * 8.6;
-            g.add(cyl(0.35, 0.35, 12, M.brass, Y, 8).translateX(x).translateZ(z));
-            const funnel = lathe([[2.2, 0], [2.2, 0.3], [0.5, 2.6], [0.4, 3.4]], M.brass, 24); funnel.rotation.x = Math.PI; funnel.position.set(x, Y + 15.4, z); g.add(funnel);
-            g.add(tube([V(x, Y + 12, z), V(x * 0.6, Y + 11.4, z * 0.6), V(x * 0.3, Y + 10.6, z * 0.3)], 0.25, M.brass, 12));
-        }
-        const f = finial(0.6); f.position.y = Y + 12.6; g.add(f);
-        if (node.locked) { for (let k = 0; k < 3; k++) { const ch = torus(7, 0.3, M.iron, Y + 1.6 + k * 2.4); ch.rotation.z = (k - 1) * 0.12; g.add(ch); } g.add(box(2.4, 2.2, 1.2, M.brass, 0, Y + 3.4, 6.9)); }
-        return { group: g, height: Y + 19 };
+    // an assay balance: two pans on a beam, over a drawer of weights
+    assayer(c) {
+        const { G, M, node, color, light, box, lathe, cyl, torus, tube, ball, finial, gem, pace, a } = c;
+        const g = G(), T = Y + 17;
+        const s = G(); s.rotation.y = Math.PI / 2 - CAM; g.add(s);   // the beam lies across the camera's view
+        s.add(box(13, 2.2, 7, M.wood, 0, Y, 0), box(13.6, 0.4, 7.6, M.gilt, 0, Y + 2.2, 0), ball(0.4, M.gilt, 0, Y + 1.1, 3.7));
+        s.add(lathe([[2.4, Y + 2.6], [2, Y + 3.2], [0.8, Y + 4.4], [0.6, T - 1], [1.2, T]], M.brass, 24));
+        const beam = G(); beam.position.y = T; s.add(beam);
+        beam.add(tube([V(-7, -0.4, 0), V(-3.5, 0.7, 0), V(0, 0.2, 0), V(3.5, 0.7, 0), V(7, -0.4, 0)], 0.34, M.gilt, 32), box(0.2, 5, 0.2, M.iron, 0, -5, 0.7));
+        const pans = [-7, 7].map((x) => {
+            const p = G(); p.position.set(x, -0.4, 0); beam.add(p);
+            for (let i = 0; i < 3; i++) { const t = (i / 3) * TAU; p.add(tube([V(0, 0, 0), V(Math.cos(t) * 2.5, -7.4, Math.sin(t) * 2.5)], 0.09, M.brass, 1)); }
+            p.add(lathe([[0, -8.2], [1.6, -8], [2.6, -7.4]], M.brass, 28), torus(2.6, 0.14, M.gilt, -7.4));
+            return p;
+        });
+        const sample = gem(light, 0.9); sample.position.y = -6.9; pans[0].add(sample);
+        pans[1].add(cyl(0.7, 0.8, 1.4, M.gilt, -8, 16), cyl(0.25, 0.25, 0.6, M.gilt, -6.6, 8));
+        const f = finial(0.8); f.position.y = T + 0.6; s.add(f);
+        if (node.locked) chain(c, g, 7.4);
+        let p = 0;
+        a.push((dt) => { const k = pace(); p += dt * 2 * k; beam.rotation.z = 0.1 + Math.sin(p) * 0.14 * k; for (const q of pans) q.rotation.z = -beam.rotation.z; sample.rotation.y += dt * k; });
+        return { group: g, height: T + 4 };
     },
     // the Sanctum's machines not built yet: chained shut, like the Net's
     // a round colonnade over an amphora
@@ -790,7 +763,7 @@ const BODIES = {
     },
     // a domed rotunda with an open eye
     pantheon(c) {
-        const { G, M, cyl, torus, lathe, gem, node } = c;
+        const { G, M, light, cyl, torus, lathe, gem, additive, CIRCLE, mine, node, pace, a } = c;
         const g = G();
         g.add(cyl(8, 8.4, 0.8, M.stone, Y, 40), cyl(7.4, 7.6, 0.8, M.stone, Y + 0.8, 40));
         for (let i = 0; i < 10; i++) { const t = (i / 10) * TAU; g.add(cyl(0.45, 0.55, 10, M.stone, Y + 1.6, 12).translateX(Math.cos(t) * 6.6).translateZ(Math.sin(t) * 6.6)); }
@@ -799,6 +772,9 @@ const BODIES = {
         for (let i = 0; i <= 14; i++) { const t = (i / 14) * 1.32; dome.push([Math.cos(t) * 7, Y + 12.8 + Math.sin(t) * 5.4]); }
         g.add(lathe(dome, M.silver, 48), torus(1.75, 0.3, M.gilt, Y + 18.1));
         const eye = gem('#f2f3f5', 1.3); eye.position.y = Y + 20.6; g.add(eye);
+        // a circle turns on the temple's floor, and the eye over it, while it's worked
+        const circle = new THREE.Mesh(new THREE.CircleGeometry(5.6, 48), mine(additive(CIRCLE.inner, light, 0.5))); circle.rotation.x = -Math.PI / 2; circle.position.y = Y + 1.75; g.add(circle);
+        a.push((dt) => { const k = pace(); circle.rotation.z += dt * k; circle.material.opacity = 0.5 + 0.5 * k; eye.rotation.y += dt * 1.5 * k; });
         if (node.locked) chain(c, g, 7.8);
         return { group: g, height: Y + 22 };
     },

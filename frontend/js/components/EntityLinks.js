@@ -3,10 +3,11 @@ import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { ENTITY_TYPES, UNLINKABLE } from '../lifecycle.js';
 import { keepInView, matchesByType } from '../lib/entityOptions.js';
+import { Factor } from './Factor.js';
 import { PartyRoster } from './PartyRoster.js';
 
 /**
- * The adventure's links to entities (the Codex), in the Refinery: chips grouped by
+ * The adventure's links to entities (the Codex), in the Athanor: chips grouped by
  * type (click opens the entity in the Codex, ✕ unlinks) and a type-ahead to link an
  * existing entity or create a new one. An event has one site: linking another replaces it.
  * @param {{ adventure: PoolItem & { kind: 'adventure' } }} props
@@ -15,6 +16,7 @@ export function EntityLinks({ adventure }) {
     const entities = useWorkspaceStore((s) => s.entities);
     const linkEntity = useWorkspaceStore((s) => s.linkEntity);
     const unlinkEntity = useWorkspaceStore((s) => s.unlinkEntity);
+    const setFactor = useWorkspaceStore((s) => s.setFactor);
     const createEntity = useWorkspaceStore((s) => s.createEntity);
     const selectEntity = useWorkspaceStore((s) => s.selectEntity);
     const showPanel = useWorkspaceStore((s) => s.showPanel);
@@ -82,6 +84,7 @@ export function EntityLinks({ adventure }) {
                                 title=${`${ENTITY_TYPES[type].label} · open in the Codex`}>
                                 <i>${ENTITY_TYPES[type].glyph}</i>${o.name}
                             </button>
+                            ${type === 'deity' && html`<${Factor} value=${o.factor} name=${o.name} onChange=${(/** @type {number} */ n) => run(setFactor(adventure.id, o.id, n))} />`}
                             <button className="ol-chip-x" onClick=${() => run(unlinkEntity(adventure.id, o.id))}
                                 aria-label=${`Unlink ${o.name}`} title="Unlink">✕</button>
                         </span>

@@ -130,16 +130,23 @@ async def init_db(sources: dict[str, str]) -> None:
     await _migrate_saved_places()
     await _seed_spells()
     await _rename_archetypes()
+    await _rename_old_archetypes()
+    await _form_deities()
+    await _rename_state("idols", "paragons")
+    await _rename_state("anvil", "targets")
 
     async with engine.begin() as conn:
-        # the Refiner was renamed the Refinery: logged moves keep working under the new id
-        for column in ("from_node", "to_node"):
-            await conn.execute(text(f"UPDATE transitions SET {column} = 'refinery' WHERE {column} = 'refiner'"))
+        # renamed machines: logged moves keep working under their new ids
+        for old, new in NODE_RENAMES.items():
+            for column in ("from_node", "to_node"):
+                await conn.execute(text(f"UPDATE transitions SET {column} = :new WHERE {column} = :old"), {"old": old, "new": new})
 
     from backend.services.transitions import backfill  # avoids an import cycle
     await backfill()
 
 
+# machine ids in the transitions log
+NODE_RENAMES = {"refiner": "athanor", "refinery": "athanor", "alembic": "anvil", "forge": "lode"}
 ARCHETYPE_RENAMES = {"performer": "bard", "resonator": "cleric", "cleric": "druid", "rogue": "ranger", "warlock": "templar"}
 
 
@@ -156,6 +163,52 @@ async def _rename_archetypes() -> None:
         if row:
             row.value = {"idols": {ARCHETYPE_RENAMES.get(k, k): v for k, v in (row.value or {}).get("idols", {}).items()}}
         session.add(AppState(key="archetypes_renamed", value=True))
+        await session.commit()
+
+
+RENAMED_ARCHETYPES = {"juggernaut": "paladin", "terraformer": "mariner"}
+
+
+async def _rename_old_archetypes() -> None:
+    """2026-11-24: juggernaut became paladin, terraformer mariner."""
+    async with SessionLocal() as session:
+        for player in (await session.scalars(select(Entity).where(Entity.type == "player"))).all():
+            new = RENAMED_ARCHETYPES.get((player.details or {}).get("archetype"))
+            if new:
+                player.details = {**player.details, "archetype": new}
+        row = await session.get(AppState, "paragons")
+        notes = ((row.value if row else None) or {}).get("paragons", {})
+        if notes.keys() & RENAMED_ARCHETYPES.keys():
+            row.value = {"paragons": {RENAMED_ARCHETYPES.get(k, k): v for k, v in notes.items()}}
+        await session.commit()
+
+
+async def _form_deities() -> None:
+    """Once (2026-11-24): each deity its own form; NexaGraph became Career."""
+    forms = {"embra nexa": "music", "movement": "dance", "family": "family", "nexagraph": "career", "career": "career", "lexa": "games"}
+    async with SessionLocal() as session:
+        if await session.get(AppState, "deities_formed"):
+            return
+        for deity in (await session.scalars(select(Entity).where(Entity.type == "deity"))).all():
+            form = forms.get(deity.name.strip().lower())
+            if form:
+                deity.details = {**(deity.details or {}), "form": form}
+            if deity.name.strip().lower() == "nexagraph":
+                deity.name = "Career"
+        session.add(AppState(key="deities_formed", value=True))
+        await session.commit()
+
+
+async def _rename_state(old: str, new: str) -> None:
+    """2026-11-24: the Cohort's idols became paragons; the Crucible's anvil, targets (the Anvil is a machine now)."""
+    async with SessionLocal() as session:
+        row = await session.get(AppState, old)
+        if row is None:
+            return
+        if await session.get(AppState, new) is None:
+            value = row.value or {}
+            session.add(AppState(key=new, value={new: value[old]} if old in value else value))
+        await session.delete(row)
         await session.commit()
 
 

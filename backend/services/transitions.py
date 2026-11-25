@@ -7,13 +7,13 @@ Two ways rows get recorded:
 
 1. Automatically, for changes made through ORM objects. A `before_flush` listener looks
    at what changed and adds Transition rows in the same transaction:
-       new Adventure                     centrifuge / sump / forge -> its phase's node
+       new Adventure                     centrifuge / sump / lode -> its phase's node
        Adventure.phase a -> b            node(a) -> node(b)   (kill, revive, sweeper, by hand)
        Event.review new -> ignored       centrifuge -> sump
        Event.review ignored -> new       sump -> centrifuge   (revive; other review changes
                                                                are recorded by the adventure)
-       new AdventureEntity               codex -> refinery     (a link)
-       deleted AdventureEntity           refinery -> codex     (an unlink)
+       new AdventureEntity               codex -> athanor     (a link)
+       deleted AdventureEntity           athanor -> codex     (an unlink)
 2. Explicitly, with record() / record_many(), for SQL statements that change rows without
    ORM objects (harvest, feed, siphon, purge, link deletes): `before_flush` never sees those.
 
@@ -33,14 +33,14 @@ from sqlalchemy.orm import Session
 
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import (
-    CENTRIFUGE_NODE, CODEX_NODE, FORGE_NODE, MANUAL_PHASES, OUTSIDE_NODE, PHASE_NODES, SUMP_NODE,
+    CENTRIFUGE_NODE, CODEX_NODE, LODE_NODE, MANUAL_PHASES, OUTSIDE_NODE, PHASE_NODES, SUMP_NODE,
     Adventure, AdventureEntity, AppState, Event, EventSource, Transition, harvester_node,
 )
 from backend.services.hub import hub
 
 log = logging.getLogger(__name__)
 
-REFINERY_NODE = PHASE_NODES["classifying"]  # links arrive where adventures are classified
+ATHANOR_NODE = PHASE_NODES["classifying"]  # links arrive where adventures are classified
 _PENDING = "pending_transitions"           # session.info key: rows to broadcast after commit
 _tasks: set[asyncio.Task] = set()          # keep broadcast tasks alive until they finish
 
@@ -104,13 +104,18 @@ def _record_orm_changes(session: Session, flush_context, instances) -> None:
         if isinstance(obj, Adventure):
             if obj.id is None:
                 obj.id = uuid.uuid4()  # the column default only applies at INSERT, after this
+            if getattr(obj, "spawned", False):  # from a series: out of the Arena
+                record(session, "adventure", obj.id, OUTSIDE_NODE, PHASE_NODES["consuming"])
+                if obj.phase != "consuming":
+                    record(session, "adventure", obj.id, PHASE_NODES["consuming"], PHASE_NODES[obj.phase])
+                continue
             if obj.event_id is None:
-                origin = FORGE_NODE
+                origin = LODE_NODE
             else:
                 origin = SUMP_NODE if old_review.get(obj.event_id) == "ignored" else CENTRIFUGE_NODE
             record(session, "adventure", obj.id, origin, PHASE_NODES[obj.phase or "queued"])
         elif isinstance(obj, AdventureEntity):
-            record(session, "link", obj.entity_id, CODEX_NODE, REFINERY_NODE, ref_id=obj.adventure_id)
+            record(session, "link", obj.entity_id, CODEX_NODE, ATHANOR_NODE, ref_id=obj.adventure_id)
 
     for obj in list(session.dirty):
         if isinstance(obj, Adventure) and (change := _change(obj, "phase")):
@@ -122,7 +127,7 @@ def _record_orm_changes(session: Session, flush_context, instances) -> None:
 
     for obj in session.deleted:
         if isinstance(obj, AdventureEntity):
-            record(session, "link", obj.entity_id, REFINERY_NODE, CODEX_NODE, ref_id=obj.adventure_id)
+            record(session, "link", obj.entity_id, ATHANOR_NODE, CODEX_NODE, ref_id=obj.adventure_id)
 
 
 @event.listens_for(Session, "after_commit")
@@ -218,12 +223,12 @@ async def backfill() -> int:
                 written += _path(session, "event", e.id, nodes, e.first_seen, e.reviewed_at or e.first_seen)
 
             for a in adventures:
-                origin = CENTRIFUGE_NODE if a.event_id in event_by_id else FORGE_NODE
+                origin = CENTRIFUGE_NODE if a.event_id in event_by_id else LODE_NODE
                 nodes = [origin] + _route_to(a.phase, a.phase_before_kill)
                 written += _path(session, "adventure", a.id, nodes, a.created_at, a.phase_changed_at)
 
             for link in (await session.scalars(select(AdventureEntity))).all():
-                record(session, "link", link.entity_id, CODEX_NODE, REFINERY_NODE,
+                record(session, "link", link.entity_id, CODEX_NODE, ATHANOR_NODE,
                        ref_id=link.adventure_id, at=link.created_at, synthetic=True)
                 written += 1
 

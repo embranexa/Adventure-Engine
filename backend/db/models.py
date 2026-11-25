@@ -33,15 +33,16 @@ from sqlalchemy.orm import Mapped, mapped_column
 from backend.db.base import Base, UTCDateTime, utcnow
 
 # Raw event review states:
-#   harvested (flux, in its Harvester) | new (prima materia, in the Centrifuge: Discovery shows these)
-#   passed (became an adventure)       | ignored (dross, in the Sump)
+#   harvested (in its Harvester) | new (in the Centrifuge: Discovery shows these); in both, a
+#   specimen or ore by what it lacks (services/grade.py)
+#   passed (became an adventure)       | ignored (tailings, in the Sump)
 REVIEW_STATES = ("harvested", "new", "passed", "ignored")
 
 # Adventure phases, in lifecycle order (display names in frontend/js/lifecycle.js)
 PHASES = (
-    "queued",          # Hopper      / ore
-    "classifying",     # Assay       / essence
-    "decomposing",     # Alembic     / distillate
+    "queued",          # Hopper      / concentrate
+    "classifying",     # Athanor     / essence
+    "decomposing",     # Anvil     / armature
     "constructing",    # Crucible    / alloy
     "consuming",       # Arena       / animus
     "completed",       # Treasury    / artifact
@@ -52,8 +53,8 @@ PHASES = (
 # frontend/js/lifecycle.js. Harvesters are "harvester:<source name>".
 PHASE_NODES = {
     "queued": "hopper",
-    "classifying": "refinery",
-    "decomposing": "alembic",
+    "classifying": "athanor",
+    "decomposing": "anvil",
     "constructing": "crucible",
     "consuming": "arena",
     "completed": "treasury",
@@ -63,8 +64,8 @@ PHASE_NODES = {
 OUTSIDE_NODE = "outside"        # where harvested events come from
 CENTRIFUGE_NODE = "centrifuge"  # events "new"
 SUMP_NODE = "sump"              # events "ignored" that have no adventure
-FORGE_NODE = "forge"            # hand-made adventures enter here
-CODEX_NODE = "codex"            # entities; links travel codex <-> refinery
+LODE_NODE = "lode"              # hand-made adventures enter here
+CODEX_NODE = "codex"            # entities; links travel codex <-> athanor
 
 
 def harvester_node(source_name: str) -> str:
@@ -147,6 +148,9 @@ class Adventure(Base):
     # repeats: {"freq": "weekly", "days": [0..6] (Monday = 0), "until": "YYYY-MM-DD" | null};
     # start/end give the first occurrence (its time of day and length)
     recurrence: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # an artifact made from one date of a weekly adventure (services/series.py): the series, and the date where you were
+    series_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    series_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
     venue: Mapped[str | None] = mapped_column(String(500))  # free text for now (venue entities later)
     address: Mapped[str | None] = mapped_column(String(500))
     city: Mapped[str | None] = mapped_column(String(200))
@@ -159,7 +163,7 @@ class Adventure(Base):
     phase: Mapped[str] = mapped_column(String(20), default="queued")
     phase_before_kill: Mapped[str | None] = mapped_column(String(20))  # restored on revive
     stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # set by hand (HP, ATK, ...)
-    # what it's worth: {effort, resistance, ratio, locked_at}; see services/bounty.py, ledger.py
+    # what it's worth: {effort, resistance, ratio, locked_at, part (a series: date | spent)}; see services/bounty.py, ledger.py
     bounty: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     flags: Mapped[list[str] | None] = mapped_column(JSON, default=list)  # ADVENTURE_FLAGS, set by hand
     # what counts as winning: [{id, text, kind: primary | bonus, state: open | achieved | failed}]
@@ -168,7 +172,7 @@ class Adventure(Base):
     preparations: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=list, nullable=True)
     # battles only: [{entity_id (a player or organization) | null, name}]
     adversaries: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=list, nullable=True)
-    # action roadmap (Alembic): {actions, edges, done}; see backend/services/roadmap.py
+    # action roadmap (Anvil): {actions, edges, done}; see backend/services/roadmap.py
     roadmap: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     phase_changed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
@@ -178,11 +182,17 @@ class Adventure(Base):
 ENTITY_TYPES = ("deity", "site", "player", "organization", "skill", "spell")
 GEO_ENTITY_TYPES = ("site",)
 
-# What a player can be (one or none); names, orders, idols are in frontend/js/lifecycle.js.
-ARCHETYPES = ("juggernaut", "artificer", "terraformer",   # kratos
+# What a player can be (one or none); names, orders, paragons are in frontend/js/lifecycle.js.
+ARCHETYPES = ("paladin", "artificer", "mariner",   # kratos
               "wizard", "ranger", "merchant",             # logos
               "enchanter", "druid", "bard",               # pathos
               "vanguard", "templar", "cleric")            # ethos
+
+# What a deity looks like in the Pantheon (unset: a plain magic circle); models in frontend cabinet/deities.js.
+DEITY_FORMS = ("music", "dance", "family", "career", "games")
+
+# The side of its archetype a player shows (unset: not judged).
+ASPECTS = ("constructive", "exploitative")
 
 # What a person is (skills are what they can do): fixed. Archetypes have two, a skill is governed
 # by up to two, and buffs amplify either. Labels in frontend/js/lifecycle.js.
@@ -222,7 +232,7 @@ class Entity(Base):
     city: Mapped[str | None] = mapped_column(String(200))
     lat: Mapped[float | None] = mapped_column(Float)
     lon: Mapped[float | None] = mapped_column(Float)
-    # type-specific extras: player {email, phone, handle, archetype, warmth 0-5, tags}; skill {attributes}
+    # type-specific extras: player {email, phone, handle, archetype, aspect, warmth 0-5, tags}; skill {attributes}; deity {demand 0-99, form}
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     # "#rrggbb", chosen in the Codex; null = a stable default picked from the id (frontend)
     color: Mapped[str | None] = mapped_column(String(7))
@@ -252,6 +262,8 @@ class AdventureEntity(Base):
     impact: Mapped[str | None] = mapped_column(Text, nullable=True)  # what they changed (the Treasury)
     # what its aftermath added to the player's warmth, so a change of mind takes it back
     nudge: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # deities only: how much it fulfils them, 1-5 (null: 1); the Pantheon's supply
+    factor: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class EntityLink(Base):

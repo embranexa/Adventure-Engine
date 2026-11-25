@@ -25,10 +25,10 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis' | 'treasury' | 'inventory' | 'agora' | 'complex' | 'arena' | 'cohort';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis' | 'treasury' | 'inventory' | 'agora' | 'complex' | 'arena' | 'cohort' | 'pantheon';
 
 /** Icon names drawn by components/PanelTitle.js. */
-type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'alembic' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb' | 'crown' | 'satchel' | 'amphora' | 'molecule' | 'swords' | 'cohort';
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'anvil' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb' | 'crown' | 'satchel' | 'amphora' | 'molecule' | 'swords' | 'cohort' | 'temple';
 
 /** A panel's definition (backend/services/workspace.py). Its title reads:
  *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
@@ -65,6 +65,8 @@ interface EventRecord {
     /** Source-specific extras (price, hosts, guest count, ...). */
     details: Record<string, unknown>;
     review: ReviewState;
+    /** What keeps it from being ore (backend/services/grade.py); []: it is. */
+    missing: string[];
     /** Whole days: start/end are the first and last day's local midnights (lib/occurrences.js). */
     all_day: boolean | null;
     /** Repeats weekly; start/end are the first occurrence. Crawled events never do. */
@@ -84,12 +86,12 @@ interface Recurrence {
 // --- the refinery (stored values; display names in js/lifecycle.js) ---
 
 /**
- * Raw event review: harvested (flux, in its Harvester) | new (prima materia, in the Centrifuge)
- * | passed (became an adventure) | ignored (dross, in the Sump).
+ * Raw event review: harvested (in its Harvester) | new (in the Centrifuge)
+ * | passed (became an adventure) | ignored (tailings, in the Sump).
  */
 type ReviewState = 'harvested' | 'new' | 'passed' | 'ignored';
 
-/** Adventure phase: Hopper, Assay, Alembic, Crucible, Arena, Treasury, Necropolis, Archive. */
+/** Adventure phase: Hopper, Athanor, Anvil, Crucible, Arena, Treasury, Necropolis, Archive. */
 type Phase =
     | 'queued' | 'classifying' | 'decomposing' | 'constructing'
     | 'consuming' | 'completed' | 'killed' | 'decommissioned';
@@ -99,7 +101,7 @@ type Phase =
  * its own. `id` is the adventure's id; the raw event's is `event_id`. Adventures without
  * an event (made by hand, later) have null event fields.
  */
-interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start' | 'url' | 'review'> {
+interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start' | 'url' | 'review' | 'missing'> {
     source: string | null;
     api_id: string | null;
     start: string | null;
@@ -115,10 +117,15 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     phase_before_kill: Phase | null;
     /** When it last changed phase (for a killed one: when it died). */
     phase_changed_at: string | null;
+    /** An artifact made from one date of a weekly adventure: the series, and the date. */
+    series_id: string | null;
+    series_date: string | null;
+    /** A series': the dates that are artifacts. */
+    done_dates: string[];
     /** Why it died, if written; kept through a revive, so only meaningful while killed. */
     /** What it's worth in ambrosia; null without a bounty. */
     bounty: { effort: number; resistance: number; ratio: number; locked_at: string | null;
-        total: number; action_share: number; paid_actions: number; paid_seal: number } | null;
+        part?: 'date' | 'spent'; total: number; action_share: number; paid_actions: number; paid_seal: number } | null;
     /** Its sheet: a model (any type); an item's purpose and effects. */
     item: ItemSheet | null;
     /** Its analysis (the Treasury): a draft until sealed. */
@@ -128,7 +135,7 @@ interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start
     stats: Record<string, unknown>;
     /** Set by hand (js/lifecycle.js ADVENTURE_FLAGS). */
     flags: AdventureFlag[];
-    /** Action roadmap (Alembic), or null before one is drafted. */
+    /** Action roadmap (Anvil), or null before one is drafted. */
     roadmap: Roadmap | null;
     /** Linked entities (the Codex). */
     entities: LinkedEntity[];
@@ -171,7 +178,7 @@ interface FeedbackRow { key: string; label: string; target: string | null; ratin
 /** A targeted quest. */
 interface Pin { adventure: string; action: string }
 /** What you wrote about an archetype; null description: the built-in one. */
-interface IdolNotes { description: string | null; skills: string[] }
+interface ParagonNotes { description: string | null; skills: string[] }
 /** An adventure's model and, for items, purpose and effects. */
 interface ItemSheet { purpose: string; effects: ItemEffect[]; model: ModelPart[] | null; forge: ForgeState | null; /** which shows when it has both */ face: 'cover' | 'model' | null }
 /** Claude's work on a model (backend/services/forge.py). */
@@ -231,8 +238,8 @@ type AdventureChanges = Partial<{
 
 /** An adventure's action roadmap: a dependency graph (backend/services/roadmap.py). */
 interface Roadmap {
-    /** notes: optional free text per action (the Alembic's action bar; shown in the Crucible). */
-    actions: { id: string; title: string; notes?: string }[];
+    /** notes: optional free text per action (the Anvil's action bar; shown in the Crucible). */
+    actions: { id: string; title: string; notes?: string; /** ids of the skills it practices */ skills?: string[] }[];
     /** [a, b]: a must be done before b. */
     edges: [string, string][];
     /** Ids of completed actions. */
@@ -269,7 +276,8 @@ type ExcludedFate = 'siphon' | 'purge' | 'keep';
 
 type AdventureFlag = 'important' | 'urgent' | 'favorite' | 'maybe' | 'waiting';
 
-type FacetKey = 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'collaboration' | 'leader' | 'type' | 'phase' | 'review';
+type Grade = 'specimen' | 'ore';
+type FacetKey = 'grade' | 'source' | 'tag' | 'city' | 'region' | 'metro' | 'flag' | 'collaboration' | 'leader' | 'type' | 'phase' | 'review';
 
 /** Local calendar days, inclusive. */
 interface DateRange { start: string; end: string; mode: FilterMode }
@@ -319,14 +327,16 @@ interface FlowRecord {
 type EntityType = 'deity' | 'site' | 'player' | 'organization' | 'skill' | 'spell';
 
 /** ids in js/lifecycle.js ARCHETYPES */
-type Archetype = 'juggernaut' | 'artificer' | 'terraformer' | 'wizard' | 'ranger' | 'merchant' | 'enchanter' | 'druid' | 'bard' | 'vanguard' | 'templar' | 'cleric';
+type DeityForm = 'music' | 'dance' | 'family' | 'career' | 'games';
+type Aspect = 'constructive' | 'exploitative';
+type Archetype = 'paladin' | 'artificer' | 'mariner' | 'wizard' | 'ranger' | 'merchant' | 'enchanter' | 'druid' | 'bard' | 'vanguard' | 'templar' | 'cleric';
 type Order = 'kratos' | 'logos' | 'pathos' | 'ethos';
 type Attribute = 'strength' | 'endurance' | 'dexterity' | 'perception' | 'intellect' | 'charisma' | 'empathy' | 'resolve';
-interface PlayerDetails { email?: string; phone?: string; handle?: string; archetype?: Archetype; warmth?: number; tags?: string[]; /** skills: what governs it */ attributes?: Attribute[] }
+interface PlayerDetails { email?: string; phone?: string; handle?: string; archetype?: Archetype; /** unset: not judged */ aspect?: Aspect; warmth?: number; tags?: string[]; /** skills: what governs it */ attributes?: Attribute[]; /** deities */ demand?: number; form?: DeityForm }
 type PartyStatus = 'resonant' | 'charging' | 'attuning' | 'resisted' | 'bonded' | 'emergent' | 'annealed' | 'neutralized' | 'repelled';
 type StewardRole = 'archon' | 'herald' | 'commissioner' | 'warden';
 /** An entity linked to an adventure; a player's link is its place in the party. */
-interface LinkedEntity { id: string; type: EntityType; name: string; status?: PartyStatus; status_at?: string | null; role?: string | null; note?: string | null; impact?: string | null; follow_up?: string | null }
+interface LinkedEntity { id: string; type: EntityType; name: string; status?: PartyStatus; status_at?: string | null; role?: string | null; note?: string | null; impact?: string | null; follow_up?: string | null; /** deities: how much it fulfils them, 1-5 (null: 1) */ factor?: number | null }
 interface PartyLogEntry { id: number; at: string; player_id: string; from: PartyStatus | null; to: PartyStatus | null }
 
 /** An entity (the Codex): something adventures link to (backend/services/entities.py). */
@@ -417,7 +427,7 @@ interface WorkspaceState {
     rawEvents: EventRecord[];
     adventures: AdventureRecord[];
     mode: PoolMode;
-    /** Discovery mode: also show ignored raw events (dross), so they can be revived. */
+    /** Discovery mode: also show ignored raw events (tailings), so they can be revived. */
     showShades: boolean;
 
     /** The current pool (depends on mode), sorted by start time. Every view shows this. */
@@ -477,8 +487,8 @@ interface WorkspaceState {
     /** From an `adventures` message. */
     setAdventures(records: AdventureRecord[]): void;
     setMode(mode: PoolMode): void;
-    /** Select the first prima materia in the Centrifuge (comb order), if any. */
-    selectFirstPrima(): void;
+    /** Select the first raw event in the Centrifuge (comb order), if any. */
+    selectFirstRaw(): void;
     toggleShades(): void;
     selectItem(id: string | null, source: SelectionSource): void;
     hoverItem(id: string | null): void;
@@ -501,6 +511,8 @@ interface WorkspaceState {
     /** Add a player to a party or change its place there. These resolve to an error message, or null. */
     setPartyMember(adventureId: string, playerId: string, changes: { status?: PartyStatus; role?: string | null; note?: string | null; impact?: string | null; follow_up?: string | null }): Promise<string | null>;
     setSteward(adventureId: string, entityId: string, role: 'archon' | 'herald' | 'commissioner', on: boolean): Promise<string | null>;
+    /** How much an adventure fulfils a linked deity (1-5). */
+    setFactor(adventureId: string, entityId: string, factor: number | null): Promise<string | null>;
     setAffinity(playerId: string, entityId: string, on: boolean): Promise<string | null>;
     setWarden(siteId: string, entityId: string, on: boolean): Promise<string | null>;
     /** Targeted quests (the Crucible), in order. */
@@ -513,8 +525,8 @@ interface WorkspaceState {
     buffVerbs: string[];
     setVerbs(kind: 'quest' | 'buff', verbs: string[]): void;
     /** What you wrote about each archetype (the Cohort). */
-    idols: Partial<Record<Archetype, IdolNotes>>;
-    setIdol(id: Archetype, changes: Partial<IdolNotes>): void;
+    paragons: Partial<Record<Archetype, ParagonNotes>>;
+    setParagon(id: Archetype, changes: Partial<ParagonNotes>): void;
     /** The player the Complex should open (set by openInComplex). */
     complexFocus: { adventureId: string; playerId: string; at: number } | null;
     /** Select an adventure and show one of its players in the Complex. */
@@ -533,8 +545,12 @@ interface WorkspaceState {
     saveEnshrining(adventureId: string, analysis: Analysis, seal: boolean): Promise<{ discovered: string[] } | string>;
     /** Delete a killed adventure for good. Resolves to an error message, or null. */
     abandonAdventure(adventureId: string): Promise<string | null>;
+    /** A weekly adventure's date becomes an artifact (js/lib/occurrences.js). */
+    enshrineDate(adventureId: string, date: string, start: Date, end: Date): Promise<void>;
+    endSeries(adventureId: string): Promise<void>;
+    continueSeries(adventureId: string, date: string): Promise<void>;
     setPhase(adventureId: string, phase: Phase): Promise<void>;
-    /** Make a hand-made adventure (in ore), switch to Adventures and select it for editing. */
+    /** Make a hand-made adventure (in concentrate), switch to Adventures and select it for editing. */
     createAdventure(type: AdventureType): Promise<void>;
     /** Set or clear the adventure's own fields. Resolves to an error message, or null. */
     updateAdventure(adventureId: string, changes: AdventureChanges): Promise<string | null>;
@@ -543,7 +559,7 @@ interface WorkspaceState {
     setEditingAdventure(adventureId: string | null): void;
     /** Replace an adventure's roadmap: shown at once, saved shortly after (latest wins). */
     saveRoadmap(adventureId: string, roadmap: Roadmap): void;
-    /** Last roadmap save error (shown in the Alembic); cleared by the next save. */
+    /** Last roadmap save error (shown in the Anvil); cleared by the next save. */
     roadmapError: string | null;
 
     // filters (saved to the server, debounced)

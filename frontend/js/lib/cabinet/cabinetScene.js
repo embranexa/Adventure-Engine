@@ -25,7 +25,8 @@ const MODEL_H = 104;        // the height models are drawn to
 const MARGIN = 260;         // build alcoves this far outside the view
 
 export class CabinetScene {
-    /** @param {HTMLElement} host @param {{ shape: string, sealColor: string, seed: string, points?: number, dim?: boolean }} style */
+    /** @param {HTMLElement} host @param {{ shape: string, sealColor: string, seed: string, points?: number, dim?: boolean, moral?: 'virtue' | 'vice', wash?: string }} style
+     *   moral: lit by a warm light from above, or a red one from below; wash: one colour for every theme's light */
     constructor(host, style) {
         this.style = style;
         this.view = viewOf(host);
@@ -43,6 +44,11 @@ export class CabinetScene {
         const key = new THREE.DirectionalLight('#f6f4f0', 2.4); key.position.set(-300, 500, 700);
         const rim = new THREE.DirectionalLight('#c4c5c6', 1.1); rim.position.set(500, -100, 400);
         this.scene.add(key, rim);
+        if (style.moral === 'virtue') { key.color.set('#ffeccb'); rim.color.set('#ffdf9e'); rim.position.set(200, 700, 300); }
+        if (style.moral === 'vice') {
+            key.intensity = 0.9; key.color.set('#c9b4b4');
+            rim.color.set('#ff2a2a'); rim.intensity = 4; rim.position.set(0, -600, 500);
+        }
         this.camera = new THREE.PerspectiveCamera(30, 1, 100, 2600);
 
         this.kit = makeKit({ dim: style.dim });
@@ -76,7 +82,8 @@ export class CabinetScene {
     update(layout, models, { selectedId = null } = {}) {
         this.selectedId = selectedId;
         this.models = models;
-        const sig = JSON.stringify([layout.cols, layout.cellH, layout.groups]);
+        // who stands where decides the runes
+        const sig = JSON.stringify([layout.cols, layout.cellH, layout.groups, layout.cells.map((c) => this._rune(c))]);
         const moved = sig !== this._layoutSig;
         this.layout = layout;
         if (moved) { this._layoutSig = sig; this._buildFrame(); }
@@ -110,13 +117,14 @@ export class CabinetScene {
             this.frame.add(g);
             return { cell: c, gem: alcoveFrame(this.kit, g, THEMES[c.theme]?.shape ?? this.style.shape, c.w, c.h, this._rune(c)) };
         });
-        this.seal = carcass(this.kit, this.frame, layout, { sealTexture: this.sealTexture, sealColor: this.style.sealColor }).seal;
+        this.seal = carcass(this.kit, this.frame, layout, { sealTexture: this.sealTexture, sealColor: this.style.sealColor, wash: this.style.wash }).seal;
     }
 
-    /** An idol's alcove wears its archetype's rune. */
+    /** A paragon's alcove wears its archetype's rune; a deity's, its form's. */
     _rune(c) {
         const m = c.id != null ? this.models.get(c.id) : null;
-        return m?.idol ? { id: m.idol, color: m.color } : null;
+        if (m?.form) return { form: m.form, color: m.own };
+        return m?.paragon ? { id: m.paragon, color: m.color, dark: m.dark } : null;
     }
 
     /** The gem over an alcove lights in its model's colour. */

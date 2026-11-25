@@ -164,7 +164,7 @@ export function panelInUse(s) {
     return leaf.tabs.includes(leaf.activeTab) ? leaf.activeTab : leaf.tabs[0] ?? null;
 }
 
-/** Selections made by clicking an item's card in a panel: they bring up the Refinery. */
+/** Selections made by clicking an item's card in a panel: they bring up the Athanor. */
 const CARD_CLICK_SOURCES = new Set(['classifier', 'calendar', 'map', 'quests', 'codex', 'ledger']);
 
 /**
@@ -179,7 +179,7 @@ export function excludedFromCentrifuge(rawEvents, filters, now) {
 }
 
 /**
- * The prima materia in the Centrifuge in comb order: earliest first, undated ones last.
+ * The raw event in the Centrifuge in comb order: earliest first, undated ones last.
  * @param {EventRecord[]} rawEvents @param {Record<string, PoolItem>} itemsById @returns {string[]}
  */
 export function centrifugeOrder(rawEvents, itemsById) {
@@ -491,9 +491,9 @@ const workspaceStore = (set, get) => ({
             console.error('[state] could not load saved filters', err);
         }
         get().loadLayoutPresets();
-        getJson('/api/state/anvil').then((s) => s && set({ pins: s.pins }));
+        getJson('/api/state/targets').then((s) => s && set({ pins: s.pins }));
         getJson('/api/state/verbs').then((s) => { if (s) { setOwnVerbs('quest', s.verbs); setOwnVerbs('buff', s.buff_verbs); set({ verbs: s.verbs, buffVerbs: s.buff_verbs }); } });
-        getJson('/api/state/idols').then((s) => s && set({ idols: s.idols }));
+        getJson('/api/state/paragons').then((s) => s && set({ paragons: s.paragons }));
         // items become past (and fall behind the Hermetic Seal) as time passes
         setInterval(() => set((state) => withVisible(state, {})), 60_000);
         startFeed(get);
@@ -549,7 +549,7 @@ const workspaceStore = (set, get) => ({
             ? {}
             : withVisible(state, { mode, actionError: null, ...poolUpdate({ ...state, mode }) }))),
 
-    selectFirstPrima: () => {
+    selectFirstRaw: () => {
         const { rawEvents, itemsById } = get();
         const first = centrifugeOrder(rawEvents, itemsById)[0];
         if (first) get().selectItem(first, 'triage');
@@ -793,6 +793,11 @@ const workspaceStore = (set, get) => ({
         return typeof res === 'string' ? res : null;
     },
 
+    setFactor: async (adventureId, entityId, factor) => {
+        const res = await sendJson(`/api/adventures/${adventureId}/entities/${entityId}`, 'PATCH', { factor });
+        return typeof res === 'string' ? res : null;
+    },
+
     unlinkEntity: async (adventureId, entityId) => {
         const res = await sendJson(`/api/adventures/${adventureId}/entities/${entityId}`, 'DELETE');
         return typeof res === 'string' ? res : null;
@@ -800,7 +805,7 @@ const workspaceStore = (set, get) => ({
 
     selectItem: (id, source) => {
         if (id !== get().selectedItemId) set({ selectedItemId: id, selectionSource: id == null ? null : source, actionError: null });
-        // clicking a card in a panel brings the Refinery up (reopened if it was closed)
+        // clicking a card in a panel brings the Athanor up (reopened if it was closed)
         if (id != null && CARD_CLICK_SOURCES.has(source)) get().showPanel('node');
     },
 
@@ -857,7 +862,7 @@ const workspaceStore = (set, get) => ({
     },
 
     pins: [],
-    setPins: (pins) => { set({ pins }); scheduleSave('anvil', () => ({ pins: get().pins })); },
+    setPins: (pins) => { set({ pins }); scheduleSave('targets', () => ({ pins: get().pins })); },
     togglePin: (adventure, action) => {
         const { pins, setPins } = get(), on = pins.some((p) => p.adventure === adventure && p.action === action);
         setPins(on ? pins.filter((p) => p.adventure !== adventure || p.action !== action) : [...pins, { adventure, action }]);
@@ -869,10 +874,10 @@ const workspaceStore = (set, get) => ({
         set(kind === 'quest' ? { verbs } : { buffVerbs: verbs });
         scheduleSave('verbs', () => ({ verbs: get().verbs, buff_verbs: get().buffVerbs }));
     },
-    idols: {},
-    setIdol: (id, changes) => {
-        set((s) => ({ idols: { ...s.idols, [id]: { description: null, skills: [], ...s.idols[id], ...changes } } }));
-        scheduleSave('idols', () => ({ idols: get().idols }));
+    paragons: {},
+    setParagon: (id, changes) => {
+        set((s) => ({ paragons: { ...s.paragons, [id]: { description: null, skills: [], ...s.paragons[id], ...changes } } }));
+        scheduleSave('paragons', () => ({ paragons: get().paragons }));
     },
 
     complexFocus: null,
@@ -934,6 +939,12 @@ const workspaceStore = (set, get) => ({
     setPhase: async (adventureId, phase) => {
         await callAction(set, `/api/adventures/${adventureId}/phase`, 'PUT', { phase });
     },
+
+    enshrineDate: async (adventureId, date, start, end) => {
+        await callAction(set, `/api/adventures/${adventureId}/dates`, 'POST', { date, start: start.toISOString(), end: end.toISOString() });
+    },
+    endSeries: async (adventureId) => { await callAction(set, `/api/adventures/${adventureId}/end`, 'POST'); },
+    continueSeries: async (adventureId, date) => { await callAction(set, `/api/adventures/${adventureId}/continue`, 'POST', { date }); },
 
     editingAdventureId: null,
     setEditingAdventure: (adventureId) => set({ editingAdventureId: adventureId }),

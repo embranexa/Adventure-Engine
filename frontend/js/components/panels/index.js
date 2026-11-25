@@ -15,6 +15,7 @@ import { LedgerPanel } from './LedgerPanel.js';
 import { MapPanel } from './MapPanel.js';
 import { NecropolisPanel } from './NecropolisPanel.js';
 import { NodeCard } from './NodeCard.js';
+import { PantheonPanel } from './PantheonPanel.js';
 import { QuestsPanel } from './QuestsPanel.js';
 import { ScripterPanel } from './ScripterPanel.js';
 import { SignalChainPanel } from './SignalChainPanel.js';
@@ -39,4 +40,5 @@ export const PANEL_COMPONENTS = {
     treasury: TreasuryPanel,
     inventory: InventoryPanel,
     agora: AgoraPanel,
+    pantheon: PantheonPanel,
 };

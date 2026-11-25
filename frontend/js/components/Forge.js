@@ -70,7 +70,7 @@ function Adjust({ adventure, model, onChange }) {
  * The Forge: describe the object and Claude models it. What comes back is a proposal to
  * accept, dismiss or ask changes to.
  * @param {{ adventure: AdventureRecord, model: ModelPart[] | null, onChange: (m: ModelPart[] | null) => void, stage?: boolean }} props
- *   stage: draw the model here (the Refinery shows it on the card instead)
+ *   stage: draw the model here (the Athanor shows it on the card instead)
  */
 export function Forge({ adventure, model, onChange, stage = true }) {
     const forgeModel = useWorkspaceStore((s) => s.forgeModel);

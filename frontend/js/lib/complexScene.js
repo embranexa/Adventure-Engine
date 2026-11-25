@@ -11,7 +11,7 @@
  *   scene.fit()
  *   scene.dispose()
  *
- * Callback: onSelect(nodeId | null). Controls match the Nexus and the Alembic.
+ * Callback: onSelect(nodeId | null). Controls match the Nexus and the Anvil.
  */
 
 import * as THREE from 'three';

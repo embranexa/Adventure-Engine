@@ -8,7 +8,7 @@
 // site, player) and tags have several: an item passes an include if ANY of its values is
 // included, and fails if any is excluded. An item with none counts as UNKNOWN.
 
-import { ADVENTURE_FLAGS, ADVENTURE_TYPES, ENTITY_TYPES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere } from './lifecycle.js';
+import { ADVENTURE_FLAGS, ADVENTURE_TYPES, ENTITY_TYPES, GRADE_STAGES, PHASE_STAGES, REVIEW_STAGES, hasWhenWhere, rawMatter } from './lifecycle.js';
 import { occursIn, span } from './lib/occurrences.js';
 import { cityName, itemMetro, itemRegion } from './lib/regions.js';
 
@@ -82,9 +82,14 @@ export const FACETS = [
         display: (v) => PHASE_STAGES[/** @type {Phase} */ (v)]?.matter ?? v,
     },
     {
-        key: 'review', label: 'Review', modes: ['discovery'],
+        key: 'grade', label: 'Matter', modes: ['discovery'],
+        value: (i) => (i.kind === 'omen' ? rawMatter(i) : null),
+        display: (v) => (GRADE_STAGES[/** @type {Grade} */ (v)] ?? REVIEW_STAGES[/** @type {ReviewState} */ (v)])?.matter ?? v,
+    },
+    {
+        key: 'review', label: 'Machine', modes: ['discovery'],
         value: (i) => (i.kind === 'omen' ? i.review : null),
-        display: (v) => REVIEW_STAGES[/** @type {ReviewState} */ (v)]?.matter ?? v,
+        display: (v) => REVIEW_STAGES[/** @type {ReviewState} */ (v)]?.module ?? v,
     },
     {
         key: 'collaboration', label: 'Collaboration', modes: ['adventures'],

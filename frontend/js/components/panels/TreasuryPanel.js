@@ -3,6 +3,7 @@ import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { accuracy, verdictName, verdictRings } from '../../lib/analysis.js';
 import { adventureColor, modelSpec, sigilPoints } from '../../lib/items.js';
+import { growth } from '../../lib/growth.js';
 import { partyOf } from '../../lib/complexGraph.js';
 import { PARTY_STATUSES } from '../../lifecycle.js';
 import { Cabinet } from '../Cabinet.js';
@@ -13,6 +14,9 @@ const VIOLET = '#a855f7';
 
 /** @type {import('../Cabinet.js').CabinetStyle} */
 const LOOK = { shape: 'arch', sealColor: '#b76bff', seed: 'treasury', points: 8 };
+
+/** "2026-11-20" -> "Nov 20". @param {string} day */
+const dateLabel = (day) => new Date(`${day}T12:00`).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
 /** Its deity's colour, else the artifact's own. @param {AdventureRecord} a */
 const colorOf = (a) => adventureColor(a, VIOLET);
@@ -42,7 +46,7 @@ export function TreasuryPanel() {
         items: artifacts.map((a) => {
             const sealed = !!a.enshrining?.sealed_at, spec = modelSpec(a, { fallback: VIOLET });
             return {
-                id: a.id, label: a.title ?? 'Untitled', sub: sealed ? verdictName(a.enshrining?.verdict) : a.enshrining ? 'Draft' : 'Unsealed',
+                id: a.id, label: a.title ?? 'Untitled', sub: `${a.series_date ? `${dateLabel(a.series_date)} · ` : ''}${sealed ? verdictName(a.enshrining?.verdict) : a.enshrining ? 'Draft' : 'Unsealed'}`,
                 model: { ...spec, type: spec.parts && a.type === 'item' ? 'recipe' : 'vessel', on: sealed },
             };
         }),
@@ -62,6 +66,9 @@ export function TreasuryPanel() {
         if (acc != null) lines.push(['Accuracy', acc.toFixed(1)]);
         if (pay) lines.push(['Ambrosia', `+${pay}`]);
         for (const m of partyOf(a)) if (m.status && PARTY_STATUSES[m.status].stage === 'aftermath') lines.push([PARTY_STATUSES[m.status].label, m.name]);
+        const grew = growth(a, rec.moves, adventures, entities), names = (/** @type {import('../../lib/growth.js').Grown[]} */ l) => l.map((x) => x.skill.name).join(', ');
+        if (grew.practiced.length) lines.push(['Practiced', names(grew.practiced)]);
+        if (grew.proven.length) lines.push(['Proven', names(grew.proven)]);
         for (const name of discovered) lines.push(['New in the Codex', name]);
         setCeremony({ title: 'Enshrined', subtitle: a.title ?? 'Untitled', color: colorOf(a), seed: a.id, points: sigilPoints(a), rings: verdictRings(rec.verdict), lines });
     };

@@ -49,7 +49,7 @@ export function AgoraPanel() {
                         ${note && html`<p className="nec-dim" role="status">${note}</p>`}
                         <div className="ag-total"><b>${balance}</b><span>ambrosia held · the vessel holds ${cap}</span></div>
                         <h4>Ledger</h4>
-                        ${!entries.length && html`<p className="nec-dim">Nothing earned yet. Set a bounty in the Alembic: its quests pay as you finish them, and enshrining pays the rest.</p>`}
+                        ${!entries.length && html`<p className="nec-dim">Nothing earned yet. Set a bounty in the Anvil: its quests pay as you finish them, and enshrining pays the rest.</p>`}
                         <div className="ag-ledger">
                             ${entries.map((e) => html`
                                 <div key=${e.id} className="ag-row">

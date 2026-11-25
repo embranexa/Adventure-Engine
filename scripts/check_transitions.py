@@ -38,7 +38,7 @@ from backend.services.hub import hub  # noqa: E402
 if DB_PATH.resolve() == (DATA_DIR / "adventure.db").resolve():
     sys.exit("refusing to run against the real database")
 
-SOURCE_NODES = {"outside", "forge"}  # packets appear from these (not counted)
+SOURCE_NODES = {"outside", "lode"}  # packets appear from these (not counted)
 broadcast_ids: list[int] = []
 
 
@@ -162,7 +162,7 @@ async def main():
                 await s.execute(update(Adventure).where(Adventure.id == state[key])
                                 .values(phase_changed_at=now - timedelta(days=11)))
             await s.commit()
-    await step("forge a weekly and an all-day event", make_timed, {("forge", "hopper"): 2})
+    await step("forge a weekly and an all-day event", make_timed, {("lode", "hopper"): 2})
 
     async def sweep_none():
         assert await triage.sweep_missed() == 0, "the sweeper killed a weekly or an all-day event too early"
@@ -174,34 +174,34 @@ async def main():
     await step("weekly with a past end is missed", end_weekly, {("hopper", "necropolis"): 1})
     await step("ignore B", lambda: triage.ignore_event(ids["check-2"]), {("centrifuge", "sump"): 1})
     await step("purge", triage.purge_centrifuge, {("centrifuge", "sump"): held - 3})  # all but A, P and B
-    await step("revive C from the sump", lambda: triage.revive_event(ids["check-3"]), {("sump", "hopper"): 1})
-    await step("A -> classifying", lambda: triage.set_phase(state["A"], "classifying"), {("hopper", "refinery"): 1})
-    await step("A -> decomposing", lambda: triage.set_phase(state["A"], "decomposing"), {("refinery", "alembic"): 1})
-    await step("kill A", lambda: triage.kill_adventure(state["A"]), {("alembic", "necropolis"): 1})
-    await step("revive A", lambda: triage.revive_adventure(state["A"]), {("necropolis", "alembic"): 1})
+    await step("revive C from the sump", lambda: triage.revive_event(ids["check-3"]), {("sump", "centrifuge"): 1})
+    await step("A -> classifying", lambda: triage.set_phase(state["A"], "classifying"), {("hopper", "athanor"): 1})
+    await step("A -> decomposing", lambda: triage.set_phase(state["A"], "decomposing"), {("athanor", "anvil"): 1})
+    await step("kill A", lambda: triage.kill_adventure(state["A"]), {("anvil", "necropolis"): 1})
+    await step("revive A", lambda: triage.revive_adventure(state["A"]), {("necropolis", "anvil"): 1})
     await step("revive P via its event", lambda: triage.revive_event(ids["check-0"]), {("necropolis", "hopper"): 1})
 
     async def forge():
         state["F"] = uuid.UUID((await adventures.create_adventure({"type": "item", "title": "Check item"}))["id"])
-    await step("forge an item", forge, {("forge", "hopper"): 1})
+    await step("forge an item", forge, {("lode", "hopper"): 1})
 
     # the roadmap moves its adventure (resources/UPGRADES_PLAN.md, U3)
     async def forge_r():
         state["R"] = uuid.UUID((await adventures.create_adventure({"type": "item", "title": "Check roadmap"}))["id"])
         for phase in ("classifying", "decomposing"):
             await triage.set_phase(state["R"], phase)
-    await step("forge R into the alembic", forge_r, {("forge", "hopper"): 1, ("hopper", "refinery"): 1, ("refinery", "alembic"): 1})
+    await step("forge R into the anvil", forge_r, {("lode", "hopper"): 1, ("hopper", "athanor"): 1, ("athanor", "anvil"): 1})
 
     def plan(done):
         return lambda: roadmap.save_roadmap(state["R"], {
             "actions": [{"id": "A1", "title": "One"}, {"id": "A2", "title": "Two"}], "edges": [], "done": done})
     await step("roadmap drafted (nothing done)", plan([]), {})
-    await step("first action done -> alloy", plan(["A1"]), {("alembic", "crucible"): 1})
+    await step("first action done -> alloy", plan(["A1"]), {("anvil", "crucible"): 1})
     await step("all done stays alloy", plan(["A1", "A2"]), {})
     await step("promote R to animus", lambda: triage.set_phase(state["R"], "consuming"), {("crucible", "arena"): 1})
     await step("un-complete one -> alloy", plan(["A1"]), {("arena", "crucible"): 1})
-    await step("un-complete the last -> distillate", plan([]), {("crucible", "alembic"): 1})
-    await step("animus by hand", lambda: triage.set_phase(state["R"], "consuming"), {("alembic", "arena"): 1})
+    await step("un-complete the last -> armature", plan([]), {("crucible", "anvil"): 1})
+    await step("animus by hand", lambda: triage.set_phase(state["R"], "consuming"), {("anvil", "arena"): 1})
     async with SessionLocal() as s:
         r = await s.get(Adventure, state["R"])
         assert r is not None and r.roadmap and sorted(r.roadmap["done"]) == ["A1", "A2"], f"by hand: done = {r and r.roadmap}"
@@ -212,18 +212,18 @@ async def main():
         state["s2"] = uuid.UUID((await entities.create_entity({"type": "site", "name": "Check site 2"}))["id"])
         state["p"] = uuid.UUID((await entities.create_entity({"type": "deity", "name": "Check deity"}))["id"])
     await step("create entities", make_sites, {})
-    await step("link site 1 to A", lambda: entities.link(state["A"], state["s1"]), {("codex", "refinery"): 1})
+    await step("link site 1 to A", lambda: entities.link(state["A"], state["s1"]), {("codex", "athanor"): 1})
     await step("link site 2 (replaces 1)", lambda: entities.link(state["A"], state["s2"]),
-               {("refinery", "codex"): 1, ("codex", "refinery"): 1})
-    await step("link deity", lambda: entities.link(state["A"], state["p"]), {("codex", "refinery"): 1})
-    await step("unlink deity", lambda: entities.unlink(state["A"], state["p"]), {("refinery", "codex"): 1})
-    await step("delete site 2", lambda: entities.delete_entity(state["s2"]), {("refinery", "codex"): 1})
+               {("athanor", "codex"): 1, ("codex", "athanor"): 1})
+    await step("link deity", lambda: entities.link(state["A"], state["p"]), {("codex", "athanor"): 1})
+    await step("unlink deity", lambda: entities.unlink(state["A"], state["p"]), {("athanor", "codex"): 1})
+    await step("delete site 2", lambda: entities.delete_entity(state["s2"]), {("athanor", "codex"): 1})
 
     async def to_archive():
         for phase in ("classifying", "decomposing", "constructing", "consuming", "completed", "decommissioned"):
             await triage.set_phase(state["F"], phase)
     await step("forge item to the archive", to_archive, {
-        ("hopper", "refinery"): 1, ("refinery", "alembic"): 1, ("alembic", "crucible"): 1,
+        ("hopper", "athanor"): 1, ("athanor", "anvil"): 1, ("anvil", "crucible"): 1,
         ("crucible", "arena"): 1, ("arena", "treasury"): 1, ("treasury", "archive"): 1})
     await step("set the same phase (no-op)", lambda: triage.set_phase(state["F"], "decommissioned"), {})
     print("all checks passed")

@@ -72,7 +72,7 @@ async def main():
     # details
     e = await entities.update_entity(U(p), {"details": {"archetype": "cleric", "warmth": 2, "tags": ["A", "a ", ""]}})
     assert e["details"] == {"archetype": "cleric", "warmth": 2, "tags": ["a"]}, e
-    for bad in ({"archetype": "warden"}, {"warmth": 6}, {"warmth": True}, {"tags": "x"}, {"shoe": "9"}):
+    for bad in ({"archetype": "warden"}, {"aspect": "evil"}, {"warmth": 6}, {"warmth": True}, {"tags": "x"}, {"shoe": "9"}):
         await refused(entities.update_entity(U(p), {"details": bad}), entities.InvalidEntity)
     await refused(entities.update_entity(U(org), {"details": {"warmth": 1}}), entities.InvalidEntity)
 

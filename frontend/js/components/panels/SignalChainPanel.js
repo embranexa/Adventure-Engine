@@ -6,7 +6,7 @@ import { passes, pendingChanges } from '../../filters.js';
 import { freshMinutes, freshTitle } from '../../lib/harvest.js';
 import { LENSES, byMatter, lensColor, lensRuns, lensValues, sourceColor } from '../../lib/lens.js';
 import { eventNode, pipeFlows, twinModel } from '../../lib/twinModel.js';
-import { CENTRIFUGE, CODEX, FORGE, OUTSIDE, SUMP, nodeStage, twinNodes, twinPipes } from '../../lib/twinTopology.js';
+import { ASSAYER, CENTRIFUGE, CODEX, LODE, OUTSIDE, SUMP, nodeStage, twinNodes, twinPipes } from '../../lib/twinTopology.js';
 
 const ZONE_LABELS = { net: 'Net · events', core: 'Core · adventures', sanctum: 'Sanctum', viewer: 'Viewers' };
 
@@ -28,6 +28,7 @@ const PANEL_MACHINES = {
     complex: ['complex'],
     arena: [PHASE_NODES.consuming],
     agora: ['agora'],
+    pantheon: ['pantheon'],
 };
 const RECENT = 15;
 const VIEW_KEY = 'signal-chain-view';
@@ -36,11 +37,10 @@ const VIEW_KEY = 'signal-chain-view';
 const NODE_COLORS = {
     [CENTRIFUGE]: REVIEW_STAGES.new.color,
     [SUMP]: REVIEW_STAGES.ignored.color,
-    [FORGE]: '#ff7a3c',
+    [LODE]: PHASE_STAGES.queued.color,
     [CODEX]: '#c8a46a',
     cohort: '#7fb2ff', complex: '#f5c542', inventory: '#cfd3da', agora: '#e9b949', pantheon: '#c86bf0', mastery: '#ff8f6b',
-    enricher: '#c8a46a',
-    sieve: '#c8a46a',
+    [ASSAYER]: '#c8a46a',
     nexus: '#9fb4c8', atlas: '#9fb4c8', calendar: '#9fb4c8', ledger: '#9fb4c8',
     ...Object.fromEntries(Object.entries(PHASE_NODES).map(([phase, id]) => [id, PHASE_STAGES[/** @type {Phase} */ (phase)].color])),
 };
@@ -61,17 +61,17 @@ function savedView() {
 }
 
 /**
- * Do what clicking a machine does: switch mode or show dross if needed, then open its panel.
+ * Do what clicking a machine does: switch mode or show tailings if needed, then open its panel.
  * @param {import('../../lib/twinTopology.js').TwinAction} action
  */
 function runAction(action) {
     const s = useWorkspaceStore.getState();
     if (action.mode) s.setMode(action.mode);
     if (action.shades && !useWorkspaceStore.getState().showShades) s.toggleShades();
-    if (action.firstPrima) s.selectFirstPrima();
+    if (action.firstRaw) s.selectFirstRaw();
     if (action.create) {
         s.setMode('adventures');
-        s.selectItem(null, 'twin'); // the Refinery shows the create buttons when nothing is selected
+        s.selectItem(null, 'twin'); // the Athanor shows the create buttons when nothing is selected
     }
     s.showPanel(action.panel);
 }
@@ -217,7 +217,7 @@ export function SignalChainPanel() {
     const setLens = useWorkspaceStore((s) => s.setLens);
     const inUsePanel = useWorkspaceStore(panelInUse);
     const poolMode = useWorkspaceStore((s) => s.mode);
-    // the Refinery is editing an adventure it has just made: the Forge works too
+    // the Athanor is editing an adventure it has just made: the Lode works too
     const creating = useWorkspaceStore((s) => s.editingAdventureId != null && s.editingAdventureId === s.selectedItemId);
 
     const [view, setView] = useState(savedView);
@@ -365,7 +365,7 @@ export function SignalChainPanel() {
         const scene = sceneRef.current;
         if (!scene || status !== 'ready') { replayed.current = false; return; }
         const colors = Object.fromEntries(nodes.map((n) => [n.id, nodeColor(n.id)]));
-        // harvesters carry their source's colour as accents (their matter stays flux)
+        // harvesters carry their source's colour as accents (not their matter's)
         const accents = Object.fromEntries(nodes.filter((n) => n.kind === 'harvester').map((n) => [n.id, sourceColor(n.label)]));
         scene.update({
             nodes, pipes, levels: model.levels, codex: model.codex, flows: routed.byPipe, colors, accents, sources, io,
@@ -383,7 +383,7 @@ export function SignalChainPanel() {
     useEffect(() => {
         if (status !== 'ready') return;
         const ids = [...(inUsePanel ? PANEL_MACHINES[inUsePanel] ?? [] : [])];
-        if (inUsePanel === 'node' && creating) ids.push(FORGE);
+        if (inUsePanel === 'node' && creating) ids.push(LODE);
         if (poolMode === 'discovery') ids.push(CENTRIFUGE);   // the Centrifuge spins all through Discovery, whatever panel is in use
         if (inUsePanel === 'classifier' && poolMode === 'discovery') ids.push(SUMP);   // events are reviewed only in Discovery
         sceneRef.current?.setInUse(ids);

@@ -49,6 +49,18 @@ with TestClient(app) as c:
     x = adventure("performance", "T link")
     call("PUT", f"/adventures/{x}/entities/{spells[0]['id']}", want=409)
 
+    # the Pantheon: demand on a deity, a fulfillment factor per link
+    call("PATCH", f"/entities/{deity}", {"details": {"demand": 4}})
+    call("PATCH", f"/entities/{deity}", {"details": {"demand": -1}}, want=422)
+    call("PATCH", f"/entities/{site}", {"details": {"demand": 1}}, want=422)
+    call("PATCH", f"/entities/{deity}", {"details": {"form": "war"}}, want=422)
+    assert next(e for e in call("GET", "/entities") if e["id"] == deity)["details"] == {"demand": 4}
+    call("PATCH", f"/adventures/{x}/entities/{deity}", {"factor": 3}, want=422)  # not linked
+    call("PUT", f"/adventures/{x}/entities/{deity}")
+    call("PATCH", f"/adventures/{x}/entities/{deity}", {"factor": 6}, want=422)
+    call("PATCH", f"/adventures/{x}/entities/{deity}", {"factor": 3})
+    assert next(e for e in get(x)["entities"] if e["id"] == deity)["factor"] == 3
+
     # when/where: battles and performances may have one, items never
     at = "2030-01-01T20:00:00+00:00"
     b = adventure("battle", "T battle", start_time=at)
@@ -118,30 +130,30 @@ with TestClient(app) as c:
     call("PUT", f"/adventures/{item}/item", {"effects": [{"target": skill, "rating": 5}]})
     assert get(item)["item"]["effects"][0]["target"] == skill
 
-    # pins and idols
-    call("PUT", "/state/anvil", {"pins": [{"adventure": b, "action": "A1"}]})
-    assert call("GET", "/state/anvil")["pins"][0]["action"] == "A1"
-    call("PUT", "/state/anvil", {"pins": []})
+    # pins and paragons
+    call("PUT", "/state/targets", {"pins": [{"adventure": b, "action": "A1"}]})
+    assert call("GET", "/state/targets")["pins"][0]["action"] == "A1"
+    call("PUT", "/state/targets", {"pins": []})
     # targets: the first makes its adventure alloy, the last one dropped takes that back
     t = adventure("item", "T build")
     call("PUT", f"/adventures/{t}/roadmap", {"actions": [{"id": "A1", "title": "Acquire x"}, {"id": "A2", "title": "Design y"}], "edges": [], "done": []})
     assert get(t)["phase"] == "queued"
-    call("PUT", "/state/anvil", {"pins": [{"adventure": t, "action": "gone"}]})
+    call("PUT", "/state/targets", {"pins": [{"adventure": t, "action": "gone"}]})
     assert get(t)["phase"] == "queued"
-    call("PUT", "/state/anvil", {"pins": []})
-    call("PUT", "/state/anvil", {"pins": [{"adventure": t, "action": "A1"}]})
+    call("PUT", "/state/targets", {"pins": []})
+    call("PUT", "/state/targets", {"pins": [{"adventure": t, "action": "A1"}]})
     assert get(t)["phase"] == "constructing"
     road = {**get(t)["roadmap"]}
     call("PUT", f"/adventures/{t}/roadmap", road)  # an edit doesn't take it back
     assert get(t)["phase"] == "constructing"
-    call("PUT", "/state/anvil", {"pins": []})
+    call("PUT", "/state/targets", {"pins": []})
     assert get(t)["phase"] == "decomposing"
-    call("PUT", "/state/anvil", {"pins": [{"adventure": t, "action": "A1"}]})
+    call("PUT", "/state/targets", {"pins": [{"adventure": t, "action": "A1"}]})
     call("PUT", f"/adventures/{t}/roadmap", {**road, "done": ["A1"]})
-    call("PUT", "/state/anvil", {"pins": []})  # done, so it leaves the targets
+    call("PUT", "/state/targets", {"pins": []})  # done, so it leaves the targets
     assert get(t)["phase"] == "constructing"
-    call("PUT", "/state/idols", {"idols": {"vanguard": {"description": "x", "skills": [skill]}}})
-    assert call("GET", "/state/idols")["idols"]["vanguard"]["skills"] == [skill]
+    call("PUT", "/state/paragons", {"paragons": {"vanguard": {"description": "x", "skills": [skill]}}})
+    assert call("GET", "/state/paragons")["paragons"]["vanguard"]["skills"] == [skill]
 
     # deleted seeds stay deleted
     call("DELETE", f"/entities/{spells[1]['id']}")

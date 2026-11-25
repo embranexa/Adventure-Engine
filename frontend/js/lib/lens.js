@@ -7,10 +7,10 @@
 // See resources/signal chain digital twin/BUILD_PLAN.md, section 1 ("Light").
 
 import { FACETS, UNKNOWN, chosenEntityColor, facetLabel, facetValues } from '../filters.js';
-import { ADVENTURE_FLAGS, ADVENTURE_TYPES, PHASE_STAGES, REVIEW_STAGES } from '../lifecycle.js';
+import { ADVENTURE_FLAGS, ADVENTURE_TYPES, GRADE_STAGES, PHASE_STAGES, REVIEW_STAGES, rawMatter } from '../lifecycle.js';
 
 /** Facets that can't be a lens: the stage lens already covers them. */
-const NOT_LENSES = new Set(['phase', 'review']);
+const NOT_LENSES = new Set(['phase', 'review', 'grade']);
 
 /** The lenses in their groups, in order (None stands alone, first). A facet missing here
  *  is appended ungrouped, so a new facet still becomes a lens. */
@@ -35,7 +35,7 @@ export const LENSES = [
 ];
 
 /** Fixed colors where a value has an identity of its own. */
-const SOURCE_COLORS = { luma: '#3ccf8e', '19hz': '#4f8cff', 'ig-collection': '#e1306c', 'ig-profiles': '#f77737' };
+const SOURCE_COLORS = { luma: '#3ccf8e', '19hz': '#4f8cff', deposit: '#c98a4b' };
 const TYPE_COLORS = { event: '#4fb3ff', item: '#e0a43a', performance: '#c86bf0', battle: '#ef4444' };
 /** Everything else: a value keeps the same color across reloads (picked by its text). */
 export const PALETTE = ['#4fb3ff', '#3ccf8e', '#f2b134', '#f0643c', '#c86bf0', '#2fd2c9', '#ff7aa8', '#a3d14b', '#8f8cff', '#ffb27a'];
@@ -78,11 +78,11 @@ function hash(text) {
 }
 
 /**
- * The stage key of a row: its phase if it's an adventure, else its review state.
+ * The stage key of a row: its phase if it's an adventure, else its grade or review state.
  * @param {PoolItem} item
  */
 function stageKey(item) {
-    return item.kind === 'adventure' ? item.phase : item.review;
+    return item.kind === 'adventure' ? item.phase : rawMatter(item);
 }
 
 /**
@@ -110,7 +110,7 @@ export function lensColor(lens, value) {
     if (value === UNKNOWN) return UNKNOWN_COLOR;
     if (value === NOT_APPLICABLE) return NOT_APPLICABLE_COLOR;
     if (byMatter(lens)) {
-        return PHASE_STAGES[/** @type {Phase} */ (value)]?.color ?? REVIEW_STAGES[/** @type {ReviewState} */ (value)]?.color ?? UNKNOWN_COLOR;
+        return PHASE_STAGES[/** @type {Phase} */ (value)]?.color ?? GRADE_STAGES[/** @type {Grade} */ (value)]?.color ?? REVIEW_STAGES[/** @type {ReviewState} */ (value)]?.color ?? UNKNOWN_COLOR;
     }
     if (lens === 'source') return sourceColor(value);
     if (ENTITY_LENSES.has(lens)) return entityColor(value);
@@ -141,7 +141,7 @@ export function facetColor(facet, value) {
 export function lensLabel(lens, value) {
     if (value === NOT_APPLICABLE) return 'Raw event';
     if (byMatter(lens)) {
-        return PHASE_STAGES[/** @type {Phase} */ (value)]?.matter ?? REVIEW_STAGES[/** @type {ReviewState} */ (value)]?.matter ?? value;
+        return PHASE_STAGES[/** @type {Phase} */ (value)]?.matter ?? GRADE_STAGES[/** @type {Grade} */ (value)]?.matter ?? REVIEW_STAGES[/** @type {ReviewState} */ (value)]?.matter ?? value;
     }
     if (lens === 'type' && value !== UNKNOWN) return ADVENTURE_TYPES[/** @type {AdventureType} */ (value)]?.label ?? value;
     const facet = FACETS.find((f) => f.key === lens);

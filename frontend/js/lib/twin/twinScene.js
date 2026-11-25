@@ -5,8 +5,8 @@
 /**
  * TwinScene — the signal chain as machines in four zones (BUILD_PLAN.md, phase 3):
  *
- *   NET     foundry floor: harvesters -> centrifuge -> sump; the forge
- *   CORE    raised bench:  hopper -> refinery -> alembic -> crucible -> arena -> treasury
+ *   NET     foundry floor: harvesters -> centrifuge -> sump, assayer; the lode
+ *   CORE    raised bench:  hopper -> athanor -> anvil -> crucible -> arena -> treasury
  *           -> archive; necropolis behind (kill manifold)
  *   SANCTUM front: codex, cohort, inventory, agora, pantheon, mastery (no pipes yet)
  *   GALLERY back, raised:  nexus, atlas, calendar, ledger (the viewers)
@@ -37,7 +37,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { deferredResize, isResizing, viewOf } from '../resizing.js';
-import { CENTRIFUGE, COMPLEX, ENRICHER, FORGE, SANCTUM, SIEVE, MAIN_CHAIN, MANIFOLD, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from '../twinTopology.js';
+import { ASSAYER, CENTRIFUGE, COMPLEX, LODE, SANCTUM, MAIN_CHAIN, MANIFOLD, NECROPOLIS, OUTSIDE, SUMP, pipeIndex, route } from '../twinTopology.js';
 import { makeMaterials } from './materials.js';
 import { buildZones, zoneRects } from './zones.js';
 import { FOOT, bodyOf, buildMachine, lighter, makeShop } from './machines.js';
@@ -52,7 +52,7 @@ const MACHINE_SCALE = 1.5;
 /** Rows that fill a heart: each zone has its own scale (raw events are bulk, adventures refined). */
 const CAP = { net: 120, core: 12 };
 /** Dynamos name what they work with on their label. */
-const SUB = { forge: 'prima materia', atlas: 'space', calendar: 'time', nexus: 'topology', ledger: 'list' };
+const SUB = { lode: 'native metal', atlas: 'space', calendar: 'time', nexus: 'topology', ledger: 'list' };
 const FRUSTUM = 300;
 const VIEW_DIR = new THREE.Vector3(0.55, 0.85, 1.15).normalize();
 
@@ -73,7 +73,7 @@ function el(tag, cls, text) {
 
 /**
  * Where each machine stands (PHASE7_PLAN.md: the approved prototype's layout). The camera
- * looks from +z, so +z is the near side: the forge and the Sanctum stand there;
+ * looks from +z, so +z is the near side: the lode and the Sanctum stand there;
  * the sump and necropolis on the far side. The manifold is the harvesters' pipe junction.
  * @param {{ id: string, zone: string, kind: string }[]} nodes
  */
@@ -84,10 +84,9 @@ function layout(nodes) {
     harvesters.forEach((n, i) => pos.set(n.id, new THREE.Vector3(-372 + i * 16, NET_Y, 80 - i * 72)));
     const fixed = {
         [MANIFOLD]: [-258, NET_Y, 0],
-        [CENTRIFUGE]: [-210, NET_Y, 0], [SUMP]: [-205, NET_Y, -122], [FORGE]: [-215, NET_Y, 118],
-        [ENRICHER]: [-295, NET_Y, 118],   // front, between the harvesters and the Forge
-        [SIEVE]: [-272, NET_Y, -104],     // back, between the harvesters and the Centrifuge
-        [COMPLEX]: [-40, CORE_Y, 84],      // before the Refinery
+        [CENTRIFUGE]: [-210, NET_Y, 0], [SUMP]: [-205, NET_Y, -122], [LODE]: [-215, NET_Y, 136],
+        [ASSAYER]: [-210, NET_Y, 68],     // before the Centrifuge, its pipe running straight to it
+        [COMPLEX]: [-40, CORE_Y, 84],      // before the Athanor
         [NECROPOLIS]: [110, CORE_Y, -104],
     };
     const chainX = [-110, -40, 30, 110, 180, 250, 320];

@@ -1,7 +1,7 @@
 // @ts-nocheck -- three.js geometry; untyped like the scenes.
 // A theme for one group of a cabinet: its alcoves' opening, its columns, the light on its
 // shelves, and ornament on its housing. The metal stays silver; the colour is in the light.
-// The four orders (the Cohort's idols):
+// The four orders (the Cohort's paragons):
 //   kratos  a forge: battered openings, riveted plates, battlements, embers
 //   logos   an observatory: octagons, an astrolabe, a constellation joined star to star
 //   pathos  a garden under water: pointed arches, tendrils, drops hanging
@@ -112,11 +112,11 @@ export const THEMES = {
 };
 
 /** Dress one group's housing. @param g the layout's group */
-export function dress(K, group, layout, g) {
+export function dress(K, group, layout, g, wash) {
     const theme = THEMES[g.theme];
     if (!theme) return;
     const L = layout.cols[0], R = layout.cols.at(-1);
-    const c = { K, group, color: theme.color, L, R, mid: (L + R) / 2, w: R - L, top: -g.y, bot: -(g.y + g.h), columns: layout.cols, rows: g.rows.map((ry) => -(ry + layout.cellH)) };
+    const c = { K, group, color: wash ?? theme.color, L, R, mid: (L + R) / 2, w: R - L, top: -g.y, bot: -(g.y + g.h), columns: layout.cols, rows: g.rows.map((ry) => -(ry + layout.cellH)) };
     theme.ornament(c);
     glowBar(c, c.mid, c.top + 7, c.w + 40, 1.6, 0.9);   // the cornice's line of light
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
+import { ASPECTS, facing } from '../lib/paragons.js';
 import { EntityPicker } from './EntityPicker.js';
 
 const TYPES = /** @type {EntityType[]} */ (['player', 'organization']);
@@ -19,11 +20,11 @@ export function Adversaries({ adventure }) {
             <div className="ol-head">⚔ Adversaries</div>
             ${list.length > 0 && html`
                 <div className="ol-chips">
-                    ${list.map((a, i) => html`
+                    ${list.map((a, i) => { const foe = entities.find((e) => e.id === a.entity_id), d = foe?.details; return html`
                         <span key=${(a.entity_id ?? '') + a.name} className="ol-chip foe">
-                            <span className="ol-chip-name"><i>⚔</i>${entities.find((e) => e.id === a.entity_id)?.name ?? a.name}</span>
+                            <span className="ol-chip-name"><i>⚔</i>${foe?.name ?? a.name}${d?.archetype && d.aspect === 'exploitative' && html`<small style=${{ color: ASPECTS.exploitative.color }}>${facing(d.archetype, d.aspect).label}</small>`}</span>
                             <button className="ol-chip-x" aria-label=${`Remove ${a.name}`} onClick=${() => save(list.filter((_, j) => j !== i))}>✕</button>
-                        </span>`)}
+                        </span>`; })}
                 </div>`}
             <${EntityPicker} ids=${list.flatMap((a) => a.entity_id ?? [])} chips=${false} types=${TYPES} placeholder="+ A player or organization…"
                 onAdd=${(/** @type {string} */ id) => save([...list, { entity_id: id, name: '' }])} />

@@ -64,7 +64,7 @@ function PlayerDetail({ adventure, player, log, onBack }) {
                 <button className="cls-layer" onClick=${() => { selectEntity(player.id); showPanel('codex'); }} title="Edit the profile in the Codex">Codex ⟶</button>
             </div>
             <div className="cpx-name">☉ ${player.name}</div>
-            <div className="cpx-profile"><${ArchetypeBadge} id=${player.details.archetype} /><${Warmth} value=${player.details.warmth} /></div>
+            <div className="cpx-profile"><${ArchetypeBadge} id=${player.details.archetype} aspect=${player.details.aspect} /><${Warmth} value=${player.details.warmth} /></div>
             ${(player.details.tags?.length ?? 0) > 0 && html`<div className="cpx-tags">${player.details.tags?.map((t) => html`<span key=${t}>${t}</span>`)}</div>`}
             <div className="cpx-contact">
                 ${[player.details.handle, player.details.email, player.details.phone].filter(Boolean).map((c) => html`<span key=${c}>${c}</span>`)}
@@ -145,7 +145,7 @@ function Roster({ adventure, onOpen }) {
                     ? html`<${EntityPicker} ids=${wardens.map((w) => w.id)} types=${['player', 'organization']} placeholder=${`+ Who keeps ${site.name}…`}
                         onAdd=${async (/** @type {string} */ id) => setError(await setWarden(site.id, id, true))}
                         onRemove=${async (/** @type {string} */ id) => setError(await setWarden(site.id, id, false))} />`
-                    : html`<div className="cx-empty-line">Link a site in the Refinery to give it wardens</div>`}
+                    : html`<div className="cx-empty-line">Link a site in the Athanor to give it wardens</div>`}
             </div>
             <div className="cpx-section">Party <b>${party.length}</b></div>
             ${Object.entries(STAGES).map(([stage, label]) => {
@@ -178,7 +178,7 @@ function ResonanceList({ adventure, onOpen }) {
 
     return html`
         <div className="cpx-detail">
-            ${!anchors && html`<div className="ae-hint">Nothing to resonate with: link deities, sites, organizations or skills to this adventure in the Refinery</div>`}
+            ${!anchors && html`<div className="ae-hint">Nothing to resonate with: link deities, sites, organizations or skills to this adventure in the Athanor</div>`}
             <input className="cx-search" value=${query} placeholder="Name, archetype or tag…" aria-label="Search players" onInput=${(/** @type {any} */ e) => setQuery(e.target.value)} />
             ${error && html`<div className="nc-error" role="alert">${error}</div>`}
             ${!shown.length && html`<div className="cx-empty-line">${ranked.length ? 'Nobody matches' : 'No players yet: make them in the Codex'}</div>`}
@@ -186,7 +186,7 @@ function ResonanceList({ adventure, onOpen }) {
                 <div key=${player.id} className="cpx-card">
                     <button className="cpx-card-main" onClick=${() => onOpen(player.id)}>
                         <span><b>${player.name}</b><em title="Shared entities, plus a tenth of its warmth">⚡ ${score.toFixed(1)}</em></span>
-                        <span><${ArchetypeBadge} id=${player.details.archetype} /></span>
+                        <span><${ArchetypeBadge} id=${player.details.archetype} aspect=${player.details.aspect} /></span>
                         <small>${shared.length ? shared.map((e) => `${ENTITY_TYPES[e.type].glyph} ${e.name}`).join('  ') : 'Nothing shared'}</small>
                     </button>
                     ${member?.status
@@ -278,7 +278,7 @@ export function ComplexPanel() {
                 ${status !== 'ready' && html`<div className="map-status">${status === 'loading' ? 'Warming the Combinator…' : 'The Combinator failed to load (see console)'}</div>`}
                 ${status === 'ready' && !adventure && html`
                     <div className="nc-empty alm-overlay-empty">${item ? 'Raw events have no party' : 'Nothing selected'}
-                        <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to see who it connects'}</small></div>`}
+                        <small>${item ? 'Pass it first: it becomes concentrate' : 'Select an adventure to see who it connects'}</small></div>`}
                 ${adventure && html`
                     <div className="alm-hud" onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
                         ${Object.entries(MODES).map(([k, label]) => html`<button key=${k} className=${`cls-layer ${mode === k ? 'on' : ''}`} aria-pressed=${mode === k}

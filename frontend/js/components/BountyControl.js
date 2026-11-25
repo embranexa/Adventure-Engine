@@ -11,7 +11,7 @@ const FIELDS = /** @type {const} */ ([
 const SAVE_MS = 350;
 
 /**
- * What an adventure is worth, in the Alembic: effort, resistance and the payout lever. It
+ * What an adventure is worth, in the Anvil: effort, resistance and the payout lever. It
  * locks on reaching the Crucible.
  * @param {{ adventure: AdventureRecord }} props
  */
@@ -42,12 +42,12 @@ export function BountyControl({ adventure }) {
     };
     const clear = async () => { clearTimeout(timer.current); pending.current = null; setError(await saveBounty(adventure.id, null)); setOpen(false); };
 
-    if (!stored && !settable) return null; // it got past the Alembic without one
+    if (!stored && !settable) return null; // it got past the Anvil without one
     const total = bountyTotal(draft), share = actionShare(draft);
     return html`
         <div className="bounty">
             <button className=${`cls-layer ${open ? 'on' : ''}`} aria-expanded=${open} onClick=${() => { if (!open && !stored && settable) save(DEFAULT_BOUNTY); setOpen(!open); }}
-                title=${locked ? 'Its bounty, locked on leaving the Alembic' : 'What is it worth?'}>
+                title=${locked ? 'Its bounty, locked on leaving the Anvil' : 'What is it worth?'}>
                 <i className="amb"></i> ${stored || pending.current ? total : 'Set bounty'}${locked ? ' 🔒' : ''}
             </button>
             ${open && html`

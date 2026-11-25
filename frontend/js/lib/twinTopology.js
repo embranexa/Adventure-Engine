@@ -2,7 +2,7 @@
 // travels along them. See resources/signal chain digital twin/BUILD_PLAN.md.
 //
 // Node ids match the transitions log (backend/db/models.py): PHASE_NODES for adventures,
-// "harvester:<source>", centrifuge, sump, forge, codex, plus "outside" (where harvested
+// "harvester:<source>", centrifuge, sump, assayer, lode, codex, plus "outside" (where harvested
 // events come from; not drawn, and no pipe leads from it). The manifold is a pipe junction
 // where the harvesters' pipes merge into one trunk to the centrifuge; it holds nothing and
 // never appears in the log. Phase 7 layout: resources/signal chain digital twin/PHASE7_PLAN.md.
@@ -24,8 +24,8 @@ import { MAIN_ROUTE, PHASE_NODES, PHASE_STAGES } from '../lifecycle.js';
  */
 /**
  * What clicking a machine does: open a panel, maybe after switching mode or opening the
- * create dialog, or selecting the first prima materia. `label` (the panel's name) is filled in by the panel.
- * @typedef {{ panel: PanelId, mode?: PoolMode, shades?: boolean, create?: boolean, firstPrima?: boolean, label?: string }} TwinAction
+ * create dialog, or selecting the first raw event. `label` (the panel's name) is filled in by the panel.
+ * @typedef {{ panel: PanelId, mode?: PoolMode, shades?: boolean, create?: boolean, firstRaw?: boolean, label?: string }} TwinAction
  */
 /**
  * A pipe. `pipe` carries adventures and events. `conveyor` (entities) and `market` (costs and
@@ -37,11 +37,12 @@ import { MAIN_ROUTE, PHASE_NODES, PHASE_STAGES } from '../lifecycle.js';
 export const OUTSIDE = 'outside';
 export const CENTRIFUGE = 'centrifuge';
 export const SUMP = 'sump';
-export const FORGE = 'forge';
+/** Hand-made adventures start here (the Forge makes models). */
+export const LODE = 'lode';
 export const CODEX = 'codex';
 export const MANIFOLD = 'manifold';
 export const COHORT = 'cohort';
-/** The Combinator (the Complex panel's id stays): in the Core, before the Refinery; no pipes yet. */
+/** The Combinator (the Complex panel's id stays): in the Core, before the Athanor; no pipes yet. */
 export const COMPLEX = 'complex';
 export const INVENTORY = 'inventory';
 export const AGORA = 'agora';
@@ -49,24 +50,22 @@ export const PANTHEON = 'pantheon';
 export const MASTERY = 'mastery';
 /** The Sanctum: machines for what isn't primary matter, left to right. They have no pipes yet. */
 export const SANCTUM = [CODEX, COHORT, INVENTORY, AGORA, PANTHEON, MASTERY];
-/** Fills in what harvested events lack (cover, exact place, end time): not built yet. */
-export const ENRICHER = 'enricher';
-/** The autonomous filter: a tunable chain of rules between the harvesters and the Centrifuge: not built yet. */
-export const SIEVE = 'sieve';
+/** Fills in what specimens lack, one by one, and returns them to the Centrifuge as ore: not built yet. */
+export const ASSAYER = 'assayer';
 export const CRUCIBLE = PHASE_NODES.constructing;
 export const ARENA = PHASE_NODES.consuming;
 export const TREASURY = PHASE_NODES.completed;
 export const NECROPOLIS = PHASE_NODES.killed;
-export const REFINERY = PHASE_NODES.classifying;
+export const ATHANOR = PHASE_NODES.classifying;
 
 /** Harvesters drawn even before their crawler exists (locked until then). */
-// ig-collection: events you send in (Telegram); ig-profiles: watched Instagram accounts (resources/net/BUILD_PLAN.md)
-export const KNOWN_HARVESTERS = ['luma', '19hz', 'ig-collection', 'ig-profiles'];
+// deposit: links you send in (resources/BUILD_PLAN.md)
+export const KNOWN_HARVESTERS = ['luma', '19hz', 'deposit'];
 
 /** @param {string} source */
 export const harvesterId = (source) => `harvester:${source}`;
 
-/** hopper -> refinery -> alembic -> crucible -> arena -> treasury -> archive */
+/** hopper -> athanor -> anvil -> crucible -> arena -> treasury -> archive */
 export const MAIN_CHAIN = [...MAIN_ROUTE.map((p) => PHASE_NODES[p]), PHASE_NODES.decommissioned];
 
 /** @param {Partial<TwinNode> & Pick<TwinNode, 'id' | 'label' | 'zone' | 'kind'>} n @returns {TwinNode} */
@@ -82,23 +81,22 @@ export function twinNodes(sourceNames) {
     const live = new Set(sourceNames);
     const harvesters = [...new Set([...KNOWN_HARVESTERS, ...sourceNames])].map((name) => node({
         id: harvesterId(name), label: name, zone: 'net', kind: 'harvester',
-        holds: 'events', matter: 'flux', locked: !live.has(name),
+        holds: 'events', matter: 'specimen & ore', locked: !live.has(name),
     }));
     const core = (/** @type {Phase} */ phase, /** @type {TwinKind} */ kind, /** @type {string} */ label,
         /** @type {TwinAction | null} */ action = null) =>
         node({ id: PHASE_NODES[phase], label, zone: 'core', kind, holds: 'adventures', matter: PHASE_STAGES[phase].matter, action });
     return [
         ...harvesters,
-        node({ id: CENTRIFUGE, label: 'Centrifuge', zone: 'net', kind: 'processor', holds: 'events', matter: 'prima materia',
-            action: { panel: 'classifier', mode: 'discovery', firstPrima: true } }),
-        node({ id: SUMP, label: 'Sump', zone: 'net', kind: 'vessel', holds: 'events', matter: 'dross',
+        node({ id: CENTRIFUGE, label: 'Centrifuge', zone: 'net', kind: 'processor', holds: 'events', matter: 'specimen & ore',
+            action: { panel: 'classifier', mode: 'discovery', firstRaw: true } }),
+        node({ id: SUMP, label: 'Sump', zone: 'net', kind: 'vessel', holds: 'events', matter: 'tailings',
             action: { panel: 'classifier', mode: 'discovery', shades: true } }),
-        node({ id: FORGE, label: 'Forge', zone: 'net', kind: 'dynamo', action: { panel: 'node', create: true } }),
-        node({ id: ENRICHER, label: 'Enricher', zone: 'net', kind: 'dynamo', locked: true }),
-        node({ id: SIEVE, label: 'Sieve', zone: 'net', kind: 'processor', locked: true }),
+        node({ id: LODE, label: 'Lode', zone: 'net', kind: 'dynamo', action: { panel: 'node', create: true } }),
+        node({ id: ASSAYER, label: 'Assayer', zone: 'net', kind: 'processor', locked: true }),
         core('queued', 'vessel', 'Hopper'),
-        core('classifying', 'processor', 'Refinery', { panel: 'node', mode: 'adventures' }),
-        core('decomposing', 'processor', 'Alembic', { panel: 'alembic', mode: 'adventures' }),
+        core('classifying', 'processor', 'Athanor', { panel: 'node', mode: 'adventures' }),
+        core('decomposing', 'processor', 'Anvil', { panel: 'alembic', mode: 'adventures' }),
         core('constructing', 'processor', 'Crucible', { panel: 'quests', mode: 'adventures' }),
         core('consuming', 'processor', 'Arena', { panel: 'arena', mode: 'adventures' }),
         node({ id: COMPLEX, label: 'Combinator', zone: 'core', kind: 'cabinet', action: { panel: 'complex', mode: 'adventures' } }),
@@ -109,7 +107,7 @@ export function twinNodes(sourceNames) {
         node({ id: COHORT, label: 'Cohort', zone: 'sanctum', kind: 'cabinet', action: { panel: 'cohort' } }),
         node({ id: INVENTORY, label: 'Inventory', zone: 'sanctum', kind: 'cabinet', action: { panel: 'inventory' } }),
         node({ id: AGORA, label: 'Agora', zone: 'sanctum', kind: 'cabinet', action: { panel: 'agora' } }),
-        node({ id: PANTHEON, label: 'Pantheon', zone: 'sanctum', kind: 'cabinet', locked: true }),
+        node({ id: PANTHEON, label: 'Pantheon', zone: 'sanctum', kind: 'cabinet', action: { panel: 'pantheon' } }),
         node({ id: MASTERY, label: 'Mastery', zone: 'sanctum', kind: 'cabinet', locked: true }),
         node({ id: 'nexus', label: 'Nexus', zone: 'viewer', kind: 'viewer', action: { panel: 'classifier', mode: 'adventures' } }),
         node({ id: 'atlas', label: 'Atlas', zone: 'viewer', kind: 'viewer', action: { panel: 'map' } }),
@@ -136,7 +134,8 @@ export function twinPipes(sourceNames) {
         pipe(MANIFOLD, CENTRIFUGE),
         pipe(CENTRIFUGE, SUMP),
         pipe(CENTRIFUGE, MAIN_CHAIN[0]),
-        pipe(FORGE, MAIN_CHAIN[0]),
+        pipe(CENTRIFUGE, ASSAYER),
+        pipe(LODE, MAIN_CHAIN[0]),
         ...MAIN_CHAIN.slice(1).map((b, i) => pipe(MAIN_CHAIN[i], b)),
         pipe(CRUCIBLE, NECROPOLIS),
     ];

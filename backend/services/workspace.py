@@ -11,7 +11,7 @@ from typing import Any
 PANELS_METADATA = {
     "node": {
         "id": "node", "kind": "node", "icon": "eye",
-        "name": "Refinery", "question": "why", "flow": ["ore", "essence"],
+        "name": "Athanor", "question": "why", "flow": ["concentrate", "essence"],
     },
     "classifier": {
         "id": "classifier", "kind": "classifier", "icon": "flask",
@@ -26,12 +26,12 @@ PANELS_METADATA = {
         "name": "Calendar", "question": "when", "flow": ["matter", "time"],
     },
     "alembic": {
-        "id": "alembic", "kind": "alembic", "icon": "alembic",
-        "name": "Alembic", "question": "how", "flow": ["essence", "distillate"],
+        "id": "alembic", "kind": "alembic", "icon": "anvil",
+        "name": "Anvil", "question": "how", "flow": ["essence", "armature"],
     },
     "scripter": {
         "id": "scripter", "kind": "scripter", "icon": "quill",
-        "name": "Scripter", "question": "how", "flow": ["essence", "distillate"],
+        "name": "Scripter", "question": "how", "flow": ["essence", "armature"],
     },
     "codex": {
         "id": "codex", "kind": "codex", "icon": "codex",
@@ -51,7 +51,7 @@ PANELS_METADATA = {
     },
     "cohort": {
         "id": "cohort", "kind": "cohort", "icon": "cohort",
-        "name": "Cohort", "question": "who", "flow": ["players", "archetypes"],
+        "name": "Cohort", "question": "who", "flow": ["archetypes", "players"],
     },
     "ledger": {
         "id": "ledger", "kind": "ledger", "icon": "ledger",
@@ -69,13 +69,17 @@ PANELS_METADATA = {
         "id": "agora", "kind": "agora", "icon": "amphora",
         "name": "Agora", "question": "what for", "flow": ["toil", "ambrosia"],
     },
+    "pantheon": {
+        "id": "pantheon", "kind": "pantheon", "icon": "temple",
+        "name": "Pantheon", "question": "for whom", "flow": ["demand", "favor"],
+    },
     "necropolis": {
         "id": "necropolis", "kind": "necropolis", "icon": "tomb",
         "name": "Necropolis", "question": "why not", "flow": ["matter", "vestige"],
     },
     "signal_chain": {
         "id": "signal_chain", "kind": "twin", "icon": "gear",
-        "name": "Signal Chain", "question": "all", "flow": ["flux", "relic"],
+        "name": "Signal Chain", "question": "all", "flow": ["specimen", "relic"],
     },
 }
 

@@ -1,6 +1,6 @@
 // Where something is, typed by hand: "lat, lon" or a Plus Code (a full one, or a short one
 // with its town, e.g. M4RP+3R Irvine, California). Plus Codes are resolved by the server
-// (GET /api/geo/plus-code; backend/services/geo.py). Shared by the Refinery and the Codex.
+// (GET /api/geo/plus-code; backend/services/geo.py). Shared by the Athanor and the Codex.
 
 /** @param {number | null} lat @param {number | null} lon */
 export const coordsText = (lat, lon) => (lat != null && lon != null ? `${lat}, ${lon}` : '');

@@ -1,7 +1,7 @@
 // @ts-nocheck -- three.js models; untyped like the scenes.
-// The twelve idols (the Cohort): a robed silver figure on a pedestal, each with its own
+// The twelve paragons (the Cohort): a robed silver figure on a pedestal, each with its own
 // attributes. Built from code; origin on the shelf, about 100 units tall, facing +z. The
-// magic parts glow in the idol's colour once someone has its archetype.
+// magic parts glow in the paragon's colour once someone has its archetype.
 
 import * as THREE from 'three';
 
@@ -68,7 +68,7 @@ const MAKE = {
         for (let i = 0; i < 3; i++) K.ball(1.3, lit(), g, h.left.x - 1 + i * 1.6, h.left.y - 4 + (i % 2) * 1.4, h.left.z + 1);
         return (t) => heart.scale.setScalar(1 + 0.08 * Math.max(0, Math.sin(t / 260)));
     }],
-    juggernaut: [{ left: 'out', right: 'out', broad: 0.28 }, ({ K, g, h, body, trim, lit }) => {
+    paladin: [{ left: 'out', right: 'out', broad: 0.28 }, ({ K, g, h, body, trim, lit }) => {
         K.mesh(new THREE.SphereGeometry(6.2, 24, 14, 0, TAU, 0, 1.75), trim, g, 0, 81, 0);
         plate(K, [[-7, -1], [-8, 8], [-3, 12], [4, 11], [7, 5], [5, 4], [0, 7], [-4, 5], [-5, -1]], 1.4, lit(), g, 0, 85, 0).rotation.y = Math.PI / 2;
         rod(K, g, h.right.x, h.right.z, 16, 92, 0.8, trim); const tip = K.gem(3, lit(), g, h.right.x, 95, h.right.z, 2.2); tip.scale.z = 0.4;
@@ -85,7 +85,7 @@ const MAKE = {
         const arrow = K.cyl(0.4, 0.4, 30, trim, g, x + 4, y, z); arrow.rotation.z = Math.PI / 2; const tip = K.mesh(new THREE.ConeGeometry(1.4, 4, 6), lit(), g, x - 12, y, z); tip.rotation.z = Math.PI / 2;
         const q = K.cyl(2.6, 2, 18, trim, g, 6, 66, -8); q.rotation.z = -0.45; for (let i = 0; i < 4; i++) K.tube([V(8 + i, 73, -8), V(11 + i * 1.2, 82, -8)], 0.3, K.M.bright, g, 4);
     }],
-    terraformer: [{ left: 'out', right: 'out', broad: 0.24 }, ({ K, g, h, body, trim, lit }) => {
+    mariner: [{ left: 'out', right: 'out', broad: 0.24 }, ({ K, g, h, body, trim, lit }) => {
         const x = h.right.x, z = h.right.z; rod(K, g, x, z, 15, 86, 0.9, trim);
         K.tube([V(x - 6, 98, z), V(x - 5.6, 88, z), V(x, 84, z), V(x + 5.6, 88, z), V(x + 6, 98, z)], 0.9, trim, g, 30); rod(K, g, x, z, 84, 99, 0.9, trim);
         for (const s of [-1, 0, 1]) K.mesh(new THREE.ConeGeometry(1.5, 5, 6), lit(), g, x + s * 6, 101, z);
@@ -161,14 +161,33 @@ const MAKE = {
     }],
 };
 
-/** @param m  { idol, color, on } */
-export function idol(K, group, m) {
-    const [pose, adorn] = MAKE[m.idol], body = m.on ? K.M.bright : K.M.trim, trim = m.on ? K.M.trim : K.M.steel;
+/** Virtue: a thin halo behind the head. Vice: horns, and eyes alight. */
+function mark(K, g, m, lit) {
+    if (!m.dark) {
+        const halo = new THREE.Group(); halo.position.set(0, 81, -8); g.add(halo);
+        const ring = K.ring(13, 0.5, m.on ? K.glow('#f0d490', 1.2) : K.M.trim, halo, 0, 0, 0, false);
+        K.mesh(new THREE.PlaneGeometry(44, 44), K.light(K.tex.haze, '#ffe2a0', m.on ? 0.4 : 0.1), halo, 0, 0, -1);
+        return () => { ring.rotation.z += 0.002; };
+    }
+    const horn = K.std({ color: '#0d0a0b', metalness: 0.9, roughness: 0.3 });
+    for (const s of [-1, 1]) {
+        for (const [pts, r] of [[[[4, 84], [9, 88], [11, 93]], 1.4], [[[11, 93], [11, 97], [8.6, 101]], 0.8]]) K.tube(pts.map(([x, y]) => V(s * x, y, -1)), r, horn, g, 14);
+        K.ball(0.75, lit(), g, s * 1.8, 81.2, 5.2);
+    }
+    const haze = K.mesh(new THREE.PlaneGeometry(40, 40), K.light(K.tex.haze, '#ff2a2a', 0.2), g, 0, 82, -9);
+    return (t) => { haze.material.opacity = (m.on ? 0.34 : 0.14) * (0.8 + 0.2 * Math.sin(t / 260) * Math.sin(t / 730)); };
+}
+
+/** @param m  { paragon, color, on, dark } */
+export function paragon(K, group, m) {
+    const [pose, adorn] = MAKE[m.paragon], body = m.dark ? K.std({ color: m.on ? '#3a3234' : '#2a2627', metalness: 0.95, roughness: 0.28, envMapIntensity: 1.1 }) : m.on ? K.M.bright : K.M.trim, trim = m.on ? K.M.trim : K.M.steel;
     const g = new THREE.Group(); group.add(g);
     const lit = () => (m.on ? K.glow(m.color, 1.15) : K.glow(m.color, 0.28));
     const h = figure(K, g, pose, body, trim);
     const extra = adorn({ K, g, h, body, trim, lit, glowOf: m.color });
+    const marked = mark(K, g, m, lit);
     return { frame(t, hover) {
+        marked(t);
         g.rotation.y = Math.sin(t / 2400) * 0.42 * (1 - 0.6 * hover);
         extra?.(t);
     } };

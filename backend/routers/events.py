@@ -70,14 +70,14 @@ async def move_events(body: EventMove):
 
 @router.post("/{event_id}/pass")
 async def pass_event(event_id: uuid.UUID):
-    """Prima materia -> ore: creates an adventure in the Hopper."""
+    """Raw event -> concentrate: creates an adventure in the Hopper."""
     with triage_errors():
         return {"adventure_id": await triage.pass_event(event_id)}
 
 
 @router.post("/{event_id}/ignore")
 async def ignore_event(event_id: uuid.UUID):
-    """Prima materia -> dross (Sump)."""
+    """Raw event -> tailings (Sump)."""
     with triage_errors():
         await triage.ignore_event(event_id)
     return {"status": "ignored"}
@@ -85,6 +85,6 @@ async def ignore_event(event_id: uuid.UUID):
 
 @router.post("/{event_id}/revive")
 async def revive_event(event_id: uuid.UUID):
-    """Dross -> passed: restores its adventure from the Necropolis, or creates one."""
+    """Tailings -> passed: restores its adventure from the Necropolis, or creates one."""
     with triage_errors():
         return {"adventure_id": await triage.revive_event(event_id)}

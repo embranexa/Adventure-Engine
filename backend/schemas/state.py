@@ -7,7 +7,7 @@ from typing import Any, Literal, get_args
 from pydantic import BaseModel, Field, model_validator
 
 FilterMode = Literal["include", "exclude"]
-FacetKey = Literal["source", "tag", "city", "region", "metro", "type", "phase", "review", "flag",
+FacetKey = Literal["grade", "source", "tag", "city", "region", "metro", "type", "phase", "review", "flag",
                    "collaboration", "leader", "deity", "site", "player", "organization", "skill"]
 # what colors the matter: "stage" (Matter) or a facet (frontend/js/lib/lens.js)
 LensKey = Literal["none", "stage", "source", "tag", "city", "region", "metro", "type", "flag",
@@ -75,7 +75,7 @@ class Pin(BaseModel):
     action: str = Field(max_length=40)
 
 
-class Anvil(BaseModel):
+class Targets(BaseModel):
     """Targeted quests (the Crucible), in order."""
 
     pins: list[Pin] = Field(default_factory=list, max_length=200)
@@ -88,15 +88,15 @@ class Verbs(BaseModel):
     buff_verbs: list[str] = Field(default_factory=list, max_length=100)
 
 
-class Idol(BaseModel):
+class Paragon(BaseModel):
     """What you wrote about an archetype (the Cohort). description null: the built-in one."""
 
     description: str | None = Field(None, max_length=5000)
     skills: list[str] = Field(default_factory=list, max_length=40)  # ids of skill entities
 
 
-class Idols(BaseModel):
-    idols: dict[str, Idol] = Field(default_factory=dict)
+class Paragons(BaseModel):
+    paragons: dict[str, Paragon] = Field(default_factory=dict)
 
 
 class LayoutPreset(BaseModel):

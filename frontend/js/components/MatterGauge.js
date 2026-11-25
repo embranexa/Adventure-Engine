@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
-import { MAIN_ROUTE, PHASE_STAGES, REVIEW_STAGES } from '../lifecycle.js';
+import { MAIN_ROUTE, GRADE_STAGES, PHASE_STAGES, REVIEW_STAGES, rawMatter } from '../lifecycle.js';
 
 /**
  * The analytics strip under the top bar: one vial per stage, filled by how many
- * items are there, named by matter. Adventures mode counts phases; Discovery counts flux,
- * prima materia and dross.
+ * items are there, named by matter. Adventures mode counts phases; Discovery counts
+ * specimens and ore (harvested or fed) and tailings.
  */
 export function MatterGauge() {
     const mode = useWorkspaceStore((s) => s.mode);
@@ -17,9 +17,8 @@ export function MatterGauge() {
         /** @type {{ key: string, name: string, count: number, color: string, deep: string }[]} */
         let list;
         if (mode === 'discovery') {
-            list = /** @type {ReviewState[]} */ (['harvested', 'new', 'ignored']).map((r) => ({
-                key: r, name: REVIEW_STAGES[r].matter, color: REVIEW_STAGES[r].color, deep: REVIEW_STAGES[r].deep,
-                count: rawEvents.filter((e) => e.review === r).length,
+            list = Object.entries({ ...GRADE_STAGES, ignored: REVIEW_STAGES.ignored }).map(([key, s]) => ({
+                key, name: s.matter, color: s.color, deep: s.deep, count: rawEvents.filter((e) => rawMatter(e) === key).length,
             }));
         } else {
             list = MAIN_ROUTE.map((p) => ({

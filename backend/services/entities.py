@@ -6,7 +6,7 @@
 
 Rules:
     - only sites have a location (address, city, lat/lon); players keep email, phone,
-      handle, archetype, warmth and tags in `details`; skills
+      handle, archetype, aspect, warmth and tags in `details`; skills
       the attributes that govern them
     - a player linked to an adventure joins its party as resonant (services/party.py)
     - an event, performance or battle links at most one site: linking another replaces it
@@ -14,7 +14,7 @@ Rules:
       own where fields (crawled events keep their source's where; see queries.py)
 
 Every change is broadcast: `entities`, and `adventures` when links or names changed.
-Links and unlinks are logged as transitions (codex <-> refinery); links removed with a
+Links and unlinks are logged as transitions (codex <-> athanor); links removed with a
 delete statement are recorded here, since the automatic recorder only sees ORM objects.
 """
 
@@ -27,7 +27,7 @@ from sqlalchemy import delete, select
 
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import (
-    AFFINITY_TYPES, ARCHETYPES, ATTRIBUTES, CODEX_NODE, GEO_ENTITY_TYPES, ENTITY_TYPES, PHASE_NODES, STEWARD_TYPES, UNLINKABLE_TYPES, WHEN_WHERE_TYPES,
+    AFFINITY_TYPES, ARCHETYPES, ASPECTS, DEITY_FORMS, ATTRIBUTES, CODEX_NODE, GEO_ENTITY_TYPES, ENTITY_TYPES, PHASE_NODES, STEWARD_TYPES, UNLINKABLE_TYPES, WHEN_WHERE_TYPES,
     AdventureEntity, Entity, EntityLink, PartyLog, Steward,
 )
 from backend.db.queries import list_adventures, get_entity, list_entities
@@ -61,7 +61,17 @@ def _detail(entity_type: str, key: str, value: Any) -> Any:
         if not isinstance(value, list) or len(value) > 2 or any(v not in ATTRIBUTES for v in value):
             raise InvalidEntity(f"a skill has up to two attributes of {', '.join(ATTRIBUTES)}")
         return list(dict.fromkeys(value))
-    if entity_type != "player" or key not in (*PLAYER_DETAILS, "archetype", "warmth", "tags"):
+    if entity_type == "deity" and key == "form":
+        if value not in (None, "", *DEITY_FORMS):
+            raise InvalidEntity(f"form must be one of {', '.join(DEITY_FORMS)}")
+        return value or None
+    if entity_type == "deity" and key == "demand":
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 99:
+            raise InvalidEntity("demand is a whole number from 0 to 99")
+        return value or None
+    if entity_type != "player" or key not in (*PLAYER_DETAILS, "archetype", "aspect", "warmth", "tags"):
         raise InvalidEntity(f"a {entity_type} has no {key}")
     if key in PLAYER_DETAILS:
         return _text(key, value, PLAYER_DETAILS[key])
@@ -70,6 +80,10 @@ def _detail(entity_type: str, key: str, value: Any) -> Any:
     if key == "archetype":
         if value not in ARCHETYPES:
             raise InvalidEntity(f"archetype must be one of {', '.join(ARCHETYPES)}")
+        return value
+    if key == "aspect":
+        if value not in ASPECTS:
+            raise InvalidEntity(f"aspect must be one of {', '.join(ASPECTS)}")
         return value
     if key == "warmth":
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 5:
@@ -140,7 +154,7 @@ async def drop_archon(session, adventure_id: uuid.UUID, player_id: uuid.UUID) ->
 
 
 async def _delete_links(session, *where) -> None:
-    """Delete the links matching `where`, recording each as an unlink (refinery -> codex)."""
+    """Delete the links matching `where`, recording each as an unlink (athanor -> codex)."""
     links = (await session.execute(
         select(AdventureEntity.adventure_id, AdventureEntity.entity_id, AdventureEntity.status).where(*where))).all()
     for adventure_id, entity_id, status in links:
@@ -248,6 +262,21 @@ async def link(adventure_id: uuid.UUID, entity_id: uuid.UUID) -> None:
     await _broadcast(adventures_too=True)
 
 
+async def set_factor(adventure_id: uuid.UUID, entity_id: uuid.UUID, factor: int | None) -> None:
+    """How much an adventure fulfils a deity it's linked to (1-5; None: the default, 1)."""
+    async with SessionLocal() as session:
+        await _get_adventure(session, adventure_id)
+        entity = await _get_entity(session, entity_id)
+        row = await session.get(AdventureEntity, (adventure_id, entity_id))
+        if entity.type != "deity" or row is None:
+            raise InvalidEntity("a fulfillment factor needs a linked deity")
+        if factor is not None and not 1 <= factor <= 5:
+            raise InvalidEntity("a fulfillment factor goes from 1 to 5")
+        row.factor = factor
+        await session.commit()
+    await _broadcast(adventures_too=True)
+
+
 async def unlink(adventure_id: uuid.UUID, entity_id: uuid.UUID) -> None:
     async with SessionLocal() as session:
         await _get_adventure(session, adventure_id)
@@ -274,5 +303,5 @@ async def migrate_saved_places(places: list[dict[str, Any]]) -> int:
     return len(places)
 
 
-__all__ = ["InvalidEntity", "add_link", "create_entity", "delete_entity", "link", "migrate_saved_places",
+__all__ = ["InvalidEntity", "add_link", "create_entity", "delete_entity", "link", "migrate_saved_places", "set_factor",
            "set_entity_link", "unlink", "update_entity"]

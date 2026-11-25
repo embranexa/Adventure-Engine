@@ -1,9 +1,11 @@
 import { html } from '../html.js';
 import { useWorkspaceStore } from '../store.js';
 import { ARCHETYPES, ATTRIBUTES, ORDERS } from '../lifecycle.js';
+import { ASPECTS, facing } from '../lib/paragons.js';
 import { EntityPicker } from './EntityPicker.js';
 import { Field } from './panels/AdventureEditor.js';
 
+const ASPECT_IDS = /** @type {Aspect[]} */ (Object.keys(ASPECTS));
 const GROUPS = /** @type {Order[]} */ (Object.keys(ORDERS));
 
 /** Warmth, 0 to 5: click a pip to set it, the last lit one to lower it. Never set reads as none.
@@ -18,15 +20,15 @@ export function Warmth({ value, onChange }) {
     `;
 }
 
-/** An archetype in words, as a badge. @param {{ id: Archetype | undefined }} props */
-export function ArchetypeBadge({ id }) {
+/** An archetype in words, as a badge. @param {{ id: Archetype | undefined, aspect?: Aspect }} props */
+export function ArchetypeBadge({ id, aspect }) {
     if (!id) return html`<span className="pl-arch none">No archetype</span>`;
-    const a = ARCHETYPES[id];
-    return html`<span className="pl-arch" style=${{ '--g': ORDERS[a.order].color }} title=${`${ORDERS[a.order].label} · ${a.idol} · ${a.operator}`}>${a.glyph} ${a.label} <small>${a.verb}</small></span>`;
+    const a = ARCHETYPES[id], f = facing(id, aspect), dark = aspect === 'exploitative';
+    return html`<span className="pl-arch" style=${{ '--g': dark ? ASPECTS.exploitative.color : ORDERS[a.order].color }} title=${`${ORDERS[a.order].label} · ${a.paragon} · ${f.operator}`}>${dark ? html`<i className="pl-rev">${a.glyph}</i>` : a.glyph} ${f.label} <small>${f.verb}</small></span>`;
 }
 
 /**
- * A player's archetype, warmth, tags and affinities (the Codex).
+ * A player's archetype, aspect, warmth, tags and affinities (the Codex).
  * @param {{ player: Entity, save: (changes: EntityChanges) => Promise<string | null>, onError: (e: string | null) => void }} props
  */
 export function PlayerFields({ player, save, onError }) {
@@ -49,7 +51,14 @@ export function PlayerFields({ player, save, onError }) {
                 <${Warmth} value=${d.warmth} onChange=${(/** @type {number} */ warmth) => save({ details: { warmth } })} />
             </div>
         </div>
-        ${arch && html`<span className="ae-hint">${arch.glyph} ${arch.idol} · works ${arch.medium.toLowerCase()} · ${arch.attributes.map((x) => ATTRIBUTES[x].label).join(', ')}</span>`}
+        ${d.archetype && html`
+            <div className="ae-field">
+                <span className="ae-label">Aspect</span>
+                <div className="fb-choices" role="group" aria-label="Aspect">${ASPECT_IDS.map((k) => html`
+                    <button key=${k} type="button" className=${`cls-layer ${d.aspect === k ? 'on' : ''}`} aria-pressed=${d.aspect === k} title=${`${facing(/** @type {Archetype} */ (d.archetype), k).label}: ${ASPECTS[k].hint}`}
+                        onClick=${() => save({ details: { aspect: d.aspect === k ? null : k } })}>${ASPECTS[k].label}</button>`)}</div>
+            </div>`}
+        ${arch && html`<span className="ae-hint">${arch.glyph} ${arch.paragon} · works ${arch.medium.toLowerCase()} · ${arch.attributes.map((x) => ATTRIBUTES[x].label).join(', ')}</span>`}
         <${Field} label="Tags" placeholder="comma, separated" value=${(d.tags ?? []).join(', ')}
             onCommit=${(/** @type {string} */ v) => save({ details: { tags: v.split(',').map((t) => t.trim()).filter(Boolean) } })} />
         <div className="ol">

@@ -13,7 +13,7 @@ import { LENSES, lensRuns } from '../../lib/lens.js';
  */
 function lensLayers(lens, mode) {
     if (lens === 'none') return {};   // no lens: only the active filters show as stars
-    if (lens === 'stage') return mode === 'adventures' ? { phase: true } : { review: true };
+    if (lens === 'stage') return mode === 'adventures' ? { phase: true } : { grade: true };
     return { [lens]: true };
 }
 
@@ -39,7 +39,7 @@ function cycleStar(star) {
 /** Where a Discovery pass-through sends the centrifuge events the filters leave out. */
 const FATES = /** @type {{ key: ExcludedFate, label: string, title: string }[]} */ ([
     { key: 'siphon', label: '⟵ Siphon', title: 'Back to their harvesters (Feed brings them back)' },
-    { key: 'purge', label: '↓ Purge', title: 'Into the Sump as dross (each can be revived)' },
+    { key: 'purge', label: '↓ Purge', title: 'Into the Sump as tailings (each can be revived)' },
     { key: 'keep', label: 'Keep', title: 'Leave them in the centrifuge (only the calendar and map are filtered)' },
 ]);
 

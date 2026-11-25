@@ -16,7 +16,7 @@ class EntityFields(BaseModel):
     city: str | None = None
     lat: float | None = None
     lon: float | None = None
-    # players: email, phone, handle, archetype, warmth, tags; skills: attributes (null clears one)
+    # players: email, phone, handle, archetype, aspect, warmth, tags; skills: attributes; deities: demand, form (null clears one)
     details: dict[str, Any] | None = None
     # "#rrggbb"; null or "" goes back to the default colour
     color: str | None = None
@@ -28,3 +28,7 @@ class EntityCreate(EntityFields):
 
 class EntityUpdate(EntityFields):
     pass
+
+
+class FactorPayload(BaseModel):
+    factor: int | None = None

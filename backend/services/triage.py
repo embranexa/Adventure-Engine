@@ -42,6 +42,7 @@ from backend.services.transitions import record_many
 
 log = logging.getLogger(__name__)
 
+SERIES_GRACE = timedelta(days=7)  # to enshrine a series' last date before it's archived
 SWEEP_INTERVAL_S = 300  # how often to check for missed adventures
 
 
@@ -207,7 +208,7 @@ async def move_events(ids: list[uuid.UUID], from_review: str, to_review: str) ->
 # --- raw events ---
 
 async def pass_event(event_id: uuid.UUID) -> str:
-    """Prima materia -> ore. Returns the new adventure's id."""
+    """Raw event -> concentrate. Returns the new adventure's id."""
     async with SessionLocal() as session:
         event = await _get_event(session, event_id)
         if event.review != "new":
@@ -225,7 +226,7 @@ async def pass_event(event_id: uuid.UUID) -> str:
 
 
 async def ignore_event(event_id: uuid.UUID) -> None:
-    """Prima materia -> dross (Sump)."""
+    """Raw event -> tailings (Sump)."""
     async with SessionLocal() as session:
         event = await _get_event(session, event_id)
         if event.review != "new":
@@ -236,8 +237,8 @@ async def ignore_event(event_id: uuid.UUID) -> None:
 
 
 async def revive_event(event_id: uuid.UUID) -> str | None:
-    """Dross back into play. If it had an adventure (killed), that is restored and its id
-    returned; otherwise the event returns to the Centrifuge as prima materia (None)."""
+    """Tailings back into play. If it had an adventure (killed), that is restored and its id
+    returned; otherwise the event returns to the Centrifuge for review (None)."""
     async with SessionLocal() as session:
         event = await _get_event(session, event_id)
         if event.review != "ignored":
@@ -303,6 +304,8 @@ async def set_phase(adventure_id: uuid.UUID, phase: str) -> None:
             raise InvalidTransition("only artifacts (completed adventures) can be decommissioned")
         if phase not in MANUAL_PHASES and phase != "decommissioned":
             raise InvalidTransition(f"can't move to {phase} by hand")
+        if phase == "completed" and adventure.recurrence:
+            raise InvalidTransition("it's weekly: enshrine a date from the Arena")
         await _leave_treasury(session, adventure, phase)
         _set_phase(adventure, phase)
         # animus or later by hand: the roadmap counts as finished (services/roadmap.py)
@@ -324,7 +327,8 @@ async def sweep_missed() -> int:
     time, else start time, the adventure's own (set by hand) over its raw event's. Only adventures whose phase was last set
     *before* the event ended count as missed: reviving one afterwards, or passing an
     event that is already over, is a deliberate choice and isn't undone.
-    An all-day event ends after its last day; a weekly one after its `until` day, or never.
+    An all-day event ends after its last day; a weekly one after its `until` day, or never. A finished
+    series with an artifact goes to the Archive instead, after a week's grace.
     Returns how many moved; broadcasts if any did.
     """
     now = utcnow()
@@ -335,13 +339,22 @@ async def sweep_missed() -> int:
             .outerjoin(Event, Adventure.event_id == Event.id)
             .where(
                 Adventure.type.in_(WHEN_WHERE_TYPES),
-                Adventure.phase.in_(PRE_ARENA_PHASES),
+                Adventure.phase.in_((*PRE_ARENA_PHASES, "consuming")),
                 ended_at < now,  # the first occurrence is over; refined below
             )
         )).all()
         missed = []
+        closed = 0
         for adventure, first_end in candidates:
             end = _really_ended(adventure, first_end)
+            if adventure.recurrence and end is not None and await _has_artifacts(session, adventure.id):
+                # a finished series with something to show for it isn't missed
+                if end + SERIES_GRACE < now and adventure.phase_changed_at < end:
+                    _set_phase(adventure, "decommissioned")
+                    closed += 1
+                continue
+            if adventure.phase == "consuming":
+                continue
             if end is not None and end < now and adventure.phase_changed_at < end:
                 missed.append(adventure)
         for adventure in missed:
@@ -353,8 +366,11 @@ async def sweep_missed() -> int:
             if await session.get(Epitaph, adventure.id) is None:  # one written by hand stays
                 session.add(Epitaph(adventure_id=adventure.id, cause="missed"))
         await session.commit()
+    if closed:
+        log.info("archived %d finished series", closed)
     if missed:
         log.info("moved %d missed adventure(s) to the Necropolis", len(missed))
+    if missed or closed:
         await broadcast_pools()
     return len(missed)
 
@@ -374,6 +390,10 @@ def _really_ended(adventure: Adventure, first_end: datetime) -> datetime | None:
         # the end of the until day, generously (a day past it in UTC covers every zone)
         end = max(end, datetime.fromisoformat(until).replace(tzinfo=timezone.utc) + timedelta(days=2))
     return end
+
+
+async def _has_artifacts(session: AsyncSession, series_id: uuid.UUID) -> bool:
+    return await session.scalar(select(Adventure.id).where(Adventure.series_id == series_id, Adventure.phase != "killed").limit(1)) is not None
 
 
 async def run_sweeper() -> None:

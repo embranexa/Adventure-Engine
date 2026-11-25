@@ -8,6 +8,7 @@ import {
 import { remaining } from '../../lib/bounty.js';
 import { confirmHere } from '../../lib/windows.js';
 import { safeHttpUrl } from '../../events.js';
+import { GrowthPane } from '../GrowthPane.js';
 import { FeedbackPane } from '../FeedbackPane.js';
 import { Objectives, suggestedOutcome } from '../Objectives.js';
 import { AftermathPane } from '../AftermathPane.js';
@@ -227,7 +228,7 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
                     </div>
                     ${editing && html`
                         <div><button className="cls-layer" onClick=${() => change({ moves: [...rec.moves, blankPlay()] })}>+ Play</button></div>
-                        <p className="nec-dim">Plays don’t change skill levels: a skill is learned when the play succeeds in live play.${skills.length ? '' : ' Skills you add to the Codex can be tagged here.'}</p>
+                        <p className="nec-dim">A play that comes off proves its skills; quests only practice theirs.${skills.length ? '' : ' Skills you add to the Codex can be tagged here.'}</p>
                     `}
                 </section>
                 <div className="ana-side">
@@ -249,6 +250,7 @@ export function AnalysisView({ adventure, onBack, onSealed }) {
                             ? html`<label className="ana-field"><span>Link to the performance (required)</span><input type="url" value=${rec.link} placeholder="https://" onInput=${(/** @type {any} */ e) => change({ link: e.target.value })} /></label>`
                             : link && html`<a className="cls-layer" href=${link} target="_blank" rel="noreferrer noopener">Watch the performance ↗</a>`)}
                     </section>
+                    <${GrowthPane} adventure=${adventure} moves=${rec.moves} sealed=${!editing} />
                     <${FeedbackPane} adventure=${adventure} rows=${rec.feedback} editing=${editing} onChange=${(/** @type {FeedbackRow[]} */ feedback) => change({ feedback })} />
                     <${AftermathPane} adventure=${adventure} editing=${editing} />
                     <section className="nec-pane">

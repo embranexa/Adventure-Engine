@@ -1,8 +1,8 @@
-"""Targets: the quests laid at the top of the Crucible (app state "anvil", in order).
+"""Targets: the quests laid at the top of the Crucible (app state "targets", in order).
 
 Targeting a quest starts the build: its adventure, if it hasn't reached the Crucible, becomes
 alloy. Dropping an adventure's last target before any quest is done takes that back, to
-distillate (services/roadmap.py holds it in alloy meanwhile).
+armature (services/roadmap.py holds it in alloy meanwhile).
 """
 
 import uuid
@@ -23,7 +23,7 @@ def adventures_of(value: Any) -> set[str]:
 
 async def is_targeted(session: AsyncSession, adventure: Adventure) -> bool:
     """Whether a quest it still has to do is a target."""
-    row = await session.get(AppState, "anvil")
+    row = await session.get(AppState, "targets")
     road = adventure.roadmap or {}
     todo = {a["id"] for a in road.get("actions") or []} - set(road.get("done") or [])
     return any(p["adventure"] == str(adventure.id) and p["action"] in todo for p in ((row.value if row else None) or {}).get("pins", []))

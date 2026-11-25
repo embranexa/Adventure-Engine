@@ -1,11 +1,11 @@
 """Adventures made and edited by hand (the node card's editor).
 
-    create   a new adventure with no raw event, in ore (queued): an event, item or performance
+    create   a new adventure with no raw event, in concentrate (queued): an event, item or performance
     update   set or clear the adventure's own fields (see models.Adventure); on a crawled
              adventure these win over the event's values, and clearing one shows the
              event's again
     abandon  delete a killed adventure for good, with its links, epitaph and enshrining (a crawled one's
-             raw event stays, as dross in the Sump)
+             raw event stays, as tailings in the Sump)
 
 Items have no when/where: those fields are refused for them, and cleared when a hand-made
 adventure becomes one. Performances and battles may have one, or none.
@@ -205,7 +205,7 @@ async def _broadcast(adventure_id: uuid.UUID) -> dict[str, Any]:
 
 
 async def create_adventure(fields: dict[str, Any]) -> dict[str, Any]:
-    """A hand-made adventure in ore. `fields` must include `type`."""
+    """A hand-made adventure in concentrate. `fields` must include `type`."""
     async with SessionLocal() as session:
         adventure = Adventure(id=uuid.uuid4(), event_id=None, type="event", phase="queued", stats={})
         _apply(adventure, fields)
@@ -234,7 +234,7 @@ async def abandon_adventure(adventure_id: uuid.UUID) -> None:
     """Delete a killed adventure for good. There is no undo.
 
     Its raw event, if any, was already ignored by the kill: without an adventure it counts
-    as dross in the Sump. Logged as leaving the chain (necropolis -> outside) and, for a
+    as tailings in the Sump. Logged as leaving the chain (necropolis -> outside) and, for a
     crawled one, its event appearing in the Sump, so the twin's counts still replay.
     """
     async with SessionLocal() as session:

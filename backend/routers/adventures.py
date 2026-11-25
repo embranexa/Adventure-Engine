@@ -9,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.base import get_session
 from backend.db.queries import list_adventures
 from backend.routers.errors import triage_errors
-from backend.schemas.adventures import AdventureCreate, AdventureUpdate, BountyPayload, EnshriningPayload, EpitaphPayload, ForgePayload, ItemPayload, PhasePayload, RoadmapPayload
-from backend.services import adventures, enshrinings, epitaphs, forge, items, ledger, roadmap, triage
+from backend.schemas.adventures import (
+    AdventureCreate, AdventureUpdate, BountyPayload, DatePayload, DayPayload, EnshriningPayload, EpitaphPayload, ForgePayload, ItemPayload, PhasePayload, RoadmapPayload,
+)
+from backend.services import adventures, enshrinings, epitaphs, forge, items, ledger, roadmap, series, triage
 
 router = APIRouter(prefix="/adventures", tags=["adventures"])
 
@@ -22,7 +24,7 @@ async def get_adventures(session: AsyncSession = Depends(get_session)):
 
 @router.post("")
 async def create_adventure(payload: AdventureCreate):
-    """A hand-made adventure (event, item, performance or battle) in ore. 422 if a field is invalid."""
+    """A hand-made adventure (event, item, performance or battle) in concentrate. 422 if a field is invalid."""
     try:
         return await adventures.create_adventure(payload.sent() | {"type": payload.type})
     except adventures.InvalidAdventure as e:
@@ -48,6 +50,28 @@ async def set_phase(adventure_id: uuid.UUID, payload: PhasePayload):
     with triage_errors():
         await triage.set_phase(adventure_id, payload.phase)
     return {"phase": payload.phase}
+
+
+@router.post("/{adventure_id}/dates")
+async def enshrine_date(adventure_id: uuid.UUID, payload: DatePayload):
+    """A date of a weekly adventure becomes an artifact. 409 if it can't (services/series.py)."""
+    with triage_errors():
+        return {"id": await series.enshrine_date(adventure_id, payload.date, payload.start, payload.end)}
+
+
+@router.post("/{adventure_id}/end")
+async def end_series(adventure_id: uuid.UUID):
+    """A weekly adventure with an artifact -> Archive."""
+    with triage_errors():
+        await series.end_series(adventure_id)
+    return {"phase": "decommissioned"}
+
+
+@router.post("/{adventure_id}/continue")
+async def continue_series(adventure_id: uuid.UUID, payload: DayPayload):
+    """A completed weekly adventure becomes its date's artifact; the series carries on in the Arena."""
+    with triage_errors():
+        return {"id": await series.continue_series(adventure_id, payload.date)}
 
 
 @router.put("/{adventure_id}/roadmap")

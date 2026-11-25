@@ -506,7 +506,7 @@ export class AlembicScene {
             node.halo.material.opacity = linking ? 0.35 + 0.25 * Math.sin(this.time * 6) : selected ? 0.32 : hover ? 0.12 : 0;
         }
 
-        // pipes follow their stills; lit ones carry a packet of distillate
+        // pipes follow their stills; lit ones carry a packet of armature
         const a = new THREE.Vector3(), b = new THREE.Vector3(), dir = new THREE.Vector3();
         for (const e of this.edges) {
             const src = this.nodes.get(e.from), tgt = this.nodes.get(e.to);

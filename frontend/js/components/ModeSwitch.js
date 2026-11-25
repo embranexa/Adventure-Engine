@@ -55,18 +55,18 @@ function HarvesterBar() {
     return html`
         <div className="harvesters" role="group" aria-label="Harvesters">
             ${Object.values(sources).map((src) => {
-                const flux = counts[src.name]?.harvested ?? 0;
+                const held = counts[src.name]?.harvested ?? 0;
                 const fed = counts[src.name]?.new ?? 0;
                 const syncing = src.status === 'syncing';
                 const fresh = syncing ? null : freshMinutes(src, now);
                 return html`
                     <div key=${src.name} className=${`hv ${src.status}`}
-                        title=${src.status === 'failed' ? `Last harvest failed: ${src.last_error ?? ''}` : `${flux} flux waiting · ${fed} in the Centrifuge${fresh != null ? ` · ${freshTitle(fresh)}` : ''}`}>
+                        title=${src.status === 'failed' ? `Last harvest failed: ${src.last_error ?? ''}` : `${held} waiting · ${fed} in the Centrifuge${fresh != null ? ` · ${freshTitle(fresh)}` : ''}`}>
                         <span className="hv-name">${src.name}</span>
-                        <b className="hv-count">${flux}</b>
+                        <b className="hv-count">${held}</b>
                         <button className=${`btn hv-btn ${fresh != null ? 'fresh' : ''}`} disabled=${syncing || fresh != null} onClick=${() => syncSource(src.name)}
                             title="Crawl the source: events not harvested before fill this harvester">${syncing ? 'Harvesting…' : 'Harvest'}</button>
-                        <button className="btn hv-btn" disabled=${!flux} onClick=${() => feedSource(src.name)}
+                        <button className="btn hv-btn" disabled=${!held} onClick=${() => feedSource(src.name)}
                             title="Pour this harvester's events into the Centrifuge, to review them">Feed ⟶</button>
                         <button className="btn hv-btn" disabled=${!fed} onClick=${() => siphonSource(src.name)}
                             title="Draw this source's events back out of the Centrifuge">⟵ Siphon</button>
@@ -84,13 +84,13 @@ function HarvesterBar() {
 }
 
 /**
- * Adventures / Discovery switch, the inbox (prima materia in the Centrifuge + last
- * harvest), and, in Discovery, the harvesters and the toggle for showing dross.
+ * Adventures / Discovery switch, the inbox (raw events in the Centrifuge + last
+ * harvest), and, in Discovery, the harvesters and the toggle for showing tailings.
  */
 export function ModeSwitch() {
     const mode = useWorkspaceStore((s) => s.mode);
     const setMode = useWorkspaceStore((s) => s.setMode);
-    const selectFirstPrima = useWorkspaceStore((s) => s.selectFirstPrima);
+    const selectFirstRaw = useWorkspaceStore((s) => s.selectFirstRaw);
     const showShades = useWorkspaceStore((s) => s.showShades);
     const toggleShades = useWorkspaceStore((s) => s.toggleShades);
     const spinning = useWorkspaceStore((s) => s.rawEvents.reduce((n, e) => n + (e.review === 'new' ? 1 : 0), 0));
@@ -117,19 +117,19 @@ export function ModeSwitch() {
             >Adventures <b>${adventureCount}</b></button>
             <button
                 className=${`mode-btn discovery ${mode === 'discovery' ? 'active' : ''}`}
-                onClick=${() => { setMode('discovery'); selectFirstPrima(); }}
-                title=${`Review the prima materia in the Centrifuge (last harvest ${ago(lastSync, now)})`}
+                onClick=${() => { setMode('discovery'); selectFirstRaw(); }}
+                title=${`Review the raw events in the Centrifuge (last harvest ${ago(lastSync, now)})`}
             >
                 Discovery
-                <span className=${`inbox ${spinning ? 'has-prima' : ''}`}>${spinning} in centrifuge</span>
+                <span className=${`inbox ${spinning ? 'has-raw' : ''}`}>${spinning} in centrifuge</span>
                 <small>harvested ${ago(lastSync, now)}</small>
             </button>
         </div>
         ${mode === 'discovery' && html`
             <${HarvesterBar} />
-            <label className="shade-toggle" title="Also show ignored events (dross) so they can be revived">
+            <label className="shade-toggle" title="Also show ignored events (tailings) so they can be revived">
                 <input type="checkbox" checked=${showShades} onChange=${toggleShades} />
-                Show dross
+                Show tailings
             </label>
         `}
     `;

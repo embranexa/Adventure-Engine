@@ -11,7 +11,7 @@
 // ending in the ports on the machines' bases. They stay dark until a move sends a slug of
 // light through (up to SLUGS at once per pipe; more wait their turn). Net pipes are wider
 // than Core pipes; the Temper sits on the Centrifuge -> Hopper pipe and steps it down.
-// The Codex -> Refinery conveyor carries gilt plates that move only during a link;
+// The Codex -> Athanor conveyor carries gilt plates that move only during a link;
 // market pipes are gold glass banded like a roll of coins (neither is used: the Sanctum has no pipes yet).
 
 import * as THREE from 'three';

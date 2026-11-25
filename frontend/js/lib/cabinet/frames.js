@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { V } from './kit.js';
 import { LABEL_H } from './layout.js';
-import { archetypeRune } from './runes.js';
+import { archetypeRune, deityRune } from './runes.js';
 import { THEMES, dress } from './themes.js';
 
 /** The alcove's opening, as a path around its centre. */
@@ -39,7 +39,7 @@ export function inside(w, h) {
 /**
  * One alcove's frame, added to `group`. Returns its keystone gem (lit by the scene).
  * @param {ReturnType<import('./kit.js').makeKit>} K
- * @param rune  { id, color }: its rune in the corners, instead of curls (runes.js)
+ * @param rune  { id, color } or { form, color }: its rune in the corners, instead of curls (runes.js)
  */
 export function alcoveFrame(K, group, shape, w, h, rune = null) {
     const { M, mesh, wire, gem, curl } = K, { y0, y1 } = inside(w, h), nw = Math.min(w * 0.9, h * 0.96);
@@ -51,7 +51,7 @@ export function alcoveFrame(K, group, shape, w, h, rune = null) {
     wire(pts, 0.95, M.trim, group, 0);
     wire(pts, 0.4, M.steel, group, -98);      // its echo at the back
     if (rune) {
-        const size = Math.max(13, Math.min(32, nw * 0.14)), map = K.texture(archetypeRune(rune.id));
+        const size = Math.max(13, Math.min(32, nw * 0.14)), map = K.texture(rune.form ? deityRune(rune.form) : archetypeRune(rune.id, 160, rune.dark));
         for (const f of [-1, 1]) { const x = f * (nw / 2 - size * 0.34), y = y1 - size * 0.3; mesh(new THREE.PlaneGeometry(size * 1.9, size * 1.9), K.light(K.tex.haze, rune.color, 0.3), group, x, y, 2); mesh(new THREE.PlaneGeometry(size, size), K.light(map, rune.color, 1), group, x, y, 4); }
     } else for (const f of [-1, 1]) curl(shape === 'lancet' ? 6 : 7, M.trim, group, f * (nw / 2 - 2), y1 - 9, 2, f, 1.4);
     return gem(4.2, M.steel, group, 0, y1 + 1, 3);
@@ -62,12 +62,12 @@ export function alcoveFrame(K, group, shape, w, h, rune = null) {
  * coordinates: x from the left, y negative downward.
  * @returns {{ seal: THREE.Mesh }} the turning seal in the crest
  */
-export function carcass(K, group, layout, { sealTexture, sealColor }) {
+export function carcass(K, group, layout, { sealTexture, sealColor, wash }) {
     const { M, mesh, cyl, ring, finial, tube, curl, light, tex } = K;
     const L = layout.cols[0], R = layout.cols.at(-1), w = R - L, mid = (L + R) / 2;
     const bar = (y, ww, h, mat, z = 4, d = 14) => mesh(new THREE.BoxGeometry(ww, h, d), mat, group, mid, y, z - d / 2);
     for (const g of layout.groups) {
-        const top = -g.y, bot = -(g.y + g.h), theme = THEMES[g.theme], edge = theme?.color ?? '#e2e4e6';
+        const top = -g.y, bot = -(g.y + g.h), theme = THEMES[g.theme], edge = wash ?? theme?.color ?? '#e2e4e6';
         layout.cols.forEach((x, i) => {
             const end = i === 0 || i === layout.cols.length - 1, r = theme?.column ?? (end ? 1.9 : 1.1);
             cyl(r, r, g.h, M.steel, group, x, (top + bot) / 2, 3);
@@ -84,7 +84,7 @@ export function carcass(K, group, layout, { sealTexture, sealColor }) {
             mesh(new THREE.PlaneGeometry(w, 46), light(tex.wash, edge, theme ? 0.16 : 0.07), group, mid, y - 23, 3);
         }
     }
-    for (const g of layout.groups) dress(K, group, layout, g);
+    for (const g of layout.groups) dress(K, group, layout, g, wash);
     // the crest
     const cy = -layout.crestY;
     mesh(new THREE.CircleGeometry(30, 48), M.pane, group, mid, cy, 2);

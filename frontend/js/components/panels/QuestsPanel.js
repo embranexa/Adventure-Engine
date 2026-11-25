@@ -17,10 +17,17 @@ const BUILDING = new Set(['queued', 'classifying', 'decomposing', 'constructing'
 const DAY_MS = 86_400_000;
 const COMPLETE_DELAY_MS = 420; // let the check land before the quest leaves
 
+/** The skills a quest practices. @param {{ ids: string[] }} props */
+function QuestSkills({ ids }) {
+    const entities = useWorkspaceStore((s) => s.entities);
+    const names = ids.flatMap((id) => entities.find((e) => e.id === id)?.name ?? []);
+    return names.length > 0 && html`<span className="ql-quest-notes ql-skills">${names.map((n) => `✧ ${n}`).join('   ')}</span>`;
+}
+
 /** A quest's title, its verb set apart. @param {{ title: string }} props */
 function QuestTitle({ title }) {
     const { verb, subject } = splitTitle(title);
-    return verb ? html`<b className="ql-verb">${verb}</b> ${subject}` : html`<i className="ql-noverb" title="Every quest needs a verb: pick one in the Alembic">verb?</i> ${subject}`;
+    return verb ? html`<b className="ql-verb">${verb}</b> ${subject}` : html`<i className="ql-noverb" title="Every quest needs a verb: pick one in the Anvil">verb?</i> ${subject}`;
 }
 
 /** "today", "in 3 days", "2 days ago"; null when undated. @param {string | null} iso */
@@ -96,7 +103,7 @@ export function QuestsPanel() {
         });
         if (kept.length !== pins.length) setPins(kept);
     }, [adventures, pins]);
-    const anvil = pins.flatMap((pin) => {
+    const targeted = pins.flatMap((pin) => {
         const adventure = adventures.find((a) => a.id === pin.adventure && BUILDING.has(a.phase));
         const quest = adventure && analyze(adventure.roadmap).bottlenecks.find((q) => q.id === pin.action);
         return quest ? [{ pin, adventure, quest }] : [];
@@ -105,7 +112,7 @@ export function QuestsPanel() {
     const pinned = (/** @type {string} */ a, /** @type {string} */ q) => pins.some((p) => p.adventure === a && p.action === q);
     /** Swap with the one shown above or below. @param {number} i @param {1 | -1} way */
     const move = (i, way) => {
-        const next = [...pins], x = next.indexOf(anvil[i].pin), y = next.indexOf(anvil[i + way].pin);
+        const next = [...pins], x = next.indexOf(targeted[i].pin), y = next.indexOf(targeted[i + way].pin);
         [next[x], next[y]] = [next[y], next[x]];
         setPins(next);
     };
@@ -127,7 +134,7 @@ export function QuestsPanel() {
     /** @param {string} id */
     const inPool = (id) => Boolean(itemsById[id]);
 
-    if (!groups.length && !anvil.length) {
+    if (!groups.length && !targeted.length) {
         return html`
             <div className="panel-body quests">
                 <div className="nc-empty">No alloy yet
@@ -144,10 +151,10 @@ export function QuestsPanel() {
                 <span>· ${groups.length} ${crucible.matter}</span>
             </div>
             <div className="ql-list">
-                ${anvil.length > 0 && html`
-                    <section className="anvil">
-                        <div className="anvil-head">◎ Targets <b>${anvil.length}</b></div>
-                        ${anvil.map(({ pin, adventure, quest }, i) => {
+                ${targeted.length > 0 && html`
+                    <section className="tgt">
+                        <div className="tgt-head">◎ Targets <b>${targeted.length}</b></div>
+                        ${targeted.map(({ pin, adventure, quest }, i) => {
                             const pay = nextActionPay(adventure);
                             return html`
                                 <div key=${`${adventure.id}:${quest.id}`} className=${`ql-quest ${completing.has(`${adventure.id}:${quest.id}`) ? 'completing' : ''}`}>
@@ -155,15 +162,15 @@ export function QuestsPanel() {
                                         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"></path></svg></button>
                                     <span className="ql-quest-text">
                                         <span className="ql-quest-title"><${QuestTitle} title=${quest.title} /></span>
-                                        ${quest.notes && html`<span className="ql-quest-notes">${quest.notes}</span>`}
-                                        <button className="anvil-of" disabled=${!inPool(adventure.id)} onClick=${() => selectItem(adventure.id, 'quests')}>${adventure.title}</button>
+                                        ${quest.notes && html`<span className="ql-quest-notes">${quest.notes}</span>`}<${QuestSkills} ids=${quest.skills} />
+                                        <button className="tgt-of" disabled=${!inPool(adventure.id)} onClick=${() => selectItem(adventure.id, 'quests')}>${adventure.title}</button>
                                     </span>
                                     ${pay > 0 && html`<span className="ql-pay" title="Ambrosia for the next quest">+${pay}</span>`}
-                                    <span className="anvil-move">
+                                    <span className="tgt-move">
                                         <button disabled=${i === 0} aria-label=${`Move ${quest.title} up`} onClick=${() => move(i, -1)}>▲</button>
-                                        <button disabled=${i === anvil.length - 1} aria-label=${`Move ${quest.title} down`} onClick=${() => move(i, 1)}>▼</button>
+                                        <button disabled=${i === targeted.length - 1} aria-label=${`Move ${quest.title} down`} onClick=${() => move(i, 1)}>▼</button>
                                     </span>
-                                    <button className="anvil-btn on" aria-label=${`Stop targeting ${quest.title}`} title="No longer a target" onClick=${() => togglePin(pin.adventure, pin.action)}>◎</button>
+                                    <button className="tgt-btn on" aria-label=${`Stop targeting ${quest.title}`} title="No longer a target" onClick=${() => togglePin(pin.adventure, pin.action)}>◎</button>
                                 </div>`;
                         })}
                     </section>`}
@@ -198,7 +205,7 @@ export function QuestsPanel() {
                                 </div>
                             `}
                             ${analysis.total === 0 && html`
-                                <div className="ql-none">No roadmap yet — draft one in the Alembic</div>
+                                <div className="ql-none">No roadmap yet — draft one in the Anvil</div>
                             `}
                             ${analysis.complete && target && html`<${PromoteButton} adventureId=${adventure.id} target=${target} compact=${true} />`}
                             ${analysis.bottlenecks.filter((q) => !pinned(adventure.id, q.id)).map((quest) => {
@@ -211,10 +218,10 @@ export function QuestsPanel() {
                                         </button>
                                         <span className="ql-quest-text">
                                             <span className="ql-quest-title"><${QuestTitle} title=${quest.title} /></span>
-                                            ${quest.notes && html`<span className="ql-quest-notes">${quest.notes}</span>`}
+                                            ${quest.notes && html`<span className="ql-quest-notes">${quest.notes}</span>`}<${QuestSkills} ids=${quest.skills} />
                                         </span>
                                         ${pay > 0 && html`<span className="ql-pay" title="Ambrosia for the next quest">+${pay}</span>`}
-                                        <button className="anvil-btn" aria-label=${`Target ${quest.title}`} title="Target: to the top"
+                                        <button className="tgt-btn" aria-label=${`Target ${quest.title}`} title="Target: to the top"
                                             onClick=${(/** @type {MouseEvent} */ e) => { e.stopPropagation(); togglePin(adventure.id, quest.id); }}>◎</button>
                                         <span className="ql-quest-id">${quest.id}</span>
                                     </div>

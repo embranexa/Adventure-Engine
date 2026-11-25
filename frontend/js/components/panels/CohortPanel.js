@@ -3,15 +3,13 @@ import { html } from '../../html.js';
 import { useWorkspaceStore } from '../../store.js';
 import { ARCHETYPES, ATTRIBUTES, ORDERS, PARTY_STATUSES, STEWARD_ROLES } from '../../lifecycle.js';
 import { entityColor } from '../../lib/lens.js';
-import { IDOLS } from '../../lib/idols.js';
-import { drawIdolCard } from '../../lib/idolCard.js';
+import { ASPECTS, PARAGONS, SHADOWS, facing, paragonColor } from '../../lib/paragons.js';
+import { drawParagonCard } from '../../lib/paragonCard.js';
 import { Cabinet } from '../Cabinet.js';
 import { EntityPicker } from '../EntityPicker.js';
 import { Field } from './AdventureEditor.js';
 import { ArchetypeBadge, PlayerFields } from '../PlayerFields.js';
 
-/** @type {import('../Cabinet.js').CabinetStyle} */
-const LOOK = { shape: 'lancet', sealColor: '#7fb2ff', seed: 'cohort', points: 12 };
 const IDS = /** @type {Archetype[]} */ (Object.keys(ARCHETYPES));
 
 /** A player's history: the adventures they were linked to, latest first, and how it went.
@@ -20,8 +18,8 @@ const recordOf = (adventures, id) => adventures
     .flatMap((a) => a.entities.filter((e) => e.id === id && e.status).map((m) => ({ a, m, status: /** @type {PartyStatus} */ (m.status) })))
     .sort((x, y) => (y.m.status_at ?? '').localeCompare(x.m.status_at ?? ''));
 
-/** One player: profile, and what you've done together. @param {{ player: Entity }} props */
-function PlayerSheet({ player }) {
+/** One player: profile, and what you've done together. @param {{ player: Entity, onBack: () => void }} props */
+function PlayerSheet({ player, onBack }) {
     const adventures = useWorkspaceStore((s) => s.adventures);
     const entities = useWorkspaceStore((s) => s.entities);
     const itemsById = useWorkspaceStore((s) => s.itemsById);
@@ -38,10 +36,11 @@ function PlayerSheet({ player }) {
     const save = async (/** @type {EntityChanges} */ changes) => { const err = await updateEntity(player.id, changes); setError(err); return err; };
 
     return html`
+        <div><button className="cls-layer" onClick=${onBack}>⟵ ${player.details.archetype ? ARCHETYPES[player.details.archetype].label : 'Archetype'}</button></div>
         <section className="nec-pane">
             <div className="cx-detail-head"><h3>${player.name}</h3>
                 <button className="cls-layer" onClick=${() => { selectEntity(player.id); showPanel('codex'); }}>Codex ⟶</button></div>
-            <${ArchetypeBadge} id=${player.details.archetype} />
+            <${ArchetypeBadge} id=${player.details.archetype} aspect=${player.details.aspect} />
             ${player.description && html`<p className="cpx-bio">${player.description}</p>`}
             <${PlayerFields} player=${player} save=${save} onError=${setError} />
             ${error && html`<div className="nc-error" role="alert">${error}</div>`}
@@ -63,36 +62,43 @@ function PlayerSheet({ player }) {
 }
 
 const GROUPS = /** @type {Order[]} */ (Object.keys(ORDERS));
-const IDOL_LOOK = /** @type {import('../Cabinet.js').CabinetStyle} */ ({ shape: 'arch', sealColor: '#f2c14e', seed: 'idols', points: 12 });
-const IDOL_SIZE = { cellH: 290, minCols: 3, maxCols: 3 };   // an order is three, so no spare alcoves
+/** @type {Record<Aspect, import('../Cabinet.js').CabinetStyle>} */
+const LOOKS = {
+    constructive: { shape: 'arch', sealColor: '#f2c14e', seed: 'paragons', points: 12, moral: 'virtue' },
+    exploitative: { shape: 'arch', sealColor: '#e0242e', seed: 'vice', points: 13, dim: true, moral: 'vice', wash: '#d01f2a' },
+};
+const PARAGON_SIZE = { cellH: 290, minCols: 3, maxCols: 3 };   // an order is three, so no spare alcoves
+const ASPECT_IDS = /** @type {Aspect[]} */ (Object.keys(ASPECTS));
 const SKILL = /** @type {EntityType[]} */ (['skill']);
-const MODES = /** @type {const} */ ({ players: 'Players', idols: 'Idols' });
 
-/** An archetype's card. @param {{ id: Archetype }} props */
-function IdolCard({ id }) {
+/** An archetype's card: click to turn the whole Cohort to the other aspect.
+ *  @param {{ id: Archetype, aspect: Aspect, onFlip: () => void }} props */
+function ParagonCard({ id, aspect, onFlip }) {
     const ref = useRef(/** @type {HTMLCanvasElement | null} */ (null));
     useEffect(() => {
         let stale = false;
-        const draw = () => { if (!stale && ref.current) drawIdolCard(ref.current, id); };
+        const draw = () => { if (!stale && ref.current) drawParagonCard(ref.current, id, aspect); };
         draw();
         document.fonts.load('600 52px "Saira Condensed"').then(draw, () => {}); // again in its own face
         return () => { stale = true; };
-    }, [id]);
-    return html`<canvas className="idol-card" ref=${ref} role="img" aria-label=${`${ARCHETYPES[id].label}: ${IDOLS[id].emblem}`}></canvas>`;
+    }, [id, aspect]);
+    return html`<button key=${aspect} className="paragon-flip" title="Turn it over" aria-label=${`${facing(id, aspect).label}: ${PARAGONS[id].emblem}. Turn it over`} onClick=${onFlip}><canvas className="paragon-card" ref=${ref}></canvas></button>`;
 }
 
-/** One archetype: its card, what it is, its skills, and who has it. @param {{ id: Archetype, players: Entity[], onPlayer: (id: string) => void }} props */
-function IdolSheet({ id, players, onPlayer }) {
+/** One archetype in an aspect: its card, what it is, its skills, and who has it.
+ *  @param {{ id: Archetype, aspect: Aspect, players: Entity[], onPlayer: (id: string) => void, onFlip: () => void }} props */
+function ParagonSheet({ id, aspect, players, onPlayer, onFlip }) {
     const entities = useWorkspaceStore((s) => s.entities);
-    const notes = useWorkspaceStore((s) => s.idols[id]);
-    const setIdol = useWorkspaceStore((s) => s.setIdol);
+    const notes = useWorkspaceStore((s) => s.paragons[id]);
+    const setParagon = useWorkspaceStore((s) => s.setParagon);
     const createEntity = useWorkspaceStore((s) => s.createEntity);
     const [error, setError] = useState(/** @type {string | null} */ (null));
-    const a = ARCHETYPES[id], d = IDOLS[id], order = ORDERS[a.order];
+    const dark = aspect === 'exploitative', f = dark ? SHADOWS[id] : null;
+    const a = ARCHETYPES[id], d = PARAGONS[id], order = ORDERS[a.order];
     const skills = (notes?.skills ?? []).filter((s) => entities.some((e) => e.id === s));
     const linked = new Set(skills.map((s) => entities.find((e) => e.id === s)?.name.toLowerCase()));
     const suggested = d.skills.filter((s) => !linked.has(s.toLowerCase()));
-    const add = (/** @type {string} */ skill) => setIdol(id, { skills: [...skills, skill] });
+    const add = (/** @type {string} */ skill) => setParagon(id, { skills: [...skills, skill] });
     /** Link the Codex skill of that name, making it (fed by this archetype's attributes) if needed. @param {string} name */
     const take = async (name) => {
         const known = entities.find((e) => e.type === 'skill' && e.name.toLowerCase() === name.toLowerCase());
@@ -101,20 +107,23 @@ function IdolSheet({ id, players, onPlayer }) {
         else { setError(null); add(res.id); }
     };
     return html`
-        <${IdolCard} id=${id} />
-        <section className="nec-pane" style=${{ '--c': d.color }}>
-            <h3>${a.glyph} ${a.label} <em className="idol-verb">${a.verb}</em></h3>
-            <dl className="idol-facts">
-                <dt>Idol</dt><dd>${a.idol}</dd><dt>Order</dt><dd>${order.label}: ${order.is}</dd>
+        <${ParagonCard} id=${id} aspect=${aspect} onFlip=${onFlip} />
+        <section className="nec-pane" style=${{ '--c': dark ? ASPECTS.exploitative.color : d.color }}>
+            <h3>${dark ? html`<i className="pl-rev">${a.glyph}</i>` : a.glyph} ${(f ?? a).label} <em className="paragon-verb">${(f ?? a).verb}</em></h3>
+            <dl className="paragon-facts">
+                <dt>Paragon</dt><dd>${a.paragon}</dd><dt>Order</dt><dd>${order.label}: ${order.is}</dd>
                 <dt>Organ</dt><dd>${a.organ}</dd><dt>Medium</dt><dd>${a.medium}</dd>
-                <dt>Operator</dt><dd>${a.operator}</dd><dt>Characters</dt><dd>${d.characters}</dd>
-                <dt>Attributes</dt><dd>${a.attributes.map((x) => html`<span key=${x} className="idol-attr" title=${ATTRIBUTES[x].hint}>❖ ${ATTRIBUTES[x].label}</span>`)}</dd>
+                <dt>Operator</dt><dd>${(f ?? a).operator}</dd><dt>Variants</dt><dd>${(f ?? d).variants}</dd>
+                <dt>Exemplars</dt><dd>${(f ?? d).exemplars}</dd>
+                <dt>Attributes</dt><dd>${a.attributes.map((x) => html`<span key=${x} className="paragon-attr" title=${ATTRIBUTES[x].hint}>❖ ${ATTRIBUTES[x].label}</span>`)}</dd>
             </dl>
+            ${f && html`<p className="cpx-bio">${f.description}</p>`}
+            ${!f && html`
             <${Field} label="Description" kind="textarea" value=${notes?.description ?? d.description}
-                onCommit=${(/** @type {string} */ v) => { setIdol(id, { description: v.trim() && v.trim() !== d.description ? v.trim().slice(0, 5000) : null }); return null; }} />
+                onCommit=${(/** @type {string} */ v) => { setParagon(id, { description: v.trim() && v.trim() !== d.description ? v.trim().slice(0, 5000) : null }); return null; }} />
             <h4>Skills</h4>
-            <${EntityPicker} ids=${skills} types=${SKILL} placeholder="+ A skill…" onAdd=${add} onRemove=${(/** @type {string} */ s) => setIdol(id, { skills: skills.filter((x) => x !== s) })} />
-            ${suggested.length > 0 && html`<div className="idol-suggest"><small>Suggested</small>${suggested.map((s) => html`<button key=${s} className="cls-layer" title="Link it, making it in the Codex if it isn’t there" onClick=${() => take(s)}>+ ${s}</button>`)}</div>`}
+            <${EntityPicker} ids=${skills} types=${SKILL} placeholder="+ A skill…" onAdd=${add} onRemove=${(/** @type {string} */ s) => setParagon(id, { skills: skills.filter((x) => x !== s) })} />
+            ${suggested.length > 0 && html`<div className="paragon-suggest"><small>Suggested</small>${suggested.map((s) => html`<button key=${s} className="cls-layer" title="Link it, making it in the Codex if it isn’t there" onClick=${() => take(s)}>+ ${s}</button>`)}</div>`}`}
             ${error && html`<div className="nc-error" role="alert">${error}</div>`}
         </section>
         <section className="nec-pane">
@@ -125,63 +134,44 @@ function IdolSheet({ id, players, onPlayer }) {
     `;
 }
 
-/** The twelve idols, by order. @param {{ onPlayer: (id: string) => void }} props */
-function IdolGallery({ onPlayer }) {
-    const entities = useWorkspaceStore((s) => s.entities);
-    const [picked, setPicked] = useState(/** @type {Archetype} */ ('vanguard'));
-    const of = (/** @type {Archetype} */ id) => entities.filter((e) => e.type === 'player' && e.details.archetype === id);
-    const groups = useMemo(() => GROUPS.map((group) => ({
-        title: `${ORDERS[group].label} · ${ORDERS[group].is}`, theme: group, accent: ORDERS[group].color,
-        items: IDS.filter((id) => ARCHETYPES[id].order === group).map((id) => ({
-            id, label: ARCHETYPES[id].label, sub: ARCHETYPES[id].verb,
-            model: { type: 'idol', id, idol: id, color: IDOLS[id].color, on: of(id).length > 0, points: IDS.indexOf(id) + 3, rings: 2 },
-        })),
-    })), [entities]);
-    return html`
-        <div className="inv-cab"><${Cabinet} groups=${groups} look=${IDOL_LOOK} options=${IDOL_SIZE} selectedId=${picked} onSelect=${setPicked} label="Idols" /></div>
-        <div className="inv-side"><${IdolSheet} key=${picked} id=${picked} players=${of(picked)} onPlayer=${onPlayer} /></div>
-    `;
-}
+const PIPS = 5;
+
+/** How many players have an archetype, as pips. @param {number} n */
+const count = (n) => html`<span className="paragon-count" title=${`${n} player${n === 1 ? '' : 's'}`}>${n ? '☉'.repeat(Math.min(n, PIPS)) : '·'}${n > PIPS ? ` +${n - PIPS}` : ''}</span>`;
 
 /**
- * The Cohort: every player in a cabinet partitioned by archetype, warmest first, as a sigil
- * (points: the archetype; rings: warmth; lit once you've collaborated). Idols shows the archetypes themselves: a statue
- * each, lit once someone has it, and a card.
+ * The Cohort: the twelve archetypes by order, a statue each, in one of two aspects (virtue or
+ * vice). A statue lights once a player has its archetype in that aspect (not judged: virtue);
+ * the sheet has its card and its players, warmest first. A player opens in place of the card.
  */
 export function CohortPanel() {
     const entities = useWorkspaceStore((s) => s.entities);
-    const adventures = useWorkspaceStore((s) => s.adventures);
-    const [picked, setPicked] = useState(/** @type {string | null} */ (null));
-    const [mode, setMode] = useState(/** @type {keyof typeof MODES} */ ('players'));
-
-    const groups = useMemo(() => {
-        const players = entities.filter((e) => e.type === 'player')
-            .sort((x, y) => (y.details.warmth ?? 0) - (x.details.warmth ?? 0) || x.name.localeCompare(y.name));
-        const proven = new Set(adventures.flatMap((a) => a.entities.filter((e) => e.status && PARTY_STATUSES[e.status].stage !== 'recruitment').map((e) => e.id)));
-        const item = (/** @type {Entity} */ p) => {
-            const id = p.details.archetype, warmth = p.details.warmth ?? 0;
-            return {
-                id: p.id, label: p.name, sub: html`<span title=${`Warmth ${warmth} of 5`}>${'●'.repeat(warmth)}${'○'.repeat(5 - warmth)}</span>`,
-                model: { type: 'sigil', id: p.id, color: entityColor(p.id), on: proven.has(p.id), points: id ? IDS.indexOf(id) + 3 : 3, rings: warmth, glyph: id ? ARCHETYPES[id].glyph : '☉' },
-            };
-        };
-        const shelf = (/** @type {Archetype | undefined} */ id) => players.filter((p) => p.details.archetype === id).map(item);
-        return [...IDS.map((id) => ({ title: `${ORDERS[ARCHETYPES[id].order].label} · ${ARCHETYPES[id].label} ${ARCHETYPES[id].verb}`, items: shelf(id) })), { title: 'No archetype', items: shelf(undefined) }]
-            .filter((g) => g.items.length);
-    }, [entities, adventures]);
-
-    const all = groups.flatMap((g) => g.items);
-    const player = entities.find((e) => e.id === (all.some((i) => i.id === picked) ? picked : all[0]?.id));
+    const [aspect, setAspect] = useState(/** @type {Aspect} */ ('constructive'));
+    const [picked, setPicked] = useState(/** @type {Archetype} */ ('vanguard'));
+    const [playerId, setPlayerId] = useState(/** @type {string | null} */ (null));
+    const dark = aspect === 'exploitative';
+    const players = useMemo(() => entities.filter((e) => e.type === 'player')
+        .sort((x, y) => (y.details.warmth ?? 0) - (x.details.warmth ?? 0) || x.name.localeCompare(y.name)), [entities]);
+    const of = (/** @type {Archetype} */ id) => players.filter((e) => e.details.archetype === id && (e.details.aspect ?? 'constructive') === aspect);
+    const groups = useMemo(() => GROUPS.map((group) => ({
+        title: `${ORDERS[group].label} · ${ORDERS[group].is}`, theme: group, accent: dark ? ASPECTS.exploitative.color : ORDERS[group].color,
+        items: IDS.filter((id) => ARCHETYPES[id].order === group).map((id) => ({
+            id, label: facing(id, aspect).label, sub: html`${facing(id, aspect).verb} ${count(of(id).length)}`,
+            model: { type: 'paragon', id, paragon: id, dark, color: paragonColor(id, aspect), on: of(id).length > 0, points: IDS.indexOf(id) + 3, rings: 2 },
+        })),
+    })), [players, aspect]);
+    const player = players.find((e) => e.id === playerId);
+    const turn = (/** @type {Aspect} */ to) => { setAspect(to); setPlayerId(null); };
     return html`
-        <div className="panel-body inventory cohort">
-            <div className="cohort-modes" role="tablist">${Object.entries(MODES).map(([k, label]) => html`
-                <button key=${k} role="tab" aria-selected=${mode === k} className=${`cls-layer ${mode === k ? 'on' : ''}`} onClick=${() => setMode(/** @type {keyof typeof MODES} */ (k))}>${label}</button>`)}</div>
+        <div className=${`panel-body inventory cohort ${dark ? 'vice' : 'virtue'}`}>
+            <div className="cohort-modes" role="tablist" aria-label="Aspect">${ASPECT_IDS.map((k) => html`
+                <button key=${k} role="tab" aria-selected=${aspect === k} className=${`cls-layer ${aspect === k ? 'on' : ''}`} style=${{ '--c': ASPECTS[k].color }} title=${ASPECTS[k].hint} onClick=${() => turn(k)}>${ASPECTS[k].label}</button>`)}</div>
             <div className="inv-grid">
-                ${mode === 'idols' && html`<${IdolGallery} key="idols" onPlayer=${(/** @type {string} */ id) => { setPicked(id); setMode('players'); }} />`}
-                ${mode === 'players' && !player && html`<div className="nc-empty">No players yet<small>Players you make in the Codex stand here, by archetype</small></div>`}
-                ${mode === 'players' && player && html`
-                    <div className="inv-cab" key="cab"><${Cabinet} groups=${groups} look=${LOOK} selectedId=${player.id} onSelect=${setPicked} label="Players" /></div>
-                    <div className="inv-side" key="side"><${PlayerSheet} key=${player.id} player=${player} /></div>`}
+                <div className="inv-cab"><${Cabinet} key=${aspect} groups=${groups} look=${LOOKS[aspect]} options=${PARAGON_SIZE} selectedId=${picked} label="Paragons"
+                    onSelect=${(/** @type {Archetype} */ id) => { setPicked(id); setPlayerId(null); }} /></div>
+                <div className="inv-side">${player
+                    ? html`<${PlayerSheet} key=${player.id} player=${player} onBack=${() => setPlayerId(null)} />`
+                    : html`<${ParagonSheet} key=${picked} id=${picked} aspect=${aspect} players=${of(picked)} onPlayer=${setPlayerId} onFlip=${() => turn(dark ? 'constructive' : 'exploitative')} />`}</div>
             </div>
         </div>
     `;

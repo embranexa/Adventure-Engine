@@ -51,9 +51,9 @@ for (const [from, to, want] of [
     ['outside', 'harvester:luma', ''],                                                     // harvest arrivals: no pipe
     ['harvester:luma', 'centrifuge', 'harvester:luma~manifold > manifold~centrifuge'],     // one trunk
     ['sump', 'hopper', 'centrifuge~sump > centrifuge~hopper'],                             // revive via the centrifuge
-    ['hopper', 'necropolis', 'hopper~refinery > refinery~alembic > alembic~crucible > crucible~necropolis'], // kills via the crucible
+    ['hopper', 'necropolis', 'hopper~athanor > athanor~anvil > anvil~crucible > crucible~necropolis'], // kills via the crucible
     ['crucible', 'treasury', 'crucible~arena > arena~treasury'],                           // along the chain
-    ['codex', 'refinery', ''],                                                             // the Sanctum has no pipes yet
+    ['codex', 'athanor', ''],                                                             // the Sanctum has no pipes yet
 ]) {
     const got = path(from, to);
     if (got !== want) fail(`route ${from} -> ${to}: got "${got}", want "${want}"`);

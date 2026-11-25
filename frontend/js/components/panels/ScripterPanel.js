@@ -7,9 +7,9 @@ import { analyze, orEmpty, parseScript, toScript } from '../../lib/roadmap.js';
 const SCRIPT_HELP = 'A1[Acquire tickets] --> A2[Resolve lodging]   ·   A1 --> A3   ·   # comment';
 
 /**
- * The Scripter: the selected adventure's roadmap as script text (the Alembic draws it).
+ * The Scripter: the selected adventure's roadmap as script text (the Anvil draws it).
  * Changes apply on Compile (or Ctrl+Enter); until then the text is yours, otherwise it
- * follows edits made in the Alembic.
+ * follows edits made in the Anvil.
  */
 export function ScripterPanel() {
     const item = useWorkspaceStore((s) => (s.selectedItemId ? s.itemsById[s.selectedItemId] : null));
@@ -34,7 +34,7 @@ export function ScripterPanel() {
             <div className="panel-body scripter">
                 <div className="nc-empty">
                     ${item ? 'Raw events have no roadmap' : 'Nothing selected'}
-                    <small>${item ? 'Pass it first: it becomes ore' : 'Select an adventure to script its quests'}</small>
+                    <small>${item ? 'Pass it first: it becomes concentrate' : 'Select an adventure to script its quests'}</small>
                 </div>
             </div>
         `;
@@ -58,7 +58,7 @@ export function ScripterPanel() {
         <div className="panel-body scripter">
             <div className="scr-head">
                 <span className="scr-title" title=${adventure.title}>${adventure.title}</span>
-                <button className="cls-layer" onClick=${() => showPanel('alembic')} title="Show the roadmap in the Alembic">Alembic ⟶</button>
+                <button className="cls-layer" onClick=${() => showPanel('alembic')} title="Show the roadmap in the Anvil">Anvil ⟶</button>
             </div>
             <textarea
                 className="scr-text"

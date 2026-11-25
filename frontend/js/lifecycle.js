@@ -9,14 +9,23 @@
  */
 
 /**
+ * What a raw event is, by what it lacks (backend/services/grade.py): the matter of both the
+ * Harvesters and the Centrifuge. @type {Record<Grade, Stage>}
+ */
+export const GRADE_STAGES = {
+    specimen: { module: 'Centrifuge', matter: 'specimen', color: '#3a4a5e', deep: '#171e27', light: '#9fb0c4', hint: 'Incomplete' },
+    ore:      { module: 'Centrifuge', matter: 'ore',      color: '#4b5a86', deep: '#1f2640', light: '#b6c1e2', hint: 'Complete enough to judge' },
+};
+
+/**
  * Raw event review states. Harvested events wait in their source's Harvester; fed ones
  * spin in the Centrifuge, which is what Discovery mode shows. @type {Record<ReviewState, Stage>}
  */
 export const REVIEW_STAGES = {
-    harvested: { module: 'Harvester',  matter: 'flux',          color: '#3a4a5e', deep: '#171e27', light: '#9fb0c4', hint: 'Harvested; feed it to the Centrifuge to review' },
-    new:       { module: 'Centrifuge', matter: 'prima materia', color: '#4b5a86', deep: '#1f2640', light: '#b6c1e2', hint: 'In the Centrifuge: not reviewed yet' },
-    passed:    { module: 'Hopper',     matter: 'ore',           color: '#3d7bf0', deep: '#1b3a7a', light: '#a8c6ff', hint: 'Became an adventure' },
-    ignored:   { module: 'Sump',       matter: 'dross',         color: '#5d6070', deep: '#25262d', light: '#8a8d9a', hint: 'Rejected; can be revived' },
+    harvested: { module: 'Harvester',  matter: 'specimen & ore', color: '#3a4a5e', deep: '#171e27', light: '#9fb0c4', hint: 'Harvested; feed it to the Centrifuge to review' },
+    new:       { module: 'Centrifuge', matter: 'specimen & ore', color: '#4b5a86', deep: '#1f2640', light: '#b6c1e2', hint: 'In the Centrifuge: not reviewed yet' },
+    passed:    { module: 'Hopper',     matter: 'concentrate',    color: '#3d7bf0', deep: '#1b3a7a', light: '#a8c6ff', hint: 'Became an adventure' },
+    ignored:   { module: 'Sump',       matter: 'tailings',       color: '#5d6070', deep: '#25262d', light: '#8a8d9a', hint: 'Rejected; can be revived' },
 };
 
 /** Entity types that are never linked to anything. @type {EntityType[]} */
@@ -24,9 +33,9 @@ export const UNLINKABLE = ['spell'];
 
 /** Adventure phases, in lifecycle order. @type {Record<Phase, Stage>} */
 export const PHASE_STAGES = {
-    queued:         { module: 'Hopper',     matter: 'ore',        color: '#3d7bf0', deep: '#1b3a7a', light: '#a8c6ff', hint: 'Waiting to be assayed' },
-    classifying:    { module: 'Refinery',    matter: 'essence',    color: '#1fc2c9', deep: '#0c5c60', light: '#a9f3f6', hint: 'Why do I want this?' },
-    decomposing:    { module: 'Alembic',    matter: 'distillate', color: '#e9c43b', deep: '#6e5a12', light: '#f8e7a6', hint: 'How do I do this?' },
+    queued:         { module: 'Hopper',     matter: 'concentrate', color: '#3d7bf0', deep: '#1b3a7a', light: '#a8c6ff', hint: 'Waiting for the Athanor' },
+    classifying:    { module: 'Athanor',    matter: 'essence',    color: '#1fc2c9', deep: '#0c5c60', light: '#a9f3f6', hint: 'Why do I want this?' },
+    decomposing:    { module: 'Anvil',    matter: 'armature', color: '#e9c43b', deep: '#6e5a12', light: '#f8e7a6', hint: 'How do I do this?' },
     constructing:   { module: 'Crucible',   matter: 'alloy',      color: '#f28a2e', deep: '#7a3a0c', light: '#ffd3a3', hint: 'What can I do right now?' },
     consuming:      { module: 'Arena',      matter: 'animus',     color: '#ef3e4a', deep: '#7a1a20', light: '#ffb0b6', hint: 'Doing it' },
     completed:      { module: 'Treasury',   matter: 'artifact',   color: '#a855f7', deep: '#4c1d80', light: '#dcb8ff', hint: 'Done' },
@@ -111,22 +120,22 @@ export const ORDERS = {
 /**
  * What a player can be: one archetype, or none. `verb`: what they do ("leads"); `organ`: their
  * part of the one body a party makes; `medium`: what they work on, outside themselves. The
- * idol is only a label, not a Codex deity. Same ids in backend/db/models.py.
- * @type {Record<Archetype, { label: string, order: Order, idol: string, glyph: string, verb: string, organ: string, operator: string, medium: string, attributes: [Attribute, Attribute] }>}
+ * paragon is only a label, not a Codex deity. Same ids in backend/db/models.py.
+ * @type {Record<Archetype, { label: string, order: Order, paragon: string, glyph: string, verb: string, organ: string, operator: string, medium: string, attributes: [Attribute, Attribute] }>}
  */
 export const ARCHETYPES = {
-    juggernaut: { label: 'Juggernaut', order: 'kratos', idol: 'Mars', glyph: '♂', verb: 'destroys', organ: 'Muscle', operator: 'Athlete, fighter, security', medium: 'Impact', attributes: ['strength', 'resolve'] },
-    artificer: { label: 'Artificer', order: 'kratos', idol: 'Vulcan', glyph: '⚒', verb: 'builds', organ: 'Hands', operator: 'Engineer, designer, maker, repair tech', medium: 'Matter', attributes: ['intellect', 'dexterity'] },
-    terraformer: { label: 'Terraformer', order: 'kratos', idol: 'Neptune', glyph: '♆', verb: 'transports', organ: 'Blood', operator: 'Driver, set builder, stagehand', medium: 'Space', attributes: ['strength', 'endurance'] },
-    wizard: { label: 'Wizard', order: 'logos', idol: 'Minerva', glyph: '⚴', verb: 'weaves', organ: 'Brain', operator: 'Strategist, tactician, researcher, planner', medium: 'Information', attributes: ['intellect', 'resolve'] },
-    ranger: { label: 'Ranger', order: 'logos', idol: 'Diana', glyph: '☽', verb: 'discovers', organ: 'Eyes', operator: 'Scout, detective, spy, investigator, hacker', medium: 'Secrets', attributes: ['dexterity', 'perception'] },
-    merchant: { label: 'Merchant', order: 'logos', idol: 'Mercury', glyph: '☿', verb: 'exchanges', organ: 'Glands', operator: 'Broker, producer, sourcer', medium: 'Value', attributes: ['charisma', 'intellect'] },
-    enchanter: { label: 'Enchanter', order: 'pathos', idol: 'Venus', glyph: '♀', verb: 'attracts', organ: 'Loins', operator: 'Marketer, salesperson, promoter', medium: 'Desire', attributes: ['charisma', 'empathy'] },
-    druid: { label: 'Druid', order: 'pathos', idol: 'Vesta', glyph: '⚶', verb: 'restores', organ: 'Heart', operator: 'Host, caretaker, medic, site keeper', medium: 'Morale', attributes: ['empathy', 'endurance'] },
-    bard: { label: 'Bard', order: 'pathos', idol: 'Apollo', glyph: '☀', verb: 'captivates', organ: 'Voice', operator: 'Performer, artist, musician, comedian, dancer, videographer', medium: 'Attention', attributes: ['charisma', 'dexterity'] },
-    vanguard: { label: 'Vanguard', order: 'ethos', idol: 'Jupiter', glyph: '♃', verb: 'leads', organ: 'Spine', operator: 'Leader, captain, director, organizer', medium: 'Momentum', attributes: ['resolve', 'charisma'] },
-    templar: { label: 'Templar', order: 'ethos', idol: 'Pluto', glyph: '♇', verb: 'binds', organ: 'Ligament', operator: 'Lawyer, judge, accountant, permit runner, grant writer', medium: 'Obligation', attributes: ['perception', 'resolve'] },
-    cleric: { label: 'Cleric', order: 'ethos', idol: 'Juno', glyph: '⚵', verb: 'reconciles', organ: 'Fascia', operator: 'Diplomat, mediator, community builder, facilitator', medium: 'Rapport', attributes: ['empathy', 'perception'] },
+    paladin: { label: 'Paladin', order: 'kratos', paragon: 'Mars', glyph: '♂', verb: 'protects', organ: 'Muscle', operator: 'Athlete, fighter, security', medium: 'Impact', attributes: ['strength', 'resolve'] },
+    artificer: { label: 'Artificer', order: 'kratos', paragon: 'Vulcan', glyph: '⚒', verb: 'builds', organ: 'Hands', operator: 'Engineer, designer, maker, repair tech', medium: 'Matter', attributes: ['intellect', 'dexterity'] },
+    mariner: { label: 'Mariner', order: 'kratos', paragon: 'Neptune', glyph: '♆', verb: 'transports', organ: 'Blood', operator: 'Driver, set builder, stagehand', medium: 'Space', attributes: ['strength', 'endurance'] },
+    wizard: { label: 'Wizard', order: 'logos', paragon: 'Minerva', glyph: '⚴', verb: 'weaves', organ: 'Brain', operator: 'Strategist, tactician, researcher, planner', medium: 'Information', attributes: ['intellect', 'resolve'] },
+    ranger: { label: 'Ranger', order: 'logos', paragon: 'Diana', glyph: '☽', verb: 'discovers', organ: 'Eyes', operator: 'Scout, detective, spy, investigator, hacker', medium: 'Secrets', attributes: ['dexterity', 'perception'] },
+    merchant: { label: 'Merchant', order: 'logos', paragon: 'Mercury', glyph: '☿', verb: 'exchanges', organ: 'Glands', operator: 'Broker, producer, sourcer, logistician', medium: 'Value', attributes: ['charisma', 'intellect'] },
+    enchanter: { label: 'Enchanter', order: 'pathos', paragon: 'Venus', glyph: '♀', verb: 'attracts', organ: 'Loins', operator: 'Marketer, salesperson, promoter', medium: 'Desire', attributes: ['charisma', 'empathy'] },
+    druid: { label: 'Druid', order: 'pathos', paragon: 'Vesta', glyph: '⚶', verb: 'restores', organ: 'Heart', operator: 'Host, caretaker, medic, site keeper', medium: 'Morale', attributes: ['empathy', 'endurance'] },
+    bard: { label: 'Bard', order: 'pathos', paragon: 'Apollo', glyph: '☀', verb: 'captivates', organ: 'Voice', operator: 'Performer, artist, musician, comedian, dancer, videographer', medium: 'Attention', attributes: ['charisma', 'dexterity'] },
+    vanguard: { label: 'Vanguard', order: 'ethos', paragon: 'Jupiter', glyph: '♃', verb: 'leads', organ: 'Spine', operator: 'Leader, captain, manager, director, organizer', medium: 'Momentum', attributes: ['resolve', 'charisma'] },
+    templar: { label: 'Templar', order: 'ethos', paragon: 'Pluto', glyph: '♇', verb: 'binds', organ: 'Ligament', operator: 'Lawyer, judge, accountant, permit runner, grant writer', medium: 'Obligation', attributes: ['perception', 'resolve'] },
+    cleric: { label: 'Cleric', order: 'ethos', paragon: 'Juno', glyph: '⚵', verb: 'reconciles', organ: 'Fascia', operator: 'Diplomat, mediator, community builder, facilitator', medium: 'Rapport', attributes: ['empathy', 'perception'] },
 };
 
 /**
@@ -166,23 +175,29 @@ export function hasWhenWhere(item) {
     return item.type !== 'item' && Boolean(item.start || item.venue || item.address || item.city || item.lat != null);
 }
 
-/** Matter name -> color, for titles that name a matter (e.g. "ore ⟶ essence"). */
+/** Matter name -> color, for titles that name a matter (e.g. "concentrate ⟶ essence"). */
 export const MATTER_COLORS = Object.fromEntries(
-    [...Object.values(REVIEW_STAGES), ...Object.values(PHASE_STAGES)].map((s) => [s.matter, s.light]),
+    [...Object.values(GRADE_STAGES), ...Object.values(REVIEW_STAGES), ...Object.values(PHASE_STAGES)].map((s) => [s.matter, s.light]),
 );
 
 /**
  * Signal chain node of each phase (the twin; same map as PHASE_NODES in
- * backend/db/models.py). Other nodes: "harvester:<source>", centrifuge, sump, forge, codex.
+ * backend/db/models.py). Other nodes: "harvester:<source>", centrifuge, sump, assayer, lode, codex.
  * @type {Record<Phase, string>}
  */
 export const PHASE_NODES = {
-    queued: 'hopper', classifying: 'refinery', decomposing: 'alembic', constructing: 'crucible',
+    queued: 'hopper', classifying: 'athanor', decomposing: 'anvil', constructing: 'crucible',
     consuming: 'arena', completed: 'treasury', killed: 'necropolis', decommissioned: 'archive',
 };
 
+/** Phases of an adventure still to be completed. @type {Phase[]} */
+export const SEEKING_PHASES = ['queued', 'classifying', 'decomposing', 'constructing', 'consuming'];
+
 /** The main route, set by hand from the node card. @type {Phase[]} */
 export const MAIN_ROUTE = ['queued', 'classifying', 'decomposing', 'constructing', 'consuming', 'completed'];
+
+/** A raw event's matter: its grade until it's reviewed. @param {EventRecord} e @returns {Grade | ReviewState} */
+export const rawMatter = (e) => (e.review === 'harvested' || e.review === 'new' ? (e.missing?.length ? 'specimen' : 'ore') : e.review);
 
 /**
  * Stage of a pool record: its phase if it's an adventure, else its review state.
@@ -191,7 +206,9 @@ export const MAIN_ROUTE = ['queued', 'classifying', 'decomposing', 'constructing
  */
 export function stageOf(item) {
     if (item.kind === 'adventure') return item.phase ? PHASE_STAGES[item.phase] : null;
-    return item.review ? REVIEW_STAGES[item.review] : null;
+    const key = rawMatter(item);
+    if (key === 'specimen') return { ...GRADE_STAGES.specimen, hint: `Lacks ${item.missing.join(', ')}` };
+    return key === 'ore' ? GRADE_STAGES.ore : key ? REVIEW_STAGES[key] : null;
 }
 
 /** The display color of a pool record: its stage's color. @param {PoolRecord} item */

@@ -1,5 +1,5 @@
 // A rune for each archetype, drawn in white (a material tints it): the corner marks of the
-// idols' alcoves. Each says its verb; some through its organ too. Within about 48 of the origin.
+// paragons' alcoves. Each says its verb; some through its organ too. Within about 48 of the origin.
 
 /** @typedef {CanvasRenderingContext2D} G */
 const line = (/** @type {G} */ g, /** @type {number[][]} */ pts, close = false) => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); if (close) g.closePath(); g.stroke(); };
@@ -13,15 +13,11 @@ const over = (g, f) => { g.save(); g.globalCompositeOperation = 'destination-out
 
 /** @type {Record<Archetype, (g: G) => void>} */
 const RUNES = {
-    // destroys: a spear through a shield, the shield in two
-    juggernaut(g) {
-        for (const f of [-1, 1]) {
-            g.save(); g.translate(f * 7, 5); g.rotate(f * 0.14);
-            curve(g, f < 0 ? 'M-4 -30 C-26 -28 -38 -12 -36 6 C-34 24 -18 36 -2 38 L-10 24 L-1 12 L-11 0 L-2 -14 Z' : 'M4 -30 C26 -28 38 -12 36 6 C34 24 18 36 2 38 L-4 25 L6 13 L-3 1 L7 -13 Z');
-            g.restore();
-        }
-        over(g, () => line(g, [[0, -18], [0, 48]])); solid(g, [[0, -50], [10, -30], [0, -14], [-10, -30]]);
-        both(g, () => { line(g, [[26, -38], [34, -46]]); line(g, [[40, -22], [49, -26]]); });
+    // protects: a whole shield, and a star kept behind it
+    paladin(g) {
+        curve(g, 'M0 -44 C14 -34 28 -31 40 -31 C41 2 30 30 0 47 C-30 30 -41 2 -40 -31 C-28 -31 -14 -34 0 -44 Z');
+        curve(g, 'M0 -31 C10 -24 19 -22 28 -21 C28 2 20 21 0 33 C-20 21 -28 2 -28 -21 C-19 -22 -10 -24 0 -31 Z');
+        solid(g, [[0, -17], [4, -3], [15, 1], [4, 5], [0, 19], [-4, 5], [-15, 1], [-4, -3]]);
     },
     // builds (hands): a palm with a gear turning in it
     artificer(g) {
@@ -32,7 +28,7 @@ const RUNES = {
         for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; line(g, [[Math.cos(a) * 11, 21 + Math.sin(a) * 11], [Math.cos(a) * 14.5, 21 + Math.sin(a) * 14.5]]); }
     },
     // transports: a wheel rolling along a river
-    terraformer(g) {
+    mariner(g) {
         ring(g, -6, -8, 27); ring(g, -6, -8, 5, true);
         for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + 0.3; line(g, [[-6 + Math.cos(a) * 7, -8 + Math.sin(a) * 7], [-6 + Math.cos(a) * 27, -8 + Math.sin(a) * 27]]); }
         line(g, [[30, -26], [46, -8], [30, 10]]);
@@ -107,8 +103,54 @@ const RUNES = {
     },
 };
 
-/** @param {Archetype} id @param {number} [size] @returns {HTMLCanvasElement} */
-export function archetypeRune(id, size = 160) {
+/** Runes of an exploitative aspect that has its own; the others are turned over.
+ *  @type {Partial<Record<Archetype, (g: G) => void>>} */
+const SHADOW_RUNES = {
+    // destroys: a spear through a shield, the shield in two
+    paladin(g) {
+        for (const f of [-1, 1]) {
+            g.save(); g.translate(f * 7, 5); g.rotate(f * 0.14);
+            curve(g, f < 0 ? 'M-4 -30 C-26 -28 -38 -12 -36 6 C-34 24 -18 36 -2 38 L-10 24 L-1 12 L-11 0 L-2 -14 Z' : 'M4 -30 C26 -28 38 -12 36 6 C34 24 18 36 2 38 L-4 25 L6 13 L-3 1 L7 -13 Z');
+            g.restore();
+        }
+        over(g, () => line(g, [[0, -18], [0, 48]])); solid(g, [[0, -50], [10, -30], [0, -14], [-10, -30]]);
+        both(g, () => { line(g, [[26, -38], [34, -46]]); line(g, [[40, -22], [49, -26]]); });
+    },
+};
+
+/** A deity's, by its form. @type {Record<DeityForm, (g: G) => void>} */
+const DEITY_RUNES = {
+    // a wave leaving a chip
+    music(g) {
+        g.strokeRect(-22, -22, 44, 44);
+        for (const k of [-12, 0, 12]) { line(g, [[k, -22], [k, -38]]); line(g, [[k, 22], [k, 38]]); line(g, [[-22, k], [-38, k]]); line(g, [[22, k], [38, k]]); }
+        curve(g, 'M-15 0 C-11 -18 -6 -18 -2 0 C2 18 8 18 14 0');
+    },
+    // a dancer, and the ribbon's turn
+    dance(g) {
+        ring(g, 4, -36, 7, true);
+        curve(g, 'M4 -26 C-2 -14 -2 -4 2 6 L-8 44'); curve(g, 'M2 6 C14 10 24 8 32 -2'); curve(g, 'M2 -18 C-12 -22 -22 -30 -26 -42'); curve(g, 'M2 -18 C14 -16 24 -22 30 -34');
+        curve(g, 'M-40 8 C-46 34 8 44 40 24');
+    },
+    // a hearth under one roof
+    family(g) {
+        line(g, [[-44, -6], [0, -42], [44, -6]]); line(g, [[-32, -14], [-32, 40], [32, 40], [32, -14]]);
+        curve(g, 'M0 34 C-16 24 -18 10 -6 -2 C-6 6 0 8 2 -8 C18 6 18 24 0 34 Z');
+    },
+    // steps to a star
+    career(g) {
+        line(g, [[-44, 44], [-44, 26], [-18, 26], [-18, 8], [8, 8], [8, -10], [34, -10], [34, 44]]);
+        solid(g, [[20, -48], [24, -38], [35, -35], [24, -32], [20, -22], [16, -32], [5, -35], [16, -38]]);
+    },
+    // a spade in chains
+    games(g) {
+        curve(g, 'M0 -40 C6 -24 32 -12 32 8 C32 24 12 26 4 14 L10 36 L-10 36 L-4 14 C-12 26 -32 24 -32 8 C-32 -12 -6 -24 0 -40 Z');
+        both(g, () => { for (const y of [-30, -8, 14, 36]) { g.beginPath(); g.ellipse(45, y, 5, 10, 0, 0, Math.PI * 2); g.stroke(); } });
+    },
+};
+
+/** @param {(g: G) => void} draw @param {number} size @param {boolean} [turned] */
+function runeCanvas(draw, size, turned = false) {
     const c = document.createElement('canvas');
     c.width = c.height = size;
     const g = /** @type {G} */ (c.getContext('2d'));
@@ -116,6 +158,16 @@ export function archetypeRune(id, size = 160) {
     g.scale(size / 110, size / 110);
     g.strokeStyle = g.fillStyle = '#fff';
     g.lineWidth = 5.5; g.lineCap = g.lineJoin = 'round';
-    RUNES[id](g);
+    if (turned) g.rotate(Math.PI);
+    draw(g);
     return c;
 }
+
+/** @param {Archetype} id @param {number} [size] @param {boolean} [dark] @returns {HTMLCanvasElement} */
+export function archetypeRune(id, size = 160, dark = false) {
+    const own = dark ? SHADOW_RUNES[id] : null;
+    return runeCanvas(own ?? RUNES[id], size, dark && !own);
+}
+
+/** @param {DeityForm} form @param {number} [size] */
+export const deityRune = (form, size = 160) => runeCanvas(DEITY_RUNES[form], size);

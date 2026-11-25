@@ -7,6 +7,8 @@ Rules:
       fixed, so splitting or adding actions never earns more
     - undoing takes it back: un-ticking an action, breaking a seal. The ledger is append-only:
       a reversal is a new entry
+    - a series (services/series.py): its quests pay once; a date's artifact pays the rest of the total when
+      sealed (part "date"); one continued from a completed whole was paid already (part "spent")
     - killing keeps what was earned (paid for doing, not for succeeding). Amending an
       enshrining never changes its pay
     - back before the Crucible with nothing paid, a bounty unlocks again
@@ -42,7 +44,7 @@ async def settle(session: AsyncSession, adventure: Adventure) -> bool:
     """Bring the ledger in line with one adventure (in the session, before its commit).
     Returns whether anything was added."""
     b = adventure.bounty
-    if not b or adventure.phase == "killed":
+    if not b or adventure.phase == "killed" or b.get("part") == "spent":
         return False
     if adventure.phase in STARTED and not b.get("locked_at"):
         b = {**b, "locked_at": utcnow().isoformat()}
@@ -85,7 +87,7 @@ async def settle(session: AsyncSession, adventure: Adventure) -> bool:
             if amount > 0:
                 add("action", a["id"], amount, f"{title}: {a['title']}")
         if sealed:
-            rest = bounty.total(b) - sum(n for r, n in net.items() if r != SEAL)
+            rest = bounty.total(b) - (bounty.action_share(b) if b.get("part") == "date" else 0) - sum(n for r, n in net.items() if r != SEAL)
             if rest > 0:
                 add("enshrined", SEAL, rest, f"{title}: enshrined")
     if adventure.phase in BEFORE and not any(net.values()):
