@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.base import SessionLocal, utcnow
 from backend.db.models import (
-    CENTRIFUGE_NODE, CODEX_NODE, LODE_NODE, MANUAL_PHASES, OUTSIDE_NODE, PHASE_NODES, SUMP_NODE,
+    ASSAYER_NODE, CENTRIFUGE_NODE, CODEX_NODE, LODE_NODE, MANUAL_PHASES, OUTSIDE_NODE, PHASE_NODES, SUMP_NODE,
     Adventure, AdventureEntity, AppState, Event, EventSource, Transition, harvester_node,
 )
 from backend.services.hub import hub
@@ -112,7 +112,7 @@ def _record_orm_changes(session: Session, flush_context, instances) -> None:
             if obj.event_id is None:
                 origin = LODE_NODE
             else:
-                origin = SUMP_NODE if old_review.get(obj.event_id) == "ignored" else CENTRIFUGE_NODE
+                origin = {"ignored": SUMP_NODE, "assaying": ASSAYER_NODE}.get(old_review.get(obj.event_id), CENTRIFUGE_NODE)
             record(session, "adventure", obj.id, origin, PHASE_NODES[obj.phase or "queued"])
         elif isinstance(obj, AdventureEntity):
             record(session, "link", obj.entity_id, CODEX_NODE, ATHANOR_NODE, ref_id=obj.adventure_id)
@@ -122,6 +122,8 @@ def _record_orm_changes(session: Session, flush_context, instances) -> None:
             record(session, "adventure", obj.id, PHASE_NODES[change[0]], PHASE_NODES[change[1]])
         elif isinstance(obj, Event) and _change(obj, "review") == ("new", "ignored"):
             record(session, "event", obj.id, CENTRIFUGE_NODE, SUMP_NODE)
+        elif isinstance(obj, Event) and _change(obj, "review") == ("assaying", "ignored"):
+            record(session, "event", obj.id, ASSAYER_NODE, SUMP_NODE)
         elif isinstance(obj, Event) and _change(obj, "review") == ("ignored", "new"):
             record(session, "event", obj.id, SUMP_NODE, CENTRIFUGE_NODE)
 

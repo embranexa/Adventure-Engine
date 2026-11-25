@@ -4,3 +4,5 @@ legacy/
 data/*.db
 data/covers/
 .env
+data/assay_survey/
+resources/legacy

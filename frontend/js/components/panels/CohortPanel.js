@@ -114,7 +114,7 @@ function ParagonSheet({ id, aspect, players, onPlayer, onFlip }) {
                 <dt>Paragon</dt><dd>${a.paragon}</dd><dt>Order</dt><dd>${order.label}: ${order.is}</dd>
                 <dt>Organ</dt><dd>${a.organ}</dd><dt>Medium</dt><dd>${a.medium}</dd>
                 <dt>Operator</dt><dd>${(f ?? a).operator}</dd><dt>Variants</dt><dd>${(f ?? d).variants}</dd>
-                <dt>Exemplars</dt><dd>${(f ?? d).exemplars}</dd>
+                <dt>Characters</dt><dd>${(f ?? d).characters}</dd>
                 <dt>Attributes</dt><dd>${a.attributes.map((x) => html`<span key=${x} className="paragon-attr" title=${ATTRIBUTES[x].hint}>❖ ${ATTRIBUTES[x].label}</span>`)}</dd>
             </dl>
             ${f && html`<p className="cpx-bio">${f.description}</p>`}

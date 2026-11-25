@@ -69,6 +69,14 @@ PANELS_METADATA = {
         "id": "agora", "kind": "agora", "icon": "amphora",
         "name": "Agora", "question": "what for", "flow": ["toil", "ambrosia"],
     },
+    "assayer": {
+        "id": "assayer", "kind": "assayer", "icon": "scales",
+        "name": "Assayer", "question": "what is it", "flow": ["specimen", "ore"],
+    },
+    "deposit": {
+        "id": "deposit", "kind": "deposit", "icon": "tray",
+        "name": "Deposit", "question": "whence", "flow": ["links", "specimen"],
+    },
     "pantheon": {
         "id": "pantheon", "kind": "pantheon", "icon": "temple",
         "name": "Pantheon", "question": "for whom", "flow": ["demand", "favor"],

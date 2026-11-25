@@ -25,10 +25,10 @@ interface SplitNode {
 type LayoutNode = LeafNode | SplitNode;
 
 /** Which component renders a panel (frontend/js/components/panels/index.js). */
-type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis' | 'treasury' | 'inventory' | 'agora' | 'complex' | 'arena' | 'cohort' | 'pantheon';
+type PanelKind = 'node' | 'calendar' | 'map' | 'classifier' | 'alembic' | 'scripter' | 'quests' | 'codex' | 'twin' | 'ledger' | 'necropolis' | 'treasury' | 'inventory' | 'agora' | 'complex' | 'arena' | 'cohort' | 'pantheon' | 'assayer' | 'deposit';
 
 /** Icon names drawn by components/PanelTitle.js. */
-type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'anvil' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb' | 'crown' | 'satchel' | 'amphora' | 'molecule' | 'swords' | 'cohort' | 'temple';
+type PanelIcon = 'eye' | 'flask' | 'compass' | 'clock' | 'anvil' | 'quill' | 'scroll' | 'codex' | 'gear' | 'ledger' | 'tomb' | 'crown' | 'satchel' | 'amphora' | 'molecule' | 'swords' | 'cohort' | 'temple' | 'scales' | 'tray';
 
 /** A panel's definition (backend/services/workspace.py). Its title reads:
  *  [icon] NAME / QUESTION · INPUT ⟶ OUTPUT */
@@ -67,6 +67,8 @@ interface EventRecord {
     review: ReviewState;
     /** What keeps it from being ore (backend/services/grade.py); []: it is. */
     missing: string[];
+    /** What the Assayer last found; null: never read. */
+    assay: AssayRecord | null;
     /** Whole days: start/end are the first and last day's local midnights (lib/occurrences.js). */
     all_day: boolean | null;
     /** Repeats weekly; start/end are the first occurrence. Crawled events never do. */
@@ -89,7 +91,7 @@ interface Recurrence {
  * Raw event review: harvested (in its Harvester) | new (in the Centrifuge)
  * | passed (became an adventure) | ignored (tailings, in the Sump).
  */
-type ReviewState = 'harvested' | 'new' | 'passed' | 'ignored';
+type ReviewState = 'harvested' | 'new' | 'assaying' | 'passed' | 'ignored';
 
 /** Adventure phase: Hopper, Athanor, Anvil, Crucible, Arena, Treasury, Necropolis, Archive. */
 type Phase =
@@ -101,6 +103,8 @@ type Phase =
  * its own. `id` is the adventure's id; the raw event's is `event_id`. Adventures without
  * an event (made by hand, later) have null event fields.
  */
+/** The last reading of a link (backend/services/assay.py); sources: where each found field came from. */
+interface AssayRecord { at: string | null; outcome: 'ok' | 'empty' | 'mismatch' | 'blocked' | 'error' | null; why: string | null; sources: Record<string, string> | null }
 interface AdventureRecord extends Omit<EventRecord, 'source' | 'api_id' | 'start' | 'url' | 'review' | 'missing'> {
     source: string | null;
     api_id: string | null;
@@ -549,6 +553,14 @@ interface WorkspaceState {
     enshrineDate(adventureId: string, date: string, start: Date, end: Date): Promise<void>;
     endSeries(adventureId: string): Promise<void>;
     continueSeries(adventureId: string, date: string): Promise<void>;
+    /** Specimens into the Assayer (again: even ones tried lately). */
+    assayEvents(ids: string[], again?: boolean): Promise<void>;
+    stopAssay(): Promise<void>;
+    setEventCover(id: string, url: string | null): Promise<void>;
+    /** A new adventure from a page; what it found instead if the link is already here. */
+    createFromLink(url: string, force?: boolean): Promise<{ existing?: { kind: 'event' | 'adventure'; id: string; title: string; review: ReviewState | null; phase: Phase | null }; error?: string }>;
+    /** Fill an adventure's blanks from its link. */
+    fillFromLink(id: string): Promise<{ filled?: string[]; outcome?: string; why?: string | null; error?: string }>;
     setPhase(adventureId: string, phase: Phase): Promise<void>;
     /** Make a hand-made adventure (in concentrate), switch to Adventures and select it for editing. */
     createAdventure(type: AdventureType): Promise<void>;

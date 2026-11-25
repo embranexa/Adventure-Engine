@@ -50,7 +50,7 @@ export const PANTHEON = 'pantheon';
 export const MASTERY = 'mastery';
 /** The Sanctum: machines for what isn't primary matter, left to right. They have no pipes yet. */
 export const SANCTUM = [CODEX, COHORT, INVENTORY, AGORA, PANTHEON, MASTERY];
-/** Fills in what specimens lack, one by one, and returns them to the Centrifuge as ore: not built yet. */
+/** Fills in what specimens lack, one by one, and returns them to the Centrifuge as ore. */
 export const ASSAYER = 'assayer';
 export const CRUCIBLE = PHASE_NODES.constructing;
 export const ARENA = PHASE_NODES.consuming;
@@ -81,7 +81,7 @@ export function twinNodes(sourceNames) {
     const live = new Set(sourceNames);
     const harvesters = [...new Set([...KNOWN_HARVESTERS, ...sourceNames])].map((name) => node({
         id: harvesterId(name), label: name, zone: 'net', kind: 'harvester',
-        holds: 'events', matter: 'specimen & ore', locked: !live.has(name),
+        holds: 'events', matter: 'specimen & ore', locked: !live.has(name), action: name === 'deposit' && live.has(name) ? { panel: 'deposit' } : null,
     }));
     const core = (/** @type {Phase} */ phase, /** @type {TwinKind} */ kind, /** @type {string} */ label,
         /** @type {TwinAction | null} */ action = null) =>
@@ -93,7 +93,7 @@ export function twinNodes(sourceNames) {
         node({ id: SUMP, label: 'Sump', zone: 'net', kind: 'vessel', holds: 'events', matter: 'tailings',
             action: { panel: 'classifier', mode: 'discovery', shades: true } }),
         node({ id: LODE, label: 'Lode', zone: 'net', kind: 'dynamo', action: { panel: 'node', create: true } }),
-        node({ id: ASSAYER, label: 'Assayer', zone: 'net', kind: 'processor', locked: true }),
+        node({ id: ASSAYER, label: 'Assayer', zone: 'net', kind: 'processor', holds: 'events', matter: 'specimen', action: { panel: 'assayer' } }),
         core('queued', 'vessel', 'Hopper'),
         core('classifying', 'processor', 'Athanor', { panel: 'node', mode: 'adventures' }),
         core('decomposing', 'processor', 'Anvil', { panel: 'alembic', mode: 'adventures' }),
@@ -196,6 +196,7 @@ export function route(pipesByEnds, from, to) {
 export function nodeStage(id) {
     if (id.startsWith('harvester:')) return { facet: 'review', value: 'harvested' };
     if (id === CENTRIFUGE) return { facet: 'review', value: 'new' };
+    if (id === ASSAYER) return { facet: 'review', value: 'assaying' };
     if (id === SUMP) return { facet: 'review', value: 'ignored' };
     const phase = Object.entries(PHASE_NODES).find(([, node]) => node === id)?.[0];
     return phase ? { facet: 'phase', value: phase } : null;

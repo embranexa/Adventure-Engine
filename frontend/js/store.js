@@ -940,6 +940,25 @@ const workspaceStore = (set, get) => ({
         await callAction(set, `/api/adventures/${adventureId}/phase`, 'PUT', { phase });
     },
 
+    assayEvents: async (ids, again = false) => { if (ids.length) await callAction(set, '/api/events/assay', 'POST', { ids, again }); },
+    stopAssay: async () => { await callAction(set, '/api/events/assay/stop'); },
+    setEventCover: async (id, url) => { await callAction(set, `/api/events/${id}/cover`, 'PUT', { url }); },
+    createFromLink: async (url, force = false) => {
+        const res = /** @type {any} */ (await sendJson('/api/adventures/link', 'POST', { url, force }));
+        if (typeof res === 'string') return { error: res };
+        if (res.existing) return res;
+        get().setMode('adventures');
+        const { adventures } = get(), record = res.adventure;
+        if (!adventures.some((a) => a.id === record.id)) get().setAdventures([...adventures, record]);
+        set({ editingAdventureId: record.id });
+        get().selectItem(record.id, 'create');
+        return {};
+    },
+    fillFromLink: async (id) => {
+        const res = /** @type {any} */ (await sendJson(`/api/adventures/${id}/assay`, 'POST'));
+        return typeof res === 'string' ? { error: res } : res;
+    },
+
     enshrineDate: async (adventureId, date, start, end) => {
         await callAction(set, `/api/adventures/${adventureId}/dates`, 'POST', { date, start: start.toISOString(), end: end.toISOString() });
     },

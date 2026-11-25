@@ -250,7 +250,7 @@ export function AlembicPanel() {
                 <div className="alm-hud" onPointerDown=${(/** @type {Event} */ e) => e.stopPropagation()}>
                     ${analysis.total > 0 && html`
                         <span className="alm-progress" title=${`${analysis.bottlenecks.length} ready now`}>
-                            <b>${analysis.doneCount}</b> / ${analysis.total} distilled
+                            <b>${analysis.doneCount}</b> / ${analysis.total} hammered
                             <span className="alm-meter"><i style=${{ width: `${pct}%` }}></i></span>
                         </span>
                     `}

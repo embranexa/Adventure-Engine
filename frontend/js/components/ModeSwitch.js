@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { html } from '../html.js';
+import { assayable } from '../lib/assay.js';
 import { useWorkspaceStore } from '../store.js';
 import { freshMinutes, freshTitle } from '../lib/harvest.js';
 
@@ -48,6 +49,12 @@ function HarvesterBar() {
     }, []);
     const spinning = rawEvents.reduce((n, e) => n + (e.review === 'new' ? 1 : 0), 0);
 
+    const draft = useWorkspaceStore((s) => s.draftFilters);
+    const assayEvents = useWorkspaceStore((s) => s.assayEvents);
+    const showPanel = useWorkspaceStore((s) => s.showPanel);
+    const ready = useMemo(() => assayable(rawEvents, draft, now), [rawEvents, draft, now]);
+    const reading = rawEvents.reduce((n, e) => n + (e.review === 'assaying' ? 1 : 0), 0);
+
     const purge = () => {
         if (spinning) purgeCentrifuge(); // no confirm: each event can be revived from the Sump
     };
@@ -64,8 +71,8 @@ function HarvesterBar() {
                         title=${src.status === 'failed' ? `Last harvest failed: ${src.last_error ?? ''}` : `${held} waiting · ${fed} in the Centrifuge${fresh != null ? ` · ${freshTitle(fresh)}` : ''}`}>
                         <span className="hv-name">${src.name}</span>
                         <b className="hv-count">${held}</b>
-                        <button className=${`btn hv-btn ${fresh != null ? 'fresh' : ''}`} disabled=${syncing || fresh != null} onClick=${() => syncSource(src.name)}
-                            title="Crawl the source: events not harvested before fill this harvester">${syncing ? 'Harvesting…' : 'Harvest'}</button>
+                        ${src.name === 'deposit' ? html`<button className="btn hv-btn" onClick=${() => showPanel('deposit')} title="Drop links in">Deposit</button>` : html`<button className=${`btn hv-btn ${fresh != null ? 'fresh' : ''}`} disabled=${syncing || fresh != null} onClick=${() => syncSource(src.name)}
+                            title="Crawl the source: events not harvested before fill this harvester">${syncing ? 'Harvesting…' : 'Harvest'}</button>`}
                         <button className="btn hv-btn" disabled=${!held} onClick=${() => feedSource(src.name)}
                             title="Pour this harvester's events into the Centrifuge, to review them">Feed ⟶</button>
                         <button className="btn hv-btn" disabled=${!fed} onClick=${() => siphonSource(src.name)}
@@ -76,6 +83,8 @@ function HarvesterBar() {
             <div className="hv centrifuge" title="Events being reviewed in Discovery">
                 <span className="hv-name">Centrifuge</span>
                 <b className="hv-count">${spinning}</b>
+                ${reading > 0 ? html`<button className="btn hv-btn" onClick=${() => showPanel('assayer')} title="Open the Assayer">Assaying ${reading}…</button>`
+                    : html`<button className="btn hv-btn" disabled=${!ready.length} onClick=${() => assayEvents(ready)} title="Specimens that pass the Nexus’s filter go to the Assayer, and come back as ore if their pages allow">Assay ${ready.length}</button>`}
                 <button className="btn hv-btn" disabled=${!spinning} onClick=${purge}
                     title="Send everything left in the Centrifuge to the Sump">Purge</button>
             </div>

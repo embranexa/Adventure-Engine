@@ -15,7 +15,7 @@ from backend.db.setup import init_db
 from backend.routers import api_router
 from backend.services import transitions  # noqa: F401 - registers the transition recorder
 from backend.services import geocode
-from backend.services import forge
+from backend.services import assayer, deposit, forge
 from backend.services.triage import run_sweeper
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     [%(name)s] %(message)s")
@@ -25,11 +25,15 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db({name: crawler.URL for name, crawler in CRAWLERS.items()})
+    await init_db({name: crawler.URL for name, crawler in CRAWLERS.items()} | {deposit.SOURCE: ""})
     sweeper = asyncio.create_task(run_sweeper())  # moves missed adventures to the Necropolis
+    await assayer.empty()  # what a restart left inside
+    deposit.start()  # links a restart left unread
     geocode.start()  # locate events still without coordinates (background)
     await forge.resume()  # models a restart interrupted
     yield
+    await deposit.stop()
+    await assayer.stop()
     await forge.stop_all()
     sweeper.cancel()
     with contextlib.suppress(asyncio.CancelledError):

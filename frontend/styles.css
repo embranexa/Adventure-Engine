@@ -1893,3 +1893,16 @@ input.obj-text:hover { border-color: var(--steel-2); } input.obj-text:focus { ou
 .gr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; } .gr-row small { flex: 0 0 74px; color: var(--text-dim); font: 500 11px var(--font-body); }
 .gr-skill { padding: 2px 8px; border: 0; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--steel-3); background: rgba(255, 255, 255, 0.03); color: #cdb8ff; font: 500 12px var(--font-body); } .gr-skill b { color: var(--text-muted); }
 button.gr-skill { cursor: pointer; } button.gr-skill:hover { color: #fff; box-shadow: inset 0 0 0 1px #cdb8ff; } span.gr-skill { color: var(--text); }
+
+/* the Assayer, and links in the Lode */
+.lk { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 440px; margin: 10px auto 4px; }
+.lk-row { display: flex; gap: 6px; } .lk-row .ol-input { flex: 1 1 0; min-width: 0; } .lk-row .btn { padding: 5px 12px; font-size: 11px; }
+.lk-there { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--text-muted); font: 400 12px var(--font-body); } .lk-there b { color: var(--text); }
+.as-row { margin: 2px 0 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; } .as-result { color: var(--text-muted); font: 400 12px var(--font-body); } .as-result b { font-weight: 600; }
+.assayer { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; overflow-y: auto; } .assayer > .nec-pane { flex-shrink: 0; }
+.as-item, .as-site { display: flex; align-items: center; gap: 9px; padding: 3px 0; font: 500 12.5px var(--font-body); color: var(--text-muted); }
+.as-item i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--steel-4); } .as-item.now { color: var(--text-bright); } .as-item.now i { background: #e6cf9f; box-shadow: 0 0 9px #e6cf9f; }
+.as-item b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; } .as-item em, .as-site small { color: var(--text-dim); font: 400 11px var(--font-body); }
+.as-site b { flex: 0 1 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 500; } .as-site small { flex: 0 0 74px; }
+.as-site span { flex: 1; display: flex; gap: 2px; height: 6px; } .as-site span i { border-radius: 3px; }
+.dp-box { width: 100%; } .dp-held b small { display: block; color: var(--text-dim); font: 400 11px var(--font-body); white-space: normal; }
